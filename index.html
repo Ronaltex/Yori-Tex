@@ -3,10 +3,16 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<!-- SECURITY: Referrer policy prevents leaking app URL to external services -->
 <meta name="referrer" content="no-referrer"/>
-<!-- SECURITY: X-Content-Type-Options prevents MIME-sniffing attacks -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff"/>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#f5a623"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="YORI-TEX"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
 <title>YORI-TEX</title>
 <!-- SECURITY: SRI hash ensures the CDN file hasn't been tampered with -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
@@ -2866,6 +2872,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
   // Actualizar nombre en PIN screen
   document.getElementById('pin-brand').textContent = APP.config.nombre || 'YORI-TEX';
+  // PWA: registrar service worker para instalación
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
 });
 
 </script>
