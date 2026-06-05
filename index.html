@@ -670,13 +670,14 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   <div class="modal-title">✅ Renovación <button class="modal-close" onclick="cerrarModal('modal-renovar')">×</button></div>
   <div id="ren-info" style="font-size:13px;color:var(--text2);margin-bottom:14px"></div>
   <input type="hidden" id="ren-venta-uid"/>
-  <div class="field"><label>Nueva fecha de vencimiento</label><input type="date" id="ren-vence"/></div>
+  <div class="aviso" id="ren-vence-preview" style="display:none;margin-bottom:8px;font-size:12px"></div>
+  <div class="field"><label>Nueva fecha de vencimiento <span style="font-size:11px;color:var(--text3)">(pre-calculada, puedes modificar)</span></label><input type="date" id="ren-vence"/></div>
   <div class="field"><label>📱 WhatsApp (editable)</label><input type="tel" id="ren-wa" placeholder="+593..."/></div>
   <div class="field"><label>📧 Correo (editable)</label><input type="text" id="ren-correo" placeholder="correo@ejemplo.com"/></div>
   <div class="field"><label>¿Cambio de perfil/PIN?</label><input type="text" id="ren-perfil" placeholder="Dejar vacío si es el mismo"/></div>
   <div class="row2">
     <div class="field"><label>Precio cobrado ($)</label><input type="number" id="ren-precio" placeholder="0.00" step="0.01"/></div>
-    <div class="field"><label>Método pago</label><select id="ren-metodo"><option>Efectivo</option><option>Transferencia</option><option>Binance</option><option>Deuna</option></select></div>
+    <div class="field"><label>Método pago</label><select id="ren-metodo"><option>Efectivo</option><option selected>Transferencia</option><option>Binance</option><option>Deuna</option></select></div>
   </div>
   <button class="btn btn-green" onclick="renGuardar()">✅ Confirmar renovación</button>
 </div>
@@ -1026,6 +1027,7 @@ const VENTAS_HISTORICAS = (function(){
       id: '#VTA-H' + String(counter).padStart(3,'0'),
       fecha, vence, cliente, wa: wa || '',
       srvUid, srvNom,
+      dias: dias,
       plan: dias === 30 ? '1 mes' : dias === 90 ? '3 meses' : dias === 60 ? '2 meses' : dias === 120 ? '4 meses' : dias === 180 ? '6 meses' : '1 mes',
       correo: '', perfil: '', pin: '', invCorreo: '',
       precio, metodo: 'Transferencia', estado: 'pagado',
@@ -1100,8 +1102,9 @@ function fmtFechaCorta(s){
   return d.getDate() + ' ' + MESES_CORTOS[d.getMonth()];
 }
 function diasHasta(s){
-  if(!s) return null;
-  return Math.round((new Date(s + 'T12:00:00').getTime() - new Date(hoy() + 'T12:00:00').getTime()) / 86400000);
+  if(!s || typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const diff = Math.round((new Date(s + 'T12:00:00').getTime() - new Date(hoy() + 'T12:00:00').getTime()) / 86400000);
+  return isNaN(diff) ? null : diff;
 }
 function estadoVen(s){
   const d = diasHasta(s);
@@ -1114,13 +1117,13 @@ function estadoVen(s){
 function badgeVen(s){
   const st = estadoVen(s);
   const d = diasHasta(s);
-  const m = {
-    vencido: `<span class="badge badge-vencido">Vencido hace ${Math.abs(d)}d</span>`,
-    hoy: `<span class="badge badge-hoy">Vence hoy</span>`,
-    pronto: `<span class="badge badge-pronto">En ${d}d</span>`,
-    ok: `<span class="badge badge-ok">${fmtFechaCorta(s)}</span>`
-  };
-  return m[st] || '';
+  if(st === 'vencido' && d !== null){
+    return `<span class="badge badge-vencido">Vencido hace ${Math.abs(d)}d</span>`;
+  }
+  if(st === 'hoy') return `<span class="badge badge-hoy">Vence hoy</span>`;
+  if(st === 'pronto' && d !== null) return `<span class="badge badge-pronto">En ${d}d</span>`;
+  if(st === 'ok') return `<span class="badge badge-ok">${fmtFechaCorta(s)}</span>`;
+  return '';
 }
 function togglePass(inputId, btn){
   const el = document.getElementById(inputId);
@@ -1464,6 +1467,7 @@ function mvGuardar(){
   }
   const venta = {
     uid: uid(), id: numVenta(), fecha: fechaVenta, vence,
+    dias: dur,
     cliente: nombre, wa: waInput,
     srvUid, srvNom: srv ? srv.emoji + ' ' + srv.nombre : srvUid,
     plan: sanitizarTexto(document.getElementById('mv-plan').value, 100),
@@ -1738,9 +1742,10 @@ function renderVencimientos(){
     const d = diasHasta(v.vence);
     const isInactivo = v.activa === false;
     let msgWA = '';
-    if(d !== null && d < 0) msgWA = 'Hola ' + v.cliente + '! \ud83d\udc4b\n\nTu acceso a *' + v.srvNom + '* venci\u00f3 hace ' + Math.abs(d) + ' d\u00edas.\n\n\u00bfDeseas renovar? El valor es *$' + v.precio.toFixed(2) + '*\n\n\ud83d\udd04 Cualquier consulta escr\u00edbeme.\n\n' + (APP.config.firma||'');
-    else if(d === 0) msgWA = 'Hola ' + v.cliente + '! \ud83d\udc4b\n\nTu acceso a *' + v.srvNom + '* vence *hoy*.\n\n\u00bfLo renovamos? El valor es *$' + v.precio.toFixed(2) + '*\n\n\ud83d\udd04 Cualquier consulta escr\u00edbeme.\n\n' + (APP.config.firma||'');
-    else if(d && d <= 7) msgWA = 'Hola ' + v.cliente + '! \ud83d\udc4b\n\nTe recuerdo que tu acceso a *' + v.srvNom + '* vence en *' + d + ' d\u00edas* (' + fmtFecha(v.vence) + ').\n\nEl valor de la renovaci\u00f3n es *$' + v.precio.toFixed(2) + '*\n\n\u00bfLo renovamos? \ud83d\udd04\n\n' + (APP.config.firma||'');
+    if(d !== null && d < -2) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTe escribo para informarte que tu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' días y el período de gracia ya expiró.\n\nGracias por haber utilizado los servicios de *' + (APP.config.nombre||'YORI-TEX') + '* 🙏\n\n⚠️ Si deseas continuar, el valor de renovación es *$' + v.precio.toFixed(2) + '*. Caso contrario, el servicio será cortado a la brevedad.\n\n' + (APP.config.firma||'');
+    else if(d !== null && d < 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' día' + (Math.abs(d)===1?'':'s') + '.\n\n¿Deseas renovar? El valor es *$' + v.precio.toFixed(2) + '*\n\n🔄 Cualquier consulta escríbeme.\n\n' + (APP.config.firma||'');
+    else if(d === 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* vence *hoy*.\n\n¿Lo renovamos? El valor es *$' + v.precio.toFixed(2) + '*\n\n🔄 Cualquier consulta escríbeme.\n\n' + (APP.config.firma||'');
+    else if(d !== null && d <= 7) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTe recuerdo que tu acceso a *' + v.srvNom + '* vence en *' + d + ' días* (' + fmtFecha(v.vence) + ').\n\nEl valor de la renovación es *$' + v.precio.toFixed(2) + '*\n\n¿Lo renovamos? 🔄\n\n' + (APP.config.firma||'');
     if(msgWA) venMsgWA[v.uid] = msgWA;
     const btns = isInactivo ?
       `<div class="btns-2" style="margin-top:8px">
@@ -1754,10 +1759,11 @@ function renderVencimientos(){
       </div>`;
     return `<div class="ven-card ${isInactivo?'inactivo':st}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div><div style="font-size:13px;font-weight:600;color:var(--white)">${v.cliente}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${v.srvNom} · ${v.id}</div></div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--white)">${esc(v.cliente)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(v.srvNom)} · ${esc(v.id)}</div></div>
         ${isInactivo ? '<span class="badge badge-inactivo">Inactivo</span>' : badgeVen(v.vence)}
       </div>
-      <div style="font-size:12px;color:var(--text3)">Vence: ${fmtFecha(v.vence)} · $${v.precio.toFixed(2)} · ${v.metodo}</div>
+      <div style="font-size:12px;color:var(--text3)">Vence: ${fmtFecha(v.vence)} · $${v.precio.toFixed(2)} · ${esc(v.metodo)}</div>
+      ${(!isInactivo && d !== null && d < -2) ? `<div style="font-size:11px;color:var(--red);background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:6px;padding:5px 9px;margin-top:6px">⚠️ Período de gracia vencido — servicio por cortar</div>` : ''}
       ${btns}
     </div>`;
   }).join('');
@@ -1768,12 +1774,24 @@ function abrirRenovar(ventaUid){
   if(!v) return;
   document.getElementById('ren-venta-uid').value = ventaUid;
   document.getElementById('ren-info').textContent = `${v.cliente} · ${v.srvNom} · ${v.id}`;
-  document.getElementById('ren-vence').value = '';
   document.getElementById('ren-perfil').value = '';
   document.getElementById('ren-precio').value = v.precio;
-  // Pre-llenar WA y correo actuales para que sean editables
   document.getElementById('ren-wa').value = v.wa || '';
   document.getElementById('ren-correo').value = v.correo || '';
+
+  // Calcular nueva fecha de vencimiento inteligente:
+  // Partir desde el vencimiento original (no desde hoy), para no perder días de prórroga
+  const diasSuscripcion = v.dias || 30;
+  const baseDate = v.vence && v.vence > hoy() ? v.vence : v.vence || hoy();
+  const nuevaFechaCalculada = sumarDias(baseDate, diasSuscripcion);
+  document.getElementById('ren-vence').value = nuevaFechaCalculada;
+
+  // Mostrar preview de la fecha calculada
+  const previewEl = document.getElementById('ren-vence-preview');
+  if(previewEl){
+    previewEl.textContent = `📅 Calculado: ${fmtFecha(nuevaFechaCalculada)} (${diasSuscripcion} días desde vencimiento original)`;
+    previewEl.style.display = 'block';
+  }
   abrirModal('modal-renovar');
 }
 function renGuardar(){
@@ -1784,7 +1802,8 @@ function renGuardar(){
   const nuevoCorreo = document.getElementById('ren-correo').value.trim();
   const nuevaVenta = {
     ...v, uid:uid(), id:numVenta(), fecha:hoy(),
-    vence: document.getElementById('ren-vence').value || sumarDias(hoy(), 30),
+    vence: document.getElementById('ren-vence').value || sumarDias(v.vence || hoy(), v.dias || 30),
+    dias: v.dias || 30,
     precio: parseFloat(document.getElementById('ren-precio').value) || v.precio,
     metodo: document.getElementById('ren-metodo').value,
     wa: nuevoWA || v.wa,
@@ -2704,7 +2723,28 @@ async function pinVerificar(){
     _pinIngresado = ''; pinActualizarDots(); return;
   }
 
-  // SIEMPRE cargar desde Sheets — el caché solo es fallback sin internet
+  // Intentar caché local primero para entrada rápida
+  const local = localStorage.getItem('yoritex_local');
+  if(local){
+    try {
+      const d = JSON.parse(local);
+      if(d._pin === _pinIngresado){
+        // PIN correcto en caché — entrar inmediatamente
+        _pinIntentos = 0;
+        _pinVerificado = true;
+        _pinGuardado = _pinIngresado;
+        cargarDesdeSheets(d.data || {});
+        document.getElementById('pin-screen').style.display = 'none';
+        // Actualizar desde Sheets en segundo plano
+        setTimeout(() => _verificarYActualizarDesdeSheets(), 800);
+        return;
+      } else if(d._pin && d._pin !== _pinIngresado){
+        // Caché existe con PIN diferente — probablemente incorrecto, igual verificar con Sheets
+      }
+    } catch(e){}
+  }
+
+  // Sin caché válido o PIN no coincide con caché: verificar con Sheets
   mostrarSync('🔑','Verificando PIN...','');
   try {
     const res = await apiCall({ accion:'cargar', pin: _pinIngresado });
@@ -2730,8 +2770,7 @@ async function pinVerificar(){
     document.getElementById('pin-screen').style.display = 'none';
   } catch(err) {
     ocultarSync();
-    // Sin internet — intentar caché local como último recurso
-    const local = localStorage.getItem('yoritex_local');
+    // Sin internet — usar caché local como respaldo
     if(local){
       try {
         const d = JSON.parse(local);
@@ -2768,7 +2807,7 @@ async function _verificarYActualizarDesdeSheets(){
         ? data.ventas.map(v => normalizarVenta(v))
         : [];
       const idsSheets = new Set(ventasSheets.map(v=>v.uid));
-      const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid));
+      const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid)).map(v => normalizarVenta(v));
       APP.ventas = [...ventasSheets, ...historicasNuevas];
       APP.cuentas    = Array.isArray(data.cuentas)    ? data.cuentas    : APP.cuentas;
       APP.costos     = Array.isArray(data.costos)      ? data.costos.map(g=>({...g, montoUSD:parseFloat(g.montoUSD)||0, usdtUsado:parseFloat(g.usdtUsado)||0})) : APP.costos;
@@ -2867,6 +2906,7 @@ function normalizarVenta(v){
     ...v,
     fecha:  fechaOk(v.fecha)  ? v.fecha  : hoy(),
     vence:  fechaOk(v.vence)  ? v.vence  : hoy(),
+    dias:   (parseInt(v.dias) > 0) ? parseInt(v.dias) : 30,
     precio: isNaN(parseFloat(v.precio)) ? 0 : parseFloat(v.precio),
     activa: (v.activa === 'false' || v.activa === false) ? false : true,
     wa:     v.wa     || '',
@@ -2888,8 +2928,8 @@ function cargarDesdeSheets(data){
     ? data.ventas.map(v => normalizarVenta(v))
     : [];
   const idsSheets = new Set(ventasSheets.map(v => v.uid));
-  // Agregar históricas que no estén ya en Sheets
-  const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid));
+  // Agregar históricas que no estén ya en Sheets (también normalizarlas)
+  const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid)).map(v => normalizarVenta(v));
   APP.ventas = [...ventasSheets, ...historicasNuevas];
 
   APP.cuentas    = Array.isArray(data.cuentas)    ? data.cuentas    : [];
@@ -2993,7 +3033,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
-  // Limpiar caché corrupto: si tiene ventas con vence inválido, borrarlo para forzar recarga desde Sheets
+  // Limpiar caché corrupto: si tiene ventas con vence inválido, recalcular desde fecha+dias
   try {
     const local = localStorage.getItem('yoritex_local');
     if(local){
@@ -3002,13 +3042,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const fechaOk = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
       const tieneCorruptos = ventas.some(v => !fechaOk(v.vence) || !fechaOk(v.fecha));
       if(tieneCorruptos){
-        // Normalizar en lugar de borrar — así no pierde el PIN guardado
         d.data.ventas = ventas.map(v => {
-          const fechaFallback = fechaOk(v.fecha) ? v.fecha : '2026-04-22';
+          const fechaBase = fechaOk(v.fecha) ? v.fecha : hoy();
+          const diasPeriodo = parseInt(v.dias) > 0 ? parseInt(v.dias) : 30;
+          const venceRecalc = fechaOk(v.vence) ? v.vence : sumarDias(fechaBase, diasPeriodo);
           return {
             ...v,
-            fecha: fechaOk(v.fecha) ? v.fecha : fechaFallback,
-            vence: fechaOk(v.vence) ? v.vence : fechaFallback
+            fecha: fechaBase,
+            vence: venceRecalc,
+            dias: diasPeriodo
           };
         });
         localStorage.setItem('yoritex_local', JSON.stringify(d));
