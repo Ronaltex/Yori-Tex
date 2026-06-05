@@ -2763,10 +2763,7 @@ async function _verificarYActualizarDesdeSheets(){
       // Actualizar datos silenciosamente SIN llamar inicializarUI (no interrumpe al usuario)
       const data = res.data;
       const ventasSheets = Array.isArray(data.ventas)
-        ? data.ventas.map(v=>({...v,
-            precio: parseFloat(v.precio)||0,
-            activa: (v.activa==='false'||v.activa===false) ? false : true
-          }))
+        ? data.ventas.map(v => normalizarVenta(v))
         : [];
       const idsSheets = new Set(ventasSheets.map(v=>v.uid));
       const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid));
@@ -2856,12 +2853,39 @@ async function _sincronizarBackground(payload){
 // Alias para compatibilidad con renGuardar
 async function sincronizarConSheetsSilencioso(){ return sincronizarConSheets(); }
 
+// ══════════════════════════════════════
+// NORMALIZACIÓN DE VENTAS
+// Garantiza que todos los campos tengan
+// valores válidos sin importar el origen
+// ══════════════════════════════════════
+function normalizarVenta(v){
+  // Fecha válida: formato YYYY-MM-DD
+  const fechaOk = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  return {
+    ...v,
+    fecha:  fechaOk(v.fecha)  ? v.fecha  : hoy(),
+    vence:  fechaOk(v.vence)  ? v.vence  : hoy(),
+    precio: isNaN(parseFloat(v.precio)) ? 0 : parseFloat(v.precio),
+    activa: (v.activa === 'false' || v.activa === false) ? false : true,
+    wa:     v.wa     || '',
+    correo: v.correo || '',
+    metodo: v.metodo || 'Transferencia',
+    estado: v.estado || 'pagado',
+    notas:  v.notas  || '',
+    id:     v.id     || ('#VTA-' + String(APP._ventaCounter||1).padStart(4,'0')),
+    uid:    v.uid    || uid(),
+    creado: v.creado || (v.fecha ? v.fecha + 'T12:00:00.000Z' : new Date().toISOString())
+  };
+}
+
 function cargarDesdeSheets(data){
   if(!data) { inyectarHistorico(); return; }
 
-  // Cargar ventas: combinar históricas con las de Sheets
-  const ventasSheets = Array.isArray(data.ventas) ? data.ventas.map(v=>({...v, precio: parseFloat(v.precio)||0, activa: v.activa==='false'||v.activa===false ? false : true})) : [];
-  const idsSheets = new Set(ventasSheets.map(v=>v.uid));
+  // Normalizar todas las ventas de Sheets
+  const ventasSheets = Array.isArray(data.ventas)
+    ? data.ventas.map(v => normalizarVenta(v))
+    : [];
+  const idsSheets = new Set(ventasSheets.map(v => v.uid));
   // Agregar históricas que no estén ya en Sheets
   const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid));
   APP.ventas = [...ventasSheets, ...historicasNuevas];
@@ -2889,15 +2913,7 @@ function cargarDesdeSheets(data){
   APP._ventaCounter = maxN + 1;
 
   // Guardar backup local
-  localStorage.setItem('yoritex_local', JSON.stringify({
-    _pin: _pinGuardado,
-    data: { ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
-            recargas: APP.recargas, reembolsos: APP.reembolsos,
-            catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
-            catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA,
-            config: APP.config },
-    _ts: Date.now()
-  }));
+  guardarLocal(construirPayload());
 
   inicializarUI();
 }
@@ -2970,12 +2986,33 @@ function inicializarUI(){
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
-  // Actualizar nombre en PIN screen
   document.getElementById('pin-brand').textContent = APP.config.nombre || 'YORI-TEX';
-  // PWA: registrar service worker para instalación
+  // PWA: registrar service worker
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
+  // Limpiar caché corrupto: si tiene ventas con vence inválido, borrarlo para forzar recarga desde Sheets
+  try {
+    const local = localStorage.getItem('yoritex_local');
+    if(local){
+      const d = JSON.parse(local);
+      const ventas = d?.data?.ventas || [];
+      const fechaOk = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+      const tieneCorruptos = ventas.some(v => !fechaOk(v.vence) || !fechaOk(v.fecha));
+      if(tieneCorruptos){
+        // Normalizar en lugar de borrar — así no pierde el PIN guardado
+        d.data.ventas = ventas.map(v => {
+          const fechaFallback = fechaOk(v.fecha) ? v.fecha : '2026-04-22';
+          return {
+            ...v,
+            fecha: fechaOk(v.fecha) ? v.fecha : fechaFallback,
+            vence: fechaOk(v.vence) ? v.vence : fechaFallback
+          };
+        });
+        localStorage.setItem('yoritex_local', JSON.stringify(d));
+      }
+    }
+  } catch(e){ localStorage.removeItem('yoritex_local'); }
 });
 
 </script>
