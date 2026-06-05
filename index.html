@@ -2698,33 +2698,13 @@ function pinActualizarDots(){
   }
 }
 async function pinVerificar(){
-  // SECURITY: Verificar bloqueo antes de intentar
   if(Date.now() < _pinBloqueadoHasta){
     const seg = Math.ceil((_pinBloqueadoHasta - Date.now()) / 1000);
     document.getElementById('pin-error').textContent = `🔒 Bloqueado. Espera ${seg}s`;
     _pinIngresado = ''; pinActualizarDots(); return;
   }
 
-  // VELOCIDAD: Si hay caché local con el mismo PIN, entrar inmediatamente
-  const local = localStorage.getItem('yoritex_local');
-  if(local){
-    try {
-      const d = JSON.parse(local);
-      if(d._pin === _pinIngresado){
-        // PIN correcto localmente — entrar YA, verificar Sheets en background
-        _pinIntentos = 0;
-        _pinVerificado = true;
-        _pinGuardado = _pinIngresado;
-        cargarDesdeSheets(d.data || {});
-        document.getElementById('pin-screen').style.display = 'none';
-        // Sincronizar con Sheets en background para obtener datos frescos
-        _verificarYActualizarDesdeSheets();
-        return;
-      }
-    } catch(e){}
-  }
-
-  // Sin caché o PIN no coincide con caché — verificar contra Sheets
+  // SIEMPRE cargar desde Sheets — el caché solo es fallback sin internet
   mostrarSync('🔑','Verificando PIN...','');
   try {
     const res = await apiCall({ accion:'cargar', pin: _pinIngresado });
@@ -2750,6 +2730,28 @@ async function pinVerificar(){
     document.getElementById('pin-screen').style.display = 'none';
   } catch(err) {
     ocultarSync();
+    // Sin internet — intentar caché local como último recurso
+    const local = localStorage.getItem('yoritex_local');
+    if(local){
+      try {
+        const d = JSON.parse(local);
+        if(d._pin === _pinIngresado){
+          _pinIntentos = 0;
+          _pinVerificado = true;
+          _pinGuardado = _pinIngresado;
+          cargarDesdeSheets(d.data || {});
+          document.getElementById('pin-screen').style.display = 'none';
+          setTimeout(()=>alert('⚠️ Sin conexión. Mostrando último guardado local.'), 300);
+          return;
+        } else {
+          document.getElementById('pin-error').textContent = '❌ PIN incorrecto (sin conexión)';
+          const dotsEl = document.getElementById('pin-dots');
+          dotsEl.classList.add('pin-shake');
+          setTimeout(()=>dotsEl.classList.remove('pin-shake'),400);
+          _pinIngresado = ''; pinActualizarDots(); return;
+        }
+      } catch(e){}
+    }
     document.getElementById('pin-error').textContent = '⚠️ Sin conexión. Intenta de nuevo.';
     _pinIngresado = ''; pinActualizarDots();
   }
