@@ -257,7 +257,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
     <div class="logo-hex" id="logo-hex">Y</div>
     <div><div class="logo-text" id="logo-brand">YORI<span>-TEX</span></div></div>
   </div>
-  <div class="header-right" id="header-fecha"></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div id="sync-indicador" style="display:none;font-size:16px;transition:all 0.3s"></div>
+    <div class="header-right" id="header-fecha"></div>
+  </div>
 </div>
 
 <!-- REGISTRO -->
@@ -664,6 +667,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   <div id="ren-info" style="font-size:13px;color:var(--text2);margin-bottom:14px"></div>
   <input type="hidden" id="ren-venta-uid"/>
   <div class="field"><label>Nueva fecha de vencimiento</label><input type="date" id="ren-vence"/></div>
+  <div class="field"><label>📱 WhatsApp (editable)</label><input type="tel" id="ren-wa" placeholder="+593..."/></div>
+  <div class="field"><label>📧 Correo (editable)</label><input type="text" id="ren-correo" placeholder="correo@ejemplo.com"/></div>
   <div class="field"><label>¿Cambio de perfil/PIN?</label><input type="text" id="ren-perfil" placeholder="Dejar vacío si es el mismo"/></div>
   <div class="row2">
     <div class="field"><label>Precio cobrado ($)</label><input type="number" id="ren-precio" placeholder="0.00" step="0.01"/></div>
@@ -950,7 +955,7 @@ const VENTAS_HISTORICAS = (function(){
     ['Efectivo','+593962073790','spotify','2026-05-01',30,'2026-05-31',0.00],
     ['Clarisma','+593979931767','capcut','2026-05-01',30,'2026-05-31',4.00],
     ['ISRA','+593978914606','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['carlos','+593968773650','spotify','2026-05-02',30,'2026-06-01',3.00],
+    ['carlos','+593966773650','spotify','2026-05-02',30,'2026-06-01',3.00],
     ['Marcelo Alvarez','+593988148848','capcut','2026-05-02',30,'2026-06-01',3.00],
     ['sbg Jesus','+593985882807','capcut','2026-05-02',30,'2026-06-01',4.00],
     ['Clarisma 2','+593979931767','capcut','2026-05-02',30,'2026-06-01',4.00],
@@ -983,27 +988,27 @@ const VENTAS_HISTORICAS = (function(){
     ['hain','+593967051750','spotify','2026-05-05',30,'2026-06-04',3.50],
     ['Johan Eduardo','+593992457470','spotify','2026-05-06',90,'2026-08-04',8.00],
     ['Personal','','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['Martin Alejandro','+59396370794','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['Filme','+59399894962','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['Juan Johns','+59398428950','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['CESAR USER','+59399451338','spotify','2026-05-06',30,'2026-06-05',0.00],
-    ['JohanSpotify','+59398176775','spotify','2026-05-06',30,'2026-06-05',3.00],
-    ['Lacrema','+54934365790','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['DAVID','+59399221643','spotify','2026-05-06',30,'2026-06-05',3.50],
-    ['LACREMA Google','+54934365790','google one','2026-05-06',30,'2026-06-05',4.00],
+    ['Martin Alejandro','+593963707945','capcut','2026-05-06',30,'2026-06-05',4.00],
+    ['Filme','+593998949621','capcut','2026-05-06',30,'2026-06-05',4.00],
+    ['Juan Johns','+593984289501','capcut','2026-05-06',30,'2026-06-05',4.00],
+    ['CESAR USER','+593994513386','spotify','2026-05-06',30,'2026-06-05',0.00],
+    ['JohanSpotify','+593981767757','spotify','2026-05-06',30,'2026-06-05',3.00],
+    ['Lacrema','+5493436579092','capcut','2026-05-06',30,'2026-06-05',4.00],
+    ['DAVID','+593992216437','spotify','2026-05-06',30,'2026-06-05',3.50],
+    ['LACREMA Google','+5493436579092','google one','2026-05-06',30,'2026-06-05',4.00],
     ['intercab','','capcut','2026-05-06',30,'2026-06-05',4.00],
     ['ISA','','capcut','2026-05-07',30,'2026-06-06',4.00],
-    ['Walter Lenin','+59398323283','spotify','2026-05-07',30,'2026-06-06',3.50],
-    ['Karol renovacion','+59396843271','netflix','2026-05-07',30,'2026-06-06',4.00],
-    ['Danilo Pluas','+59399224607','capcut','2026-05-08',30,'2026-06-07',4.00],
-    ['Karem Mendoza','+59396397976','capcut','2026-05-08',30,'2026-06-07',4.00],
-    ['LESLY KATTY','+59398889960','netflix','2026-05-08',30,'2026-06-07',4.50],
-    ['STALIN','+59396961003','netflix','2026-05-08',30,'2026-06-07',4.50],
-    ['Andres Obando 2','+59396958331','chatgpt','2026-05-08',30,'2026-06-07',4.00],
-    ['HENRY USER','+59396122619','spotify','2026-05-08',30,'2026-06-07',6.50],
-    ['Jonathan USER','+59399893488','spotify','2026-05-08',30,'2026-06-07',3.00],
+    ['Walter Lenin','+593983232837','spotify','2026-05-07',30,'2026-06-06',3.50],
+    ['Karol renovacion','+593968432718','netflix','2026-05-07',30,'2026-06-06',4.00],
+    ['Danilo Pluas','+593992246071','capcut','2026-05-08',30,'2026-06-07',4.00],
+    ['Karem Mendoza','+593983979768','capcut','2026-05-08',30,'2026-06-07',4.00],
+    ['LESLY KATTY','+593988899609','netflix','2026-05-08',30,'2026-06-07',4.50],
+    ['STALIN','+593969610035','netflix','2026-05-08',30,'2026-06-07',4.50],
+    ['Andres Obando 2','+593969583316','chatgpt','2026-05-08',30,'2026-06-07',4.00],
+    ['HENRY USER','+593961226196','spotify','2026-05-08',30,'2026-06-07',6.50],
+    ['Jonathan USER','+593998934889','spotify','2026-05-08',30,'2026-06-07',3.00],
     ['Jupiter','','capcut','2026-05-09',30,'2026-06-08',4.00],
-    ['LA CREMA 2','+54934365790','capcut','2026-05-09',30,'2026-06-08',4.00]
+    ['LA CREMA 2','+5493436579092','capcut','2026-05-09',30,'2026-06-08',4.00]
   ];
   let counter = 1;
   return raw.map(r => {
@@ -1741,23 +1746,36 @@ function abrirRenovar(ventaUid){
   document.getElementById('ren-vence').value = '';
   document.getElementById('ren-perfil').value = '';
   document.getElementById('ren-precio').value = v.precio;
+  // Pre-llenar WA y correo actuales para que sean editables
+  document.getElementById('ren-wa').value = v.wa || '';
+  document.getElementById('ren-correo').value = v.correo || '';
   abrirModal('modal-renovar');
 }
 function renGuardar(){
   const ventaUid = document.getElementById('ren-venta-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
+  const nuevoWA = document.getElementById('ren-wa').value.trim();
+  const nuevoCorreo = document.getElementById('ren-correo').value.trim();
   const nuevaVenta = {
     ...v, uid:uid(), id:numVenta(), fecha:hoy(),
     vence: document.getElementById('ren-vence').value || sumarDias(hoy(), 30),
     precio: parseFloat(document.getElementById('ren-precio').value) || v.precio,
     metodo: document.getElementById('ren-metodo').value,
+    wa: nuevoWA || v.wa,
+    correo: nuevoCorreo || v.correo,
     estado: 'pagado', activa: true, creado: new Date().toISOString()
   };
   if(document.getElementById('ren-perfil').value) nuevaVenta.perfil = document.getElementById('ren-perfil').value;
+  // Actualizar WA y correo en la venta original también
+  v.wa = nuevoWA || v.wa;
+  v.correo = nuevoCorreo || v.correo;
   if(v.cuentaUID && v.cupoIdx !== null){
     const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-    if(cuenta && cuenta.cupos[v.cupoIdx]) cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
+    if(cuenta && cuenta.cupos[v.cupoIdx]){
+      cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
+      if(nuevoWA) cuenta.cupos[v.cupoIdx].wa = nuevoWA;
+    }
   }
   v.activa = false;
   APP.ventas.push(nuevaVenta);
@@ -1766,7 +1784,29 @@ function renGuardar(){
   renderVencimientos();
   renderRegistro();
   alert(`✅ Renovación ${nuevaVenta.id} guardada`);
-  sincronizarConSheets();
+  // Sincronizar en background sin bloquear la UI
+  sincronizarConSheetsSilencioso();
+}
+
+// Sincronización silenciosa — guarda sin mostrar overlay bloqueante
+async function sincronizarConSheetsSilencioso(){
+  if(!_pinVerificado) return;
+  // Solo mostrar un pequeño indicador no bloqueante
+  const ind = document.getElementById('sync-indicador');
+  if(ind){ ind.style.display = 'flex'; ind.textContent = '💾'; }
+  try {
+    const payload = {
+      ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
+      recargas: APP.recargas, reembolsos: APP.reembolsos,
+      catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
+      catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
+    };
+    localStorage.setItem('yoritex_local', JSON.stringify({ _pin: _pinGuardado, data: payload, _ts: Date.now() }));
+    await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload });
+    if(ind){ ind.textContent = '✅'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
+  } catch(err) {
+    if(ind){ ind.textContent = '📱'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
+  }
 }
 function abrirNoRenovo(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
@@ -1791,6 +1831,7 @@ function nrGuardar(){
   renderVencimientos();
   renderInventario();
   renderBadgeVencimientos();
+  // Background — no bloquea UI
   sincronizarConSheets();
 }
 
@@ -2638,15 +2679,35 @@ async function pinVerificar(){
     document.getElementById('pin-error').textContent = `🔒 Bloqueado. Espera ${seg}s`;
     _pinIngresado = ''; pinActualizarDots(); return;
   }
-  mostrarSync('🔑','Verificando PIN...','Conectando con Google Sheets');
+
+  // VELOCIDAD: Si hay caché local con el mismo PIN, entrar inmediatamente
+  const local = localStorage.getItem('yoritex_local');
+  if(local){
+    try {
+      const d = JSON.parse(local);
+      if(d._pin === _pinIngresado){
+        // PIN correcto localmente — entrar YA, verificar Sheets en background
+        _pinIntentos = 0;
+        _pinVerificado = true;
+        _pinGuardado = _pinIngresado;
+        cargarDesdeSheets(d.data || {});
+        document.getElementById('pin-screen').style.display = 'none';
+        // Sincronizar con Sheets en background para obtener datos frescos
+        _verificarYActualizarDesdeSheets();
+        return;
+      }
+    } catch(e){}
+  }
+
+  // Sin caché o PIN no coincide con caché — verificar contra Sheets
+  mostrarSync('🔑','Verificando PIN...','');
   try {
     const res = await apiCall({ accion:'cargar', pin: _pinIngresado });
+    ocultarSync();
     if(!res.ok){
-      ocultarSync();
-      // SECURITY: Incrementar contador de intentos fallidos
       _pinIntentos++;
       if(_pinIntentos >= PIN_MAX_INTENTOS){
-        _pinBloqueadoHasta = Date.now() + 60000; // 60 segundos de bloqueo
+        _pinBloqueadoHasta = Date.now() + 60000;
         _pinIntentos = 0;
         document.getElementById('pin-error').textContent = '🔒 Demasiados intentos. Bloqueado 60s.';
       } else {
@@ -2655,50 +2716,29 @@ async function pinVerificar(){
       const dotsEl = document.getElementById('pin-dots');
       dotsEl.classList.add('pin-shake');
       setTimeout(()=>dotsEl.classList.remove('pin-shake'),400);
-      _pinIngresado = '';
-      pinActualizarDots();
-      return;
+      _pinIngresado = ''; pinActualizarDots(); return;
     }
-    // PIN correcto — resetear contador y cargar datos
     _pinIntentos = 0;
     _pinVerificado = true;
     _pinGuardado = _pinIngresado;
     cargarDesdeSheets(res.data);
     document.getElementById('pin-screen').style.display = 'none';
-    ocultarSync();
   } catch(err) {
     ocultarSync();
-    // Si falla la red, intentar con datos locales del localStorage
-    const local = localStorage.getItem('yoritex_local');
-    if(local){
-      try {
-        const d = JSON.parse(local);
-        // Verificar PIN guardado localmente
-        if(d._pin && d._pin !== _pinIngresado){
-          _pinIntentos++;
-          if(_pinIntentos >= PIN_MAX_INTENTOS){
-            _pinBloqueadoHasta = Date.now() + 60000;
-            _pinIntentos = 0;
-            document.getElementById('pin-error').textContent = '🔒 Demasiados intentos. Bloqueado 60s.';
-          } else {
-            document.getElementById('pin-error').textContent = `❌ PIN incorrecto (${PIN_MAX_INTENTOS - _pinIntentos} restantes, modo offline)`;
-          }
-          const dotsEl = document.getElementById('pin-dots');
-          dotsEl.classList.add('pin-shake');
-          setTimeout(()=>dotsEl.classList.remove('pin-shake'),400);
-          _pinIngresado = ''; pinActualizarDots(); return;
-        }
-        _pinIntentos = 0;
-        _pinVerificado = true; _pinGuardado = _pinIngresado;
-        cargarDesdeSheets(d.data || {});
-        document.getElementById('pin-screen').style.display = 'none';
-        setTimeout(()=>alert('⚠️ Sin conexión. Cargando datos guardados localmente.'),300);
-        return;
-      } catch(e){}
-    }
     document.getElementById('pin-error').textContent = '⚠️ Sin conexión. Intenta de nuevo.';
     _pinIngresado = ''; pinActualizarDots();
   }
+}
+
+// Actualiza datos desde Sheets en background después de entrar con caché
+async function _verificarYActualizarDesdeSheets(){
+  try {
+    const res = await apiCall({ accion:'cargar', pin: _pinGuardado });
+    if(res && res.ok && res.data){
+      // Actualizar datos silenciosamente sin interrumpir al usuario
+      cargarDesdeSheets(res.data);
+    }
+  } catch(e){ /* sin internet, quedar con caché */ }
 }
 
 // ══════════════════════════════════════
@@ -2725,36 +2765,44 @@ async function apiCall(body){
 
 async function sincronizarConSheets(){
   if(!_pinVerificado) return;
-  mostrarSync('💾','Guardando en Google Sheets...','');
+  // VELOCIDAD: Guardar local inmediatamente, luego Sheets en background sin bloquear UI
+  const payload = construirPayload();
+  guardarLocal(payload);
+  _sincronizarBackground(payload);
+}
+
+function construirPayload(){
+  return {
+    ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
+    recargas: APP.recargas, reembolsos: APP.reembolsos,
+    catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
+    catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
+  };
+}
+
+function guardarLocal(payload){
   try {
-    const payload = {
-      ventas: APP.ventas,
-      cuentas: APP.cuentas,
-      costos: APP.costos,
-      recargas: APP.recargas,
-      reembolsos: APP.reembolsos,
-      catalogoCategorias: CATALOGO_CATEGORIAS,
-      catalogoServicios: CATALOGO_SERVICIOS,
-      catalogoCatGastos: CATALOGO_CAT_GASTOS,
-      plantillasWA: PLANTILLAS_WA,
-      config: APP.config
-    };
-    // Guardar localmente siempre como respaldo
     localStorage.setItem('yoritex_local', JSON.stringify({ _pin: _pinGuardado, data: payload, _ts: Date.now() }));
-    const res = await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload });
-    if(res.ok){
-      mostrarSync('✅','Guardado en Sheets','');
-      setTimeout(ocultarSync, 1200);
-    } else {
-      mostrarSync('⚠️','Error al guardar',res.error||'');
-      setTimeout(ocultarSync, 2000);
+  } catch(e){}
+}
+
+// Sincronización en background — no bloquea nada, solo muestra emoji pequeño
+async function _sincronizarBackground(payload){
+  const ind = document.getElementById('sync-indicador');
+  if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
+  try {
+    const res = await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() });
+    if(ind){
+      ind.textContent = res && res.ok ? '✅' : '⚠️';
+      setTimeout(()=>{ ind.style.display='none'; }, 1500);
     }
-  } catch(err) {
-    // Falló la red pero ya guardamos local
-    mostrarSync('📱','Guardado localmente','Sin conexión — se sincronizará después');
-    setTimeout(ocultarSync, 2000);
+  } catch(err){
+    if(ind){ ind.textContent='📱'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
   }
 }
+
+// Alias para compatibilidad con renGuardar
+async function sincronizarConSheetsSilencioso(){ return sincronizarConSheets(); }
 
 function cargarDesdeSheets(data){
   if(!data) { inyectarHistorico(); return; }
