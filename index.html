@@ -14,10 +14,19 @@
 <meta name="apple-mobile-web-app-title" content="YORI-TEX"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <title>YORI-TEX</title>
-<!-- SECURITY: SRI hash ensures the CDN file hasn't been tampered with -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
-  integrity="sha512-6HrPF5jMCNbhrbRAA3AD5iiomtkzu6CrVFxRXkgRjMVlKbr5MqfuJpGMRx7YBpnGJQnpTTULNJgoEVo9FORA=="
-  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- Chart.js con fallback -->
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+  s.onerror = function(){
+    var s2 = document.createElement('script');
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -297,7 +306,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 <div id="s-inventario" class="screen">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <div class="page-title">Inventario</div>
-    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirModal('modal-nueva-cuenta')">＋ Cuenta</button>
+    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirNuevaCuenta()">＋ Cuenta</button>
   </div>
   <div class="page-sub" id="inv-sub">Sin cuentas aún</div>
   <div class="kpi-grid">
@@ -338,23 +347,26 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 <!-- DASHBOARD -->
 <div id="s-dashboard" class="screen">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div><div class="page-title">Dashboard</div><div class="page-sub" style="margin:0" id="dash-periodo-lbl">Junio 2026</div></div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <select id="dash-sel-mes" onchange="dashActualizar()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-weight:600"></select>
-      <select id="dash-sel-anio" onchange="dashActualizar()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-weight:600"></select>
-    </div>
+    <div><div class="page-title">Dashboard</div><div class="page-sub" style="margin:0" id="dash-periodo-lbl">Este mes</div></div>
   </div>
   <div class="filters" id="dash-filtros">
     <button class="filter-btn active" onclick="dashPeriodo('mes',this)">Este mes</button>
     <button class="filter-btn" onclick="dashPeriodo('semana',this)">Esta semana</button>
+    <button class="filter-btn" onclick="dashPeriodo('rango',this)">📅 Rango</button>
     <button class="filter-btn" onclick="dashPeriodo('todo',this)">Histórico</button>
+  </div>
+  <div id="dash-rango-wrap" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px">
+    <div class="row2">
+      <div class="field" style="margin-bottom:0"><label>Desde</label><input type="date" id="dash-desde" onchange="dashActualizar()" style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;width:100%"/></div>
+      <div class="field" style="margin-bottom:0"><label>Hasta</label><input type="date" id="dash-hasta" onchange="dashActualizar()" style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;width:100%"/></div>
+    </div>
   </div>
   <div class="sec">💰 Rentabilidad</div>
   <div class="kpi-grid">
     <div class="kpi verde"><div class="kl">Ingresos cobrados</div><div class="kv" id="d-ingresos">$0</div><div class="ksub" id="d-ingresos-s">0 ventas</div></div>
-    <div class="kpi rojo"><div class="kl">Costos totales</div><div class="kv" id="d-costos">$0</div><div class="ksub">cuentas + gastos</div></div>
+    <div class="kpi rojo"><div class="kl">Costos totales</div><div class="kv" id="d-costos">$0</div><div class="ksub" id="d-costos-sub">cuentas + gastos (FIFO)</div></div>
     <div class="kpi azul full"><div class="kl">Ganancia neta</div><div class="kv" id="d-ganancia">$0</div><div class="ksub" id="d-margen">Margen 0%</div></div>
-    <div class="kpi morado"><div class="kl">ROI</div><div class="kv" id="d-roi">0%</div><div class="ksub">retorno s/ inversión</div></div>
+    <div class="kpi morado"><div class="kl">ROI</div><div class="kv" id="d-roi">0%</div><div class="ksub" id="d-roi-sub">retorno s/ inversión</div></div>
     <div class="kpi azul"><div class="kl">Ticket promedio</div><div class="kv" id="d-ticket">$0</div></div>
     <div class="kpi amarillo"><div class="kl">Por cobrar</div><div class="kv" id="d-por-cobrar">$0</div></div>
     <div class="kpi naranja"><div class="kl">Gan. x cuenta</div><div class="kv" id="d-gan-cuenta">$0</div></div>
@@ -372,7 +384,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
     <div class="kpi rojo"><div class="kl">No renovaron</div><div class="kv" id="d-inactivos">0</div></div>
     <div class="kpi azul"><div class="kl">Tasa renov.</div><div class="kv" id="d-tasa">0%</div></div>
   </div>
-  <div class="sec">📈 Ingresos por semana</div>
+  <div class="sec" id="dash-chart-titulo">📈 Ingresos por semana</div>
   <div class="chart-wrap"><canvas id="chart-ingresos"></canvas></div>
   <div class="sec">🏅 Servicios más rentables</div>
   <div class="card" id="dash-ranking"><div class="empty" style="padding:16px 0"><div class="e-ico">📊</div><div>Sin ventas aún</div></div></div>
@@ -398,15 +410,34 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
     <div><div class="sl">💱 Saldo Binance disponible</div><div class="sv" id="saldo-usdt">0.00 USDT</div><div class="ss" id="saldo-usd">≈ $0.00 USD</div></div>
     <button class="btn btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;border-color:var(--yellow-border);color:var(--yellow)" onclick="abrirModal('modal-recarga-binance')">＋ Recarga P2P</button>
   </div>
-  <div class="kpi-grid">
-    <div class="kpi rojo"><div class="kl">Total mes</div><div class="kv" id="c-total">$0</div></div>
-    <div class="kpi azul"><div class="kl">Cuentas</div><div class="kv" id="c-cuentas">$0</div></div>
-    <div class="kpi morado"><div class="kl">Publicidad</div><div class="kv" id="c-pub">$0</div></div>
-    <div class="kpi gris"><div class="kl">Otros</div><div class="kv" id="c-otros">$0</div></div>
+  <!-- Fila 1: Total -->
+  <div class="kpi-grid" style="grid-template-columns:1fr;margin-bottom:6px">
+    <div class="kpi rojo" id="kpi-total" style="cursor:pointer" onclick="costoFiltrar('todos','cat',this)">
+      <div class="kl">💸 Total gastado</div>
+      <div class="kv" id="c-total">$0</div>
+      <div class="ksub" id="c-total-sub">todos los métodos y categorías</div>
+    </div>
   </div>
-  <div class="filters" id="costos-filtros">
-    <button class="filter-btn active" onclick="costoFiltrar('todos',this)">Todos</button>
+  <!-- Fila 2: Por método -->
+  <div class="sec" style="margin-top:4px">Por método de pago</div>
+  <div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-bottom:6px">
+    <div class="kpi amarillo" id="kpi-m-binance" style="cursor:pointer" onclick="costoFiltrar('binance','metodo',this)">
+      <div class="kl">💱 Binance USDT</div><div class="kv" id="c-m-binance">$0</div><div class="ksub" id="c-m-binance-sub">0 gastos</div>
+    </div>
+    <div class="kpi azul" id="kpi-m-tarjeta" style="cursor:pointer" onclick="costoFiltrar('tarjeta','metodo',this)">
+      <div class="kl">💳 Tarjeta</div><div class="kv" id="c-m-tarjeta">$0</div><div class="ksub" id="c-m-tarjeta-sub">0 gastos</div>
+    </div>
+    <div class="kpi verde" id="kpi-m-transferencia" style="cursor:pointer" onclick="costoFiltrar('transferencia','metodo',this)">
+      <div class="kl">🏦 Transferencia</div><div class="kv" id="c-m-transferencia">$0</div><div class="ksub" id="c-m-transferencia-sub">0 gastos</div>
+    </div>
+    <div class="kpi gris" id="kpi-m-efectivo" style="cursor:pointer" onclick="costoFiltrar('efectivo','metodo',this)">
+      <div class="kl">💵 Efectivo</div><div class="kv" id="c-m-efectivo">$0</div><div class="ksub" id="c-m-efectivo-sub">0 gastos</div>
+    </div>
   </div>
+  <!-- Fila 3: Por categoría (dinámica) -->
+  <div class="sec" style="margin-top:4px">Por categoría</div>
+  <div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-bottom:6px" id="kpi-cats-grid"></div>
+  <div class="filters" id="costos-filtros" style="display:none"></div>
   <div class="card" id="costos-lista"><div class="empty"><div class="e-ico">💸</div><div>Sin gastos registrados</div></div></div>
   <div class="sec">Historial Binance P2P</div>
   <div id="bin-historial"><div class="empty"><div class="e-ico">🟡</div><div>Sin recargas</div></div></div>
@@ -568,10 +599,20 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
       <div id="mv-correo-auto" style="display:none"><div class="info-box verde"><div class="ib-lbl">📧 Correo automático</div><div class="ib-val" id="mv-correo-auto-val">—</div></div></div>
     </div>
     <div id="mv-cactus-wrap" style="display:none">
-      <div class="aviso">⚡ Venta cactus — se creará en inventario al guardar</div>
+      <div class="aviso">⚡ Venta sin inventario — se creará la cuenta al guardar</div>
       <div class="field"><label>Correo</label><input type="email" id="mv-cactus-correo" placeholder="correo@ejemplo.com"/></div>
       <div class="field"><label>Contraseña</label><input type="text" id="mv-cactus-pass" placeholder="••••••••"/></div>
-      <div class="field"><label>Costo que pagué ($)</label><input type="number" id="mv-cactus-costo" placeholder="0.00" step="0.01"/></div>
+      <div class="row2">
+        <div class="field"><label>Costo que pagué ($)</label><input type="number" id="mv-cactus-costo" placeholder="0.00" step="0.01"/></div>
+        <div class="field"><label>Método adquisición</label>
+          <select id="mv-cactus-metodo-adq">
+            <option value="Efectivo">💵 Efectivo</option>
+            <option value="Transferencia">🏦 Transferencia</option>
+            <option value="Binance USDT">🟡 Binance USDT</option>
+            <option value="Tarjeta">💳 Tarjeta</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
   <!-- Bloque Perfil/PIN (para servicios con perfiles) -->
@@ -634,15 +675,54 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
     <label>Contraseña</label>
     <div class="pass-wrap"><input type="password" id="nc-pass" placeholder="••••••••"/><button class="eye-btn" onclick="togglePass('nc-pass',this)">👁</button></div>
   </div>
-  <div class="field"><label>Número de cupos / perfiles</label><input type="number" id="nc-cupos" placeholder="5" min="1" max="30"/></div>
+  <div class="field"><label>Número de cupos / perfiles máx.</label><input type="number" id="nc-cupos" placeholder="5" min="1" max="30"/></div>
+  <div class="divider"></div>
+  <div class="sec">Vigencia de la cuenta madre</div>
+  <div class="row2">
+    <div class="field"><label>Desde</label><input type="date" id="nc-desde"/></div>
+    <div class="field"><label>Hasta (vence)</label><input type="date" id="nc-hasta"/></div>
+  </div>
   <div class="divider"></div>
   <div class="sec">Costo de adquisición</div>
   <div class="row2">
     <div class="field"><label>Costo ($)</label><input type="number" id="nc-costo" placeholder="0.00" step="0.01"/></div>
-    <div class="field"><label>Precio venta ($)</label><input type="number" id="nc-pventa" placeholder="0.00" step="0.01"/></div>
+    <div class="field"><label>Método pago</label>
+      <select id="nc-metodo-pago">
+        <option value="Efectivo">💵 Efectivo</option>
+        <option value="Transferencia">🏦 Transferencia</option>
+        <option value="Binance USDT">🟡 Binance USDT</option>
+        <option value="Tarjeta">💳 Tarjeta</option>
+      </select>
+    </div>
   </div>
-  <div class="field"><label>Notas</label><textarea id="nc-notas" placeholder="Ej: válida hasta dic 2026..."></textarea></div>
+  <div class="row2">
+    <div class="field"><label>Precio venta / cupo ($)</label><input type="number" id="nc-pventa" placeholder="0.00" step="0.01"/></div>
+    <div class="field"><label>Cupos vendidos</label><input type="number" id="nc-vendidos" placeholder="0" min="0" readonly style="background:var(--surface);color:var(--text3)"/></div>
+  </div>
+  <div id="nc-costo-por-cupo" style="display:none;font-size:12px;color:var(--orange);background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:8px;padding:8px 12px;margin-bottom:8px">💡 Costo por cupo vendido: <strong id="nc-costo-cupo-val">$0.00</strong></div>
+  <div class="field"><label>Notas</label><textarea id="nc-notas" placeholder="Ej: cuenta familiar, misma cuenta de siempre..."></textarea></div>
   <button class="btn btn-primary" onclick="ncGuardar()">💾 Guardar cuenta</button>
+  <!-- BOTÓN RENOVAR CUENTA MADRE (solo en edición) -->
+  <div id="nc-renovar-bloque" style="display:none;margin-top:8px">
+    <div class="divider"></div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">🔄 Renovar cuenta madre</div>
+    <div class="row2">
+      <div class="field"><label>Nueva fecha desde</label><input type="date" id="nc-ren-desde"/></div>
+      <div class="field"><label>Nueva fecha hasta</label><input type="date" id="nc-ren-hasta"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Costo renovación ($)</label><input type="number" id="nc-ren-costo" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Método pago</label>
+        <select id="nc-ren-metodo">
+          <option value="Efectivo">💵 Efectivo</option>
+          <option value="Transferencia">🏦 Transferencia</option>
+          <option value="Binance USDT">🟡 Binance USDT</option>
+          <option value="Tarjeta">💳 Tarjeta</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="ncRenovarCuenta()">🔄 Renovar y registrar costo</button>
+  </div>
 </div>
 </div>
 
@@ -656,6 +736,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   <div class="field"><label>WhatsApp</label><input type="tel" id="ec-wa" placeholder="+593..."/></div>
   <div class="field"><label>Nombre perfil / cupo</label><input type="text" id="ec-perfil" placeholder="Ej: María, Perfil 1..."/></div>
   <div class="field"><label>PIN</label><input type="text" id="ec-pin" placeholder="1234" maxlength="4"/></div>
+  <div class="field" id="ec-inv-correo-field"><label>✉️ Correo invitación enviada a</label><input type="email" id="ec-inv-correo" placeholder="correo@cliente.com"/></div>
+  <div class="field"><label>Plan / tipo de acceso</label><input type="text" id="ec-plan" placeholder="Ej: Familiar 1 mes, Individual 3 meses..."/></div>
   <div class="field"><label>Fecha de vencimiento</label><input type="date" id="ec-vence"/></div>
   <div class="divider"></div>
   <button class="btn btn-primary" style="margin-bottom:8px" onclick="ecGuardar()">💾 Guardar</button>
@@ -664,20 +746,185 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 </div>
 
 <!-- MODAL RENOVAR -->
+<div class="modal-overlay" id="modal-editar-venta">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">✏️ Editar venta <button class="modal-close" onclick="cerrarModal('modal-editar-venta')">×</button></div>
+  <input type="hidden" id="ev-uid"/>
+  <div class="field"><label>Cliente</label><input type="text" id="ev-cliente" maxlength="100"/></div>
+  <div class="field"><label>📱 WhatsApp</label><input type="tel" id="ev-wa" placeholder="+593..."/></div>
+  <div class="divider"></div>
+  <div class="sec">Servicio</div>
+  <div class="field"><label>Categoría</label>
+    <select id="ev-cat" onchange="evActCat()">
+      <option value="">— Selecciona —</option>
+    </select>
+  </div>
+  <div class="field"><label>Servicio / Plataforma</label>
+    <select id="ev-srv" onchange="evActSrv()"><option value="">— Elige categoría primero —</option></select>
+  </div>
+  <div class="field"><label>Plan</label>
+    <select id="ev-plan"><option value="">— Elige servicio primero —</option></select>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">Cuenta / Acceso</div>
+  <!-- Origen de cuenta -->
+  <div style="margin-bottom:10px">
+    <label class="radio-opt" style="margin-bottom:6px">
+      <input type="radio" name="ev-origen" value="inventario" checked onchange="evToggleOrigen()">
+      <div><div class="ro-title">📦 Usar cuenta del inventario</div><div class="ro-sub">Vincula a una cuenta madre registrada</div></div>
+    </label>
+    <label class="radio-opt">
+      <input type="radio" name="ev-origen" value="manual" onchange="evToggleOrigen()">
+      <div><div class="ro-title">✍️ Correo manual / Sin inventario</div><div class="ro-sub">Ingresar correo directo sin vincular</div></div>
+    </label>
+  </div>
+  <!-- BLOQUE INVENTARIO -->
+  <div id="ev-inv-bloque">
+    <div class="field"><label>Cuenta madre del inventario</label>
+      <select id="ev-cuenta-inv" onchange="evSelCuentaInv()">
+        <option value="">— Sin cuenta asignada —</option>
+      </select>
+    </div>
+    <div id="ev-cuenta-info" style="display:none;background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:8px 11px;margin-bottom:8px;font-size:12px;color:var(--green)"></div>
+    <div class="field" id="ev-cupo-wrap" style="display:none"><label>Cupo / Perfil</label>
+      <select id="ev-cupo-inv"><option value="">— Selecciona cupo —</option></select>
+    </div>
+  </div>
+  <!-- BLOQUE MANUAL -->
+  <div id="ev-manual-bloque" style="display:none">
+    <div class="field"><label>📧 Correo</label><input type="text" id="ev-correo-manual" placeholder="correo@ejemplo.com"/></div>
+  </div>
+  <!-- Correo (siempre visible, se autocompleta desde inventario) -->
+  <div class="field"><label>📧 Correo resultante</label><input type="text" id="ev-correo" placeholder="correo@ejemplo.com" readonly style="background:var(--surface);color:var(--text2)"/></div>
+  <div class="field" id="ev-perfil-f"><label>Perfil</label><input type="text" id="ev-perfil" placeholder="Perfil asignado"/></div>
+  <div class="field" id="ev-pin-f"><label>PIN</label><input type="text" id="ev-pin" placeholder="PIN de acceso"/></div>
+  <div class="divider"></div>
+  <div class="sec">Pago y vencimiento</div>
+  <div class="row2">
+    <div class="field"><label>Precio ($)</label><input type="number" id="ev-precio" step="0.01"/></div>
+    <div class="field"><label>Método</label>
+      <select id="ev-metodo"><option>Efectivo</option><option>Transferencia</option><option>Binance</option><option>Deuna</option></select>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>Fecha venta</label><input type="date" id="ev-fecha"/></div>
+    <div class="field"><label>Fecha vence</label><input type="date" id="ev-vence"/></div>
+  </div>
+  <div class="field"><label>Estado</label>
+    <select id="ev-estado">
+      <option value="pagado">✅ Pagado</option>
+      <option value="por_cobrar">🕐 Por cobrar</option>
+      <option value="parcial">⚠️ Parcial</option>
+      <option value="pendiente">🔴 Pendiente</option>
+    </select>
+  </div>
+  <div class="field"><label>Notas</label><textarea id="ev-notas" rows="2" placeholder="Observaciones..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px;font-size:14px"></textarea></div>
+  <!-- BLOQUE COSTO CUENTA -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">💰 Costo de la cuenta (lo que tú pagaste)</div>
+    <div class="row2">
+      <div class="field" style="margin-bottom:0"><label>Costo ($)</label><input type="number" id="ev-costo-cuenta" placeholder="0.00" step="0.01"/></div>
+      <div class="field" style="margin-bottom:0"><label>Método adquisición</label>
+        <select id="ev-metodo-adq">
+          <option value="Efectivo">💵 Efectivo</option>
+          <option value="Transferencia">🏦 Transferencia</option>
+          <option value="Binance USDT">🟡 Binance USDT</option>
+          <option value="Tarjeta">💳 Tarjeta</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">Solo modifica si el costo cambió.</div>
+  </div>
+  <button class="btn btn-green" onclick="editarVentaGuardar()">💾 Guardar cambios</button>
+</div>
+</div>
+
 <div class="modal-overlay" id="modal-renovar">
 <div class="modal-sheet">
   <div class="modal-handle"></div>
   <div class="modal-title">✅ Renovación <button class="modal-close" onclick="cerrarModal('modal-renovar')">×</button></div>
-  <div id="ren-info" style="font-size:13px;color:var(--text2);margin-bottom:14px"></div>
+  <div id="ren-info" style="font-size:13px;color:var(--text2);margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 13px"></div>
   <input type="hidden" id="ren-venta-uid"/>
   <div class="aviso" id="ren-vence-preview" style="display:none;margin-bottom:8px;font-size:12px"></div>
-  <div class="field"><label>Nueva fecha de vencimiento <span style="font-size:11px;color:var(--text3)">(pre-calculada, puedes modificar)</span></label><input type="date" id="ren-vence"/></div>
-  <div class="field"><label>📱 WhatsApp (editable)</label><input type="tel" id="ren-wa" placeholder="+593..."/></div>
-  <div class="field"><label>📧 Correo (editable)</label><input type="text" id="ren-correo" placeholder="correo@ejemplo.com"/></div>
-  <div class="field"><label>¿Cambio de perfil/PIN?</label><input type="text" id="ren-perfil" placeholder="Dejar vacío si es el mismo"/></div>
+  <!-- SECCIÓN: Servicio (mismo flujo que Nueva Venta) -->
+  <div class="sec" style="margin-top:4px">Servicio que se renueva</div>
+  <div class="field"><label>Categoría</label>
+    <select id="ren-cat" onchange="renActCat()"><option value="">— Selecciona —</option></select>
+  </div>
+  <div class="field"><label>Servicio / Plataforma</label>
+    <select id="ren-srv" onchange="renActSrv()"><option value="">— Elige categoría —</option></select>
+  </div>
+  <div class="field"><label>Plan</label>
+    <select id="ren-plan"><option value="">— Elige servicio —</option></select>
+  </div>
+  <!-- SECCIÓN: Origen de cuenta -->
+  <div class="sec">Cuenta / Origen</div>
+  <div style="margin-bottom:10px">
+    <label class="radio-opt" style="margin-bottom:6px">
+      <input type="radio" name="ren-origen" value="inventario" checked onchange="renToggleOrigen()">
+      <div><div class="ro-title">📦 Usar cuenta del inventario</div><div class="ro-sub">Autocompleta correo y cupo</div></div>
+    </label>
+    <label class="radio-opt">
+      <input type="radio" name="ren-origen" value="manual" onchange="renToggleOrigen()">
+      <div><div class="ro-title">✍️ Correo manual / Cuenta cactus</div><div class="ro-sub">Ingresar datos manualmente</div></div>
+    </label>
+  </div>
+  <!-- Bloque inventario en renovar -->
+  <div id="ren-inv-bloque">
+    <div class="field">
+      <label>Cuenta madre del inventario</label>
+      <select id="ren-cuenta-inv" onchange="renSelCuenta()">
+        <option value="">— Sin cuenta asignada —</option>
+      </select>
+    </div>
+    <div id="ren-cuenta-info" style="display:none;background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:8px 11px;margin-bottom:8px;font-size:12px;color:var(--green)"></div>
+    <div class="field" id="ren-cupo-wrap" style="display:none"><label>Cupo / Perfil</label>
+      <select id="ren-cupo-inv" onchange="renSelCupo()"><option value="">— Selecciona cupo —</option></select>
+    </div>
+  </div>
+  <!-- Bloque manual en renovar -->
+  <div id="ren-manual-bloque" style="display:none">
+    <div class="field"><label>📧 Correo</label><input type="text" id="ren-correo-manual" placeholder="correo@ejemplo.com"/></div>
+    <div class="field"><label>Contraseña (si aplica)</label><input type="text" id="ren-pass-manual" placeholder="••••••••"/></div>
+  </div>
+  <!-- Correo resultante (readonly, se autocompleta desde inventario o manual) -->
+  <div class="field"><label>📧 Correo resultante</label><input type="text" id="ren-correo" placeholder="correo@ejemplo.com" readonly style="background:var(--surface);color:var(--text2)"/></div>
+  <div class="field"><label>📱 WhatsApp</label><input type="tel" id="ren-wa" placeholder="+593..."/></div>
+  <div class="field"><label>Perfil / PIN (dejar vacío si no cambia)</label><input type="text" id="ren-perfil" placeholder="Dejar vacío si es el mismo"/></div>
+  <!-- Fecha vencimiento -->
+  <div class="field"><label>Nueva fecha de vencimiento</label><input type="date" id="ren-vence"/></div>
   <div class="row2">
     <div class="field"><label>Precio cobrado ($)</label><input type="number" id="ren-precio" placeholder="0.00" step="0.01"/></div>
     <div class="field"><label>Método pago</label><select id="ren-metodo"><option>Efectivo</option><option selected>Transferencia</option><option>Binance</option><option>Deuna</option></select></div>
+  </div>
+  <div class="field"><label>Estado de pago</label>
+    <select id="ren-estado">
+      <option value="pagado">✅ Pagado</option>
+      <option value="por_cobrar">🕐 Por cobrar</option>
+      <option value="parcial">⚠️ Parcial</option>
+      <option value="pendiente">🔴 Pendiente</option>
+    </select>
+  </div>
+  <!-- BLOQUE COSTO DE CUENTA -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">💰 Costo de la cuenta (lo que tú pagaste)</div>
+    <div class="row2">
+      <div class="field" style="margin-bottom:0">
+        <label>Costo cuenta ($) <span style="font-size:10px;color:var(--orange)">(auto/editable)</span></label>
+        <input type="number" id="ren-costo-cuenta" placeholder="0.00" step="0.01"/>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Método adquisición</label>
+        <select id="ren-metodo-adq">
+          <option value="Efectivo">💵 Efectivo</option>
+          <option value="Transferencia" selected>🏦 Transferencia</option>
+          <option value="Binance USDT">🟡 Binance USDT</option>
+          <option value="Tarjeta">💳 Tarjeta</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">⚡ Binance USDT: descuenta del saldo. Otros métodos: se registra en Gastos.</div>
   </div>
   <button class="btn btn-green" onclick="renGuardar()">✅ Confirmar renovación</button>
 </div>
@@ -695,6 +942,123 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   <div class="field" style="margin-top:4px"><label>Motivo (opcional)</label><input type="text" id="nr-motivo" placeholder="Ej: No contestó, canceló..."/></div>
   <div class="aviso-red">⚠️ El historial de pagos anteriores no se borra.</div>
   <button class="btn btn-red" onclick="nrGuardar()">Confirmar</button>
+</div>
+</div>
+
+<!-- MODAL CUENTA CAÍDA -->
+<div class="modal-overlay" id="modal-cuenta-caida">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">⚡ Cuenta caída <button class="modal-close" onclick="cerrarModal('modal-cuenta-caida')">×</button></div>
+  <input type="hidden" id="cc-cuenta-uid"/>
+  <div id="cc-info" style="font-size:13px;color:var(--text2);margin-bottom:10px;padding:10px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:9px"></div>
+
+  <!-- PASO 1: ¿Qué pasó? -->
+  <div class="sec" style="margin-top:0">¿Qué acción tomar?</div>
+  <label class="radio-opt">
+    <input type="radio" name="cc-accion" value="reembolso" checked onchange="ccToggleAccion()">
+    <div><div class="ro-title">↩️ Dar reembolso al cliente</div><div class="ro-sub">La cuenta cayó y darás devolución de dinero</div></div>
+  </label>
+  <label class="radio-opt">
+    <input type="radio" name="cc-accion" value="reposicion" onchange="ccToggleAccion()">
+    <div><div class="ro-title">🔄 Reponer cuenta (nueva o del inventario)</div><div class="ro-sub">Reemplazas la cuenta caída sin cobrar de nuevo</div></div>
+  </label>
+
+  <!-- BLOQUE REEMBOLSO -->
+  <div id="cc-bloque-reembolso">
+    <div class="divider"></div>
+    <div class="sec">Datos del reembolso</div>
+    <div class="row2">
+      <div class="field"><label>Monto reembolso ($)</label><input type="number" id="cc-rem-monto" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Método de pago</label>
+        <select id="cc-rem-metodo">
+          <option value="Efectivo">💵 Efectivo</option>
+          <option value="Transferencia">🏦 Transferencia</option>
+          <option value="Binance USDT">🟡 Binance USDT</option>
+          <option value="Tarjeta">💳 Tarjeta</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Fecha del reembolso</label><input type="date" id="cc-rem-fecha"/></div>
+    <div class="field"><label>Notas (opcional)</label><input type="text" id="cc-rem-notas" placeholder="Ej: cuenta se cayó a los 3 días..."/></div>
+    <div class="aviso">💡 El reembolso se registrará como gasto y reducirá tus ingresos netos en el Dashboard.</div>
+  </div>
+
+  <!-- BLOQUE REPOSICIÓN -->
+  <div id="cc-bloque-reposicion" style="display:none">
+    <div class="divider"></div>
+    <div class="sec">¿Cómo repones la cuenta?</div>
+    <label class="radio-opt" style="margin-bottom:6px">
+      <input type="radio" name="cc-repo-tipo" value="inventario" checked onchange="ccToggleRepo()">
+      <div><div class="ro-title">📦 Del inventario</div><div class="ro-sub">Usa una cuenta ya registrada en tus cuentas</div></div>
+    </label>
+    <label class="radio-opt">
+      <input type="radio" name="cc-repo-tipo" value="nueva" onchange="ccToggleRepo()">
+      <div><div class="ro-title">🆕 Cuenta nueva</div><div class="ro-sub">Comprarás/asignarás una cuenta nueva</div></div>
+    </label>
+
+    <!-- REPOSICIÓN DESDE INVENTARIO -->
+    <div id="cc-repo-inv-bloque">
+      <div class="field" style="margin-top:10px"><label>Seleccionar cuenta del inventario</label>
+        <select id="cc-repo-cuenta-sel" onchange="ccSelCuentaRepo()">
+          <option value="">— Selecciona cuenta —</option>
+        </select>
+      </div>
+      <div id="cc-repo-cupo-wrap" style="display:none">
+        <div class="field"><label>Cupo disponible</label>
+          <select id="cc-repo-cupo-sel"><option value="">— Selecciona cupo —</option></select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Costo de reposición ($) <span style="font-size:10px;color:var(--text3)">(lo que pagaste)</span></label>
+          <input type="number" id="cc-repo-costo" placeholder="0.00" step="0.01"/>
+        </div>
+        <div class="field"><label>Método pago costo</label>
+          <select id="cc-repo-metodo">
+            <option value="Efectivo">💵 Efectivo</option>
+            <option value="Transferencia">🏦 Transferencia</option>
+            <option value="Binance USDT">🟡 Binance USDT</option>
+            <option value="Tarjeta">💳 Tarjeta</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPOSICIÓN CUENTA NUEVA -->
+    <div id="cc-repo-nueva-bloque" style="display:none">
+      <div class="aviso" style="margin-top:10px">🆕 Los datos de la nueva cuenta — se registrará en tu inventario automáticamente.</div>
+      <div class="field"><label>Correo de la nueva cuenta</label><input type="email" id="cc-repo-correo" placeholder="nueva@ejemplo.com"/></div>
+      <div class="field">
+        <label>Contraseña</label>
+        <div class="pass-wrap"><input type="password" id="cc-repo-pass" placeholder="••••••••"/><button class="eye-btn" onclick="togglePass('cc-repo-pass',this)">👁</button></div>
+      </div>
+      <div class="field"><label>N° cupos de la nueva cuenta</label><input type="number" id="cc-repo-cupos" placeholder="5" min="1" max="30" value="5"/></div>
+      <div class="row2">
+        <div class="field"><label>Costo de la nueva cuenta ($)</label><input type="number" id="cc-repo-nueva-costo" placeholder="0.00" step="0.01"/></div>
+        <div class="field"><label>Método pago</label>
+          <select id="cc-repo-nueva-metodo">
+            <option value="Efectivo">💵 Efectivo</option>
+            <option value="Transferencia">🏦 Transferencia</option>
+            <option value="Binance USDT">🟡 Binance USDT</option>
+            <option value="Tarjeta">💳 Tarjeta</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Vigencia desde</label><input type="date" id="cc-repo-desde"/></div>
+        <div class="field"><label>Vigencia hasta</label><input type="date" id="cc-repo-hasta"/></div>
+      </div>
+    </div>
+    <div class="aviso">⚡ El costo de reposición se registrará como gasto en Costos (reduce tu ganancia).</div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="field"><label>¿A qué cliente/venta aplica? <span style="font-size:11px;color:var(--text3)">(opcional — para reembolso por cliente)</span></label>
+    <select id="cc-venta-sel">
+      <option value="">— Todos los clientes de esta cuenta —</option>
+    </select>
+  </div>
+  <button class="btn btn-red" style="margin-bottom:8px" onclick="ccGuardar()">⚡ Registrar cuenta caída</button>
 </div>
 </div>
 
@@ -874,11 +1238,13 @@ let APP = {
   costos: [],
   recargas: [],
   reembolsos: [],
+  movimientosBinance: [], // NUEVO: Kardex de movimientos Binance
   _ventaCounter: 1,
   _filtroReg: 'hoy',
   _filtroInv: 'todos',
   _filtroVen: 'todos',
   _filtroCosto: 'todos',
+  _filtroCostoTipo: 'cat', // 'cat' o 'metodo'
   config: {
     nombre: 'YORI-TEX',
     slogan: 'Streaming & Digital Tools Manager',
@@ -965,7 +1331,7 @@ const VENTAS_HISTORICAS = (function(){
     ['sbg Jesus','+593985882807','capcut','2026-05-02',30,'2026-06-01',4.00],
     ['Clarisma 2','+593979931767','capcut','2026-05-02',30,'2026-06-01',4.00],
     ['pk pie','+593987331655','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['efectivo Netflix','','netflix','2026-05-02',30,'2026-06-01',0.00],
+    ['efectivo Netflix','+593967595939','netflix','2026-05-02',30,'2026-06-01',0.00],
     ['KEAN','+593963673791','capcut','2026-05-02',30,'2026-06-01',4.00],
     ['Carlitos','+593961977422','spotify','2026-05-03',30,'2026-06-02',3.50],
     ['DIEGO','+593991762648','disney','2026-05-03',30,'2026-06-02',3.50],
@@ -998,9 +1364,9 @@ const VENTAS_HISTORICAS = (function(){
     ['Juan Johns','+593984289501','capcut','2026-05-06',30,'2026-06-05',4.00],
     ['CESAR USER','+593994513386','spotify','2026-05-06',30,'2026-06-05',0.00],
     ['JohanSpotify','+593981767757','spotify','2026-05-06',30,'2026-06-05',3.00],
-    ['Lacrema','+5493436579092','capcut','2026-05-06',30,'2026-06-05',4.00],
+    ['Lacrema','+593436579092','capcut','2026-05-06',30,'2026-06-05',4.00],
     ['DAVID','+593992216437','spotify','2026-05-06',30,'2026-06-05',3.50],
-    ['LACREMA Google','+5493436579092','google one','2026-05-06',30,'2026-06-05',4.00],
+    ['LACREMA Google','+593436579092','google one','2026-05-06',30,'2026-06-05',4.00],
     ['intercab','','capcut','2026-05-06',30,'2026-06-05',4.00],
     ['ISA','','capcut','2026-05-07',30,'2026-06-06',4.00],
     ['Walter Lenin','+593983232837','spotify','2026-05-07',30,'2026-06-06',3.50],
@@ -1013,15 +1379,13 @@ const VENTAS_HISTORICAS = (function(){
     ['HENRY USER','+593961226196','spotify','2026-05-08',30,'2026-06-07',6.50],
     ['Jonathan USER','+593998934889','spotify','2026-05-08',30,'2026-06-07',3.00],
     ['Jupiter','','capcut','2026-05-09',30,'2026-06-08',4.00],
-    ['LA CREMA 2','+5493436579092','capcut','2026-05-09',30,'2026-06-08',4.00]
+    ['LA CREMA 2','+593436579092','capcut','2026-05-09',30,'2026-06-08',4.00]
   ];
   let counter = 1;
   return raw.map(r => {
     const [cliente, wa, srvKey, fecha, dias, vence, precio] = r;
     const srvUid = srvMap[srvKey.toLowerCase()] || 'srv-capcut';
     const srvNom = srvNomMap[srvUid] || srvKey;
-    // Marcar activa si vence después de hoy
-    const activa = vence >= new Date().toISOString().split('T')[0];
     return {
       uid: 'hist-' + (counter++),
       id: '#VTA-H' + String(counter).padStart(3,'0'),
@@ -1030,8 +1394,10 @@ const VENTAS_HISTORICAS = (function(){
       dias: dias,
       plan: dias === 30 ? '1 mes' : dias === 90 ? '3 meses' : dias === 60 ? '2 meses' : dias === 120 ? '4 meses' : dias === 180 ? '6 meses' : '1 mes',
       correo: '', perfil: '', pin: '', invCorreo: '',
-      precio, metodo: 'Transferencia', estado: 'pagado',
-      notas: 'Importado desde base de datos histórica',
+      precio: 0, // Corte financiero — ingresos anteriores no se contabilizan
+      metodo: 'Transferencia', estado: 'pagado',
+      costoAdq: 0, metodoAdq: 'Transferencia',
+      notas: 'Historial pre-corte — precio en $0 (corte financiero ' + hoy() + ')',
       cuentaUID: null, cupoIdx: null,
       activa: true, creado: fecha + 'T12:00:00.000Z'
     };
@@ -1078,6 +1444,8 @@ let PLANTILLAS_WA = [
 let _dashMes = new Date().getMonth();
 let _dashAnio = new Date().getFullYear();
 let _dashPeriodo = 'mes';
+let _dashDesde = ''; // para modo rango
+let _dashHasta = '';
 let _chartIngresos = null, _chartCostos = null;
 let _mvCuentaSelUID = null, _mvInvMode = true;
 let _editCupoUID = null, _editCupoIdx = null;
@@ -1160,38 +1528,237 @@ function navIr(id, btn){
 }
 
 // ══════════════════════════════════════
-// FIFO BINANCE
+// FIFO BINANCE — Sistema Kardex
 // ══════════════════════════════════════
-function calcFIFO(usdt){
-  let restante = usdt;
-  const rows = [];
-  let total = 0;
-  const colaOrdenada = [...APP.recargas].sort((a,b) => a.fecha.localeCompare(b.fecha));
-  for(const r of colaOrdenada){
-    const disp = r.usdt - r.usado;
-    if(disp <= 0) continue;
-    const usar = Math.min(restante, disp);
-    rows.push({ uid: r.uid, fecha: r.fecha, usdt: usar, tasa: r.tasa, subtotal: usar * r.tasa });
-    total += usar * r.tasa;
-    restante -= usar;
-    if(restante <= 0) break;
-  }
-  return { rows, total, faltante: restante };
+
+// Migrar datos legacy: si hay recargas con campo "usado", migrarlos a movimientosBinance
+function migrarBinanceLegacy(){
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  // Migrar recargas como entradas si no están ya en movimientos
+  // Verificar tanto por recargaUID como por los UIDs conocidos que genera inyectarDatosPDF
+  const uidsEntradas = new Set(APP.movimientosBinance.filter(m=>m.tipo==='entrada').map(m=>m.recargaUID).filter(Boolean));
+  APP.recargas.forEach(r => {
+    if(!uidsEntradas.has(r.uid)){
+      // Verificar también si ya existe un movimiento con uid = r.uid+'-mov' (formato inyectarDatosPDF)
+      const yaExistePorUID = APP.movimientosBinance.some(m =>
+        m.uid === r.uid + '-mov' || m.uid === 'mig-in-' + r.uid
+      );
+      if(!yaExistePorUID){
+        APP.movimientosBinance.push({
+          uid: 'mig-in-' + r.uid,
+          fecha: r.fecha,
+          tipo: 'entrada',
+          concepto: 'Recarga P2P' + (r.notas ? ' — ' + r.notas : ''),
+          usdt: r.usdt,
+          tasa: r.tasa,
+          montoUSD: r.usdt * r.tasa,
+          recargaUID: r.uid,
+          migrado: true,
+          esCostoReal: true
+        });
+      }
+    }
+  });
+  // Migrar "usado" de cada recarga como salidas si no están ya
+  const uidsSalidas = new Set(APP.movimientosBinance.filter(m=>m.tipo==='salida' && m.migrado).map(m=>m.recargaUID).filter(Boolean));
+  APP.recargas.forEach(r => {
+    const usado = r.usado || 0;
+    if(usado > 0 && !uidsSalidas.has(r.uid)){
+      APP.movimientosBinance.push({
+        uid: 'mig-out-' + r.uid,
+        fecha: r.fecha,
+        tipo: 'salida',
+        concepto: 'Gasto migrado desde saldo anterior',
+        usdt: usado,
+        tasa: r.tasa,
+        montoUSD: usado * r.tasa,
+        recargaUID: r.uid,
+        migrado: true,
+        esCostoReal: true
+      });
+    }
+  });
+  // Deduplicar por uid al final (corrige cualquier duplicado previo guardado en Sheets)
+  const seen = new Set();
+  APP.movimientosBinance = APP.movimientosBinance.filter(m => {
+    if(!m.uid) return true;
+    if(seen.has(m.uid)) return false;
+    seen.add(m.uid);
+    return true;
+  });
 }
 
+// Registrar entrada Binance (recarga P2P)
+function registrarEntradaBinance(recargaUID, fecha, usdt, tasa, concepto){
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  const yaExiste = APP.movimientosBinance.some(m => m.recargaUID === recargaUID && m.tipo === 'entrada' && !m.migrado);
+  if(!yaExiste){
+    APP.movimientosBinance.push({
+      uid: uid(), fecha, tipo: 'entrada',
+      concepto: concepto || 'Recarga P2P',
+      usdt, tasa, montoUSD: usdt * tasa,
+      recargaUID, esCostoReal: true
+    });
+  }
+}
+
+function registrarSalidaBinance(usdt, tasa, concepto, cuentaUID, costoUID, fecha){
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  const tasaUsar = tasa || getTasaPromBinance();
+  APP.movimientosBinance.push({
+    uid: uid(), fecha: fecha || hoy(), tipo: 'salida',
+    concepto: concepto || 'Gasto Binance',
+    usdt, tasa: tasaUsar, montoUSD: usdt * tasaUsar,
+    cuentaUID: cuentaUID || null, costoUID: costoUID || null,
+    esCostoReal: true
+  });
+}
+
+function getTasaPromBinance(){
+  // Tasa ponderada del saldo disponible actual (FIFO-aware)
+  const recargasOrdenadas = (APP.recargas||[])
+    .filter(r => r.usdt > 0)
+    .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
+  let totalUSDT = 0, totalUSD = 0;
+  for(const r of recargasOrdenadas){
+    const disponible = Math.max(0, r.usdt - (r.usado||0));
+    if(disponible > 0){
+      totalUSDT += disponible;
+      totalUSD  += disponible * (r.tasa || 1);
+    }
+  }
+  if(totalUSDT > 0) return totalUSD / totalUSDT;
+  // Fallback: promedio simple de todas las entradas
+  const entradas = (APP.movimientosBinance||[]).filter(m => m.tipo === 'entrada');
+  if(!entradas.length) return 1;
+  return entradas.reduce((s,m) => s + m.tasa, 0) / entradas.length;
+}
+
+// Saldo real Binance = suma entradas - suma salidas
 function getSaldoBinance(){
-  return APP.recargas.reduce((s, r) => s + (r.usdt - r.usado), 0);
+  if(!APP.movimientosBinance || !APP.movimientosBinance.length){
+    // fallback legacy
+    return APP.recargas.reduce((s, r) => s + (r.usdt - (r.usado||0)), 0);
+  }
+  migrarBinanceLegacy();
+  const entradas = APP.movimientosBinance.filter(m => m.tipo === 'entrada').reduce((s,m) => s + m.usdt, 0);
+  const salidas  = APP.movimientosBinance.filter(m => m.tipo === 'salida').reduce((s,m) => s + m.usdt, 0);
+  return entradas - salidas;
 }
 
 function actualizarSaldoBinance(){
   const saldo = getSaldoBinance();
-  const tasaProm = APP.recargas.length
-    ? APP.recargas.reduce((s,r) => s + r.tasa, 0) / APP.recargas.length
-    : 1;
+  const tasaProm = getTasaPromBinance();
   const elUsdt = document.getElementById('saldo-usdt');
-  const elUsd = document.getElementById('saldo-usd');
-  if(elUsdt) elUsdt.textContent = saldo.toFixed(2) + ' USDT';
-  if(elUsd) elUsd.textContent = '≈ $' + (saldo * tasaProm).toFixed(2) + ' USD';
+  const elUsd  = document.getElementById('saldo-usd');
+  if(elUsdt){
+    elUsdt.textContent = saldo.toFixed(2) + ' USDT';
+    elUsdt.style.color = saldo < 0 ? 'var(--red)' : '';
+  }
+  if(elUsd){
+    const usdVal = saldo * tasaProm;
+    elUsd.textContent = '≈ $' + usdVal.toFixed(2) + ' USD';
+    elUsd.style.color = saldo < 0 ? 'var(--red)' : '';
+  }
+}
+
+// ── FIFO REAL ──────────────────────────────────────────────────────────────
+// Devuelve el costo USD exacto de gastar `usdt` partiendo del lote más antiguo.
+// También devuelve el desglose por lote para mostrar en pantalla.
+function calcFIFO(usdt){
+  if(!usdt || usdt <= 0) return { rows:[], total:0, faltante:0 };
+
+  // Construir pool de lotes disponibles (entradas ordenadas por fecha ASC)
+  const entradas = (APP.movimientosBinance||[])
+    .filter(m => m.tipo === 'entrada')
+    .sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+  // Calcular cuánto USDT ya se consumió de cada lote (por salidas anteriores)
+  // Las salidas se aplican en FIFO también — usar campo r.usado de recargas como proxy
+  // Reconstruir pool con saldo disponible real por lote
+  const pool = [];
+  // Usar APP.recargas como fuente de verdad de los lotes (ya tienen .usdt y .usado)
+  const recargasOrdenadas = (APP.recargas||[])
+    .filter(r => r.usdt > 0)
+    .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
+
+  for(const r of recargasOrdenadas){
+    const disponible = Math.max(0, r.usdt - (r.usado||0));
+    if(disponible > 0){
+      pool.push({
+        fecha: r.fecha,
+        tasa: r.tasa || 1,
+        disponible,
+        loteDesc: `Recarga ${r.fecha} @$${(r.tasa||1).toFixed(4)}`
+      });
+    }
+  }
+
+  // Consumir del pool FIFO
+  let restante = usdt;
+  let totalUSD = 0;
+  const rows = [];
+
+  for(const lote of pool){
+    if(restante <= 0) break;
+    const usar = Math.min(restante, lote.disponible);
+    const costoLote = parseFloat((usar * lote.tasa).toFixed(6));
+    rows.push({
+      usdt: usar,
+      tasa: lote.tasa,
+      subtotal: costoLote,
+      fecha: lote.fecha
+    });
+    totalUSD += costoLote;
+    restante -= usar;
+  }
+
+  // Si faltó saldo, el restante se valúa a la última tasa conocida
+  const faltante = Math.max(0, restante);
+  if(faltante > 0){
+    const ultimaTasa = pool.length ? pool[pool.length-1].tasa : 1;
+    rows.push({
+      usdt: faltante,
+      tasa: ultimaTasa,
+      subtotal: parseFloat((faltante * ultimaTasa).toFixed(6)),
+      fecha: hoy(),
+      sinSaldo: true
+    });
+    totalUSD += faltante * ultimaTasa;
+  }
+
+  return { rows, total: parseFloat(totalUSD.toFixed(6)), faltante };
+}
+
+// Descontar USDT del saldo Binance registrando una salida con costo FIFO exacto
+function descontarUSDTBinance(usdt, concepto, cuentaUID, costoUID, fecha){
+  const saldo = getSaldoBinance();
+  if(saldo < usdt){
+    if(!confirm(`⚠️ Saldo Binance insuficiente.\n\nSaldo actual: ${saldo.toFixed(2)} USDT\nGasto: ${usdt.toFixed(2)} USDT\nSaldo resultante: ${(saldo-usdt).toFixed(2)} USDT\n\n¿Continuar de todos modos? El saldo quedará negativo.`)){
+      return false;
+    }
+  }
+
+  // Calcular costo USD exacto via FIFO antes de consumir
+  const fifo = calcFIFO(usdt);
+  const tasaEfectiva = usdt > 0 ? fifo.total / usdt : getTasaPromBinance();
+
+  // Registrar salida con costo FIFO exacto
+  registrarSalidaBinance(usdt, tasaEfectiva, concepto, cuentaUID, costoUID, fecha);
+
+  // Actualizar campo "usado" en recargas (FIFO — lote más antiguo primero)
+  let restante = usdt;
+  for(const r of (APP.recargas||[]).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''))){
+    if(restante <= 0) break;
+    if((r.usado||0) >= r.usdt) continue;
+    const disp = r.usdt - (r.usado||0);
+    const usar = Math.min(restante, disp);
+    r.usado = parseFloat(((r.usado||0) + usar).toFixed(6));
+    restante -= usar;
+  }
+
+  actualizarSaldoBinance();
+  return true;
 }
 
 // ══════════════════════════════════════
@@ -1267,9 +1834,275 @@ function renderRegistro(){
       <div class="hist-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <div class="hist-precio">$${v.precio.toFixed(2)}</div>
         <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
-        <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
+        <div style="display:flex;gap:4px">
+          <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
+          <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
+          <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
+        </div>
       </div>
     </div>`).join('');
+}
+
+// ══════════════════════════════════════
+// EDITAR VENTA — con flujo completo Cat→Srv→Plan→Cuenta
+// ══════════════════════════════════════
+function evActCat(){
+  const catUid = document.getElementById('ev-cat').value;
+  const srvSel = document.getElementById('ev-srv');
+  srvSel.innerHTML = '<option value="">— Elige servicio —</option>';
+  document.getElementById('ev-plan').innerHTML = '<option value="">— Elige servicio —</option>';
+  document.getElementById('ev-cuenta-inv').innerHTML = '<option value="">— Sin cuenta asignada —</option>';
+  document.getElementById('ev-cuenta-info').style.display = 'none';
+  document.getElementById('ev-cupo-wrap').style.display = 'none';
+  if(!catUid) return;
+  CATALOGO_SERVICIOS.filter(s => s.catUid === catUid).forEach(s => {
+    const o = document.createElement('option'); o.value = s.uid; o.textContent = s.emoji + ' ' + s.nombre; srvSel.appendChild(o);
+  });
+}
+function evActSrv(){
+  const srvUid = document.getElementById('ev-srv').value;
+  const planSel = document.getElementById('ev-plan');
+  const cuentaSel = document.getElementById('ev-cuenta-inv');
+  planSel.innerHTML = '<option value="">— Elige plan —</option>';
+  cuentaSel.innerHTML = '<option value="">— Sin cuenta asignada —</option>';
+  document.getElementById('ev-cuenta-info').style.display = 'none';
+  document.getElementById('ev-cupo-wrap').style.display = 'none';
+  if(!srvUid) return;
+  const srv = getSrv(srvUid);
+  if(!srv) return;
+  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = p; planSel.appendChild(o); });
+  // Poblar cuentas del inventario para este servicio
+  const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
+  if(origen === 'inventario'){
+    APP.cuentas.filter(c => c.srvUid === srvUid).forEach(c => {
+      const libres = c.cupos ? c.cupos.filter(cu => cu.estado === 'libre').length : 0;
+      const o = document.createElement('option');
+      o.value = c.uid;
+      o.textContent = `${c.id}${c.correo?' · '+c.correo:''} (${libres} libre${libres!==1?'s':''})`;
+      cuentaSel.appendChild(o);
+    });
+  }
+}
+function evToggleOrigen(){
+  const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
+  document.getElementById('ev-inv-bloque').style.display = origen === 'inventario' ? 'block' : 'none';
+  document.getElementById('ev-manual-bloque').style.display = origen === 'manual' ? 'block' : 'none';
+  if(origen === 'manual'){
+    document.getElementById('ev-correo').readOnly = false;
+    document.getElementById('ev-correo').style.background = '';
+    document.getElementById('ev-correo').style.color = '';
+  } else {
+    document.getElementById('ev-correo').readOnly = true;
+    document.getElementById('ev-correo').style.background = 'var(--surface)';
+    document.getElementById('ev-correo').style.color = 'var(--text2)';
+    // Refrescar cuentas según servicio seleccionado
+    evActSrv();
+  }
+}
+function evSelCuentaInv(){
+  const selVal = document.getElementById('ev-cuenta-inv').value;
+  const infoEl = document.getElementById('ev-cuenta-info');
+  const cupoWrap = document.getElementById('ev-cupo-wrap');
+  const cupoSel = document.getElementById('ev-cupo-inv');
+  document.getElementById('ev-correo').value = '';
+  cupoWrap.style.display = 'none';
+  cupoSel.innerHTML = '<option value="">— Selecciona cupo —</option>';
+  if(!selVal){ infoEl.style.display = 'none'; return; }
+  const c = APP.cuentas.find(x => x.uid === selVal);
+  if(!c){ infoEl.style.display = 'none'; return; }
+  document.getElementById('ev-correo').value = c.correo || '';
+  infoEl.style.display = 'block';
+  const libres = c.cupos ? c.cupos.filter(cu => cu.estado === 'libre').length : 0;
+  const ocup   = c.cupos ? c.cupos.filter(cu => cu.estado === 'ocupado').length : 0;
+  infoEl.textContent = `📦 ${c.id} · ${c.correo} · ${ocup} ocupado(s) · ${libres} libre(s)`;
+  // Mostrar TODOS los cupos (libres y el que ya tenía la venta)
+  const ventaUid = document.getElementById('ev-uid').value;
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  c.cupos.forEach((cu, i) => {
+    const esMiCupo = v && v.cuentaUID === selVal && v.cupoIdx === i;
+    if(cu.estado === 'libre' || esMiCupo){
+      const o = document.createElement('option');
+      o.value = i;
+      const label = cu.estado === 'libre' ? `Cupo ${i+1} — Libre` : `Cupo ${i+1} — ${cu.cliente||'Ocupado'} (actual)`;
+      o.textContent = label;
+      if(esMiCupo) o.selected = true;
+      cupoSel.appendChild(o);
+    }
+  });
+  cupoWrap.style.display = 'block';
+}
+function abrirEditarVenta(ventaUid){
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  if(!v) return;
+  document.getElementById('ev-uid').value = ventaUid;
+  document.getElementById('ev-cliente').value = v.cliente || '';
+  document.getElementById('ev-wa').value = v.wa || '';
+  document.getElementById('ev-perfil').value = v.perfil || '';
+  document.getElementById('ev-pin').value = v.pin || '';
+  document.getElementById('ev-precio').value = v.precio || '';
+  document.getElementById('ev-metodo').value = v.metodo || 'Transferencia';
+  document.getElementById('ev-fecha').value = v.fecha || hoy();
+  document.getElementById('ev-vence').value = v.vence || '';
+  document.getElementById('ev-estado').value = v.estado || 'pagado';
+  document.getElementById('ev-notas').value = v.notas || '';
+  document.getElementById('ev-correo').value = v.correo || '';
+  document.getElementById('ev-costo-cuenta').value = v.costoAdq || '';
+  if(document.getElementById('ev-metodo-adq')) document.getElementById('ev-metodo-adq').value = v.metodoAdq || 'Transferencia';
+
+  // Poblar categorías
+  const catSel = document.getElementById('ev-cat');
+  catSel.innerHTML = '<option value="">— Selecciona —</option>';
+  CATALOGO_CATEGORIAS.forEach(c => {
+    const o = document.createElement('option'); o.value = c.uid; o.textContent = c.emoji + ' ' + c.nombre; catSel.appendChild(o);
+  });
+
+  // Si la venta tiene servicio, preseleccionar categoría y servicio
+  const srv = v.srvUid ? getSrv(v.srvUid) : null;
+  if(srv){
+    catSel.value = srv.catUid;
+    evActCat();
+    setTimeout(() => {
+      document.getElementById('ev-srv').value = v.srvUid;
+      evActSrv();
+      setTimeout(() => {
+        // Preseleccionar plan
+        const planOpts = document.getElementById('ev-plan').options;
+        for(let i=0; i<planOpts.length; i++){
+          if(planOpts[i].textContent === v.plan){ planOpts[i].selected = true; break; }
+        }
+        // Preseleccionar cuenta del inventario si tiene
+        if(v.cuentaUID){
+          document.getElementById('ev-cuenta-inv').value = v.cuentaUID;
+          evSelCuentaInv();
+          setTimeout(() => {
+            if(v.cupoIdx !== null && v.cupoIdx !== undefined){
+              document.getElementById('ev-cupo-inv').value = v.cupoIdx;
+            }
+          }, 60);
+        }
+      }, 60);
+    }, 60);
+  }
+
+  // Origen: si tiene cuentaUID → inventario, si no → manual
+  const origenRadios = document.querySelectorAll('input[name="ev-origen"]');
+  if(v.cuentaUID){
+    origenRadios.forEach(r => r.checked = r.value === 'inventario');
+    document.getElementById('ev-inv-bloque').style.display = 'block';
+    document.getElementById('ev-manual-bloque').style.display = 'none';
+    document.getElementById('ev-correo').readOnly = true;
+    document.getElementById('ev-correo').style.background = 'var(--surface)';
+    document.getElementById('ev-correo').style.color = 'var(--text2)';
+  } else {
+    origenRadios.forEach(r => r.checked = r.value === 'manual');
+    document.getElementById('ev-inv-bloque').style.display = 'none';
+    document.getElementById('ev-manual-bloque').style.display = 'block';
+    document.getElementById('ev-correo-manual').value = v.correo || '';
+    document.getElementById('ev-correo').readOnly = false;
+    document.getElementById('ev-correo').style.background = '';
+    document.getElementById('ev-correo').style.color = '';
+  }
+
+  // Si tiene cuenta en inventario, mostrar costo calculado
+  if(v.cuentaUID && !v.costoAdq){
+    const c = APP.cuentas.find(x => x.uid === v.cuentaUID);
+    if(c && c.costo > 0){
+      const cuposOcup = Math.max(c.cupos ? c.cupos.filter(cu => cu.estado==='ocupado').length : 1, 1);
+      document.getElementById('ev-costo-cuenta').value = (c.costo / cuposOcup).toFixed(2);
+      if(document.getElementById('ev-metodo-adq')) document.getElementById('ev-metodo-adq').value = c.metodoPago || 'Transferencia';
+    }
+  }
+  abrirModal('modal-editar-venta');
+}
+
+function editarVentaGuardar(){
+  const ventaUid = document.getElementById('ev-uid').value;
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  if(!v) return;
+  const nuevoWA = sanitizarTexto(document.getElementById('ev-wa').value, 20);
+  const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
+  const nuevoCorreo = origen === 'manual'
+    ? sanitizarTexto(document.getElementById('ev-correo-manual').value || document.getElementById('ev-correo').value, 200)
+    : sanitizarTexto(document.getElementById('ev-correo').value, 200);
+
+  // Guardar categoría, servicio y plan si se seleccionaron
+  const catUid = document.getElementById('ev-cat').value;
+  const srvUid = document.getElementById('ev-srv').value;
+  const planSel = document.getElementById('ev-plan');
+  const planVal = planSel.options[planSel.selectedIndex]?.textContent || '';
+  if(catUid) v.catUid = catUid;
+  if(srvUid){ v.srvUid = srvUid; const srv = getSrv(srvUid); v.srvNom = srv ? srv.nombre : v.srvNom; }
+  if(planVal && planVal !== '— Elige plan —' && planVal !== '— Elige servicio —') v.plan = planVal;
+
+  v.cliente = sanitizarTexto(document.getElementById('ev-cliente').value, 100) || v.cliente;
+  v.wa = nuevoWA || v.wa;
+  v.correo = nuevoCorreo || v.correo;
+  v.perfil = sanitizarTexto(document.getElementById('ev-perfil').value, 50);
+  v.pin = sanitizarTexto(document.getElementById('ev-pin').value, 10);
+  v.precio = sanitizarNumero(document.getElementById('ev-precio').value);
+  v.metodo = document.getElementById('ev-metodo').value;
+  v.fecha = document.getElementById('ev-fecha').value || v.fecha;
+  v.vence = document.getElementById('ev-vence').value || v.vence;
+  v.estado = document.getElementById('ev-estado').value;
+  v.notas = sanitizarTexto(document.getElementById('ev-notas').value, 500);
+
+  // ── Manejo de cuenta del inventario ──
+  const nuevaCuentaUID = origen === 'inventario' ? document.getElementById('ev-cuenta-inv').value : '';
+  const nuevoCupoIdx = origen === 'inventario' ? document.getElementById('ev-cupo-inv').value : '';
+
+  if(origen === 'inventario' && nuevaCuentaUID){
+    // Si cambió de cuenta, liberar el cupo anterior
+    if(v.cuentaUID && v.cuentaUID !== nuevaCuentaUID && v.cupoIdx !== null){
+      const cuentaVieja = APP.cuentas.find(c => c.uid === v.cuentaUID);
+      if(cuentaVieja && cuentaVieja.cupos[v.cupoIdx]) cuentaVieja.cupos[v.cupoIdx] = {estado:'libre'};
+    }
+    // Si el cupo cambió dentro de la misma cuenta, liberar el anterior
+    if(v.cuentaUID === nuevaCuentaUID && nuevoCupoIdx !== '' && parseInt(nuevoCupoIdx) !== v.cupoIdx && v.cupoIdx !== null){
+      const cuentaMisma = APP.cuentas.find(c => c.uid === v.cuentaUID);
+      if(cuentaMisma && cuentaMisma.cupos[v.cupoIdx]) cuentaMisma.cupos[v.cupoIdx] = {estado:'libre'};
+    }
+    v.cuentaUID = nuevaCuentaUID;
+    if(nuevoCupoIdx !== '') v.cupoIdx = parseInt(nuevoCupoIdx);
+    // Actualizar el cupo en la cuenta
+    const cuentaNueva = APP.cuentas.find(c => c.uid === nuevaCuentaUID);
+    if(cuentaNueva && v.cupoIdx !== null && v.cupoIdx !== undefined){
+      cuentaNueva.cupos[v.cupoIdx] = {
+        estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
+        perfil: v.perfil || '', pin: v.pin || '', vence: v.vence, ventaUid: v.uid
+      };
+      if(nuevoCorreo) cuentaNueva.correo = cuentaNueva.correo || nuevoCorreo;
+    }
+    // Autocompletar correo desde la cuenta
+    if(cuentaNueva && cuentaNueva.correo) v.correo = cuentaNueva.correo;
+  } else if(origen === 'manual' && v.cuentaUID){
+    // Si cambió a manual, liberar cupo anterior
+    if(confirm('¿Desvincular esta venta de la cuenta del inventario? El cupo quedará libre.')){
+      const cuentaVieja = APP.cuentas.find(c => c.uid === v.cuentaUID);
+      if(cuentaVieja && v.cupoIdx !== null && cuentaVieja.cupos[v.cupoIdx]) cuentaVieja.cupos[v.cupoIdx] = {estado:'libre'};
+      v.cuentaUID = null; v.cupoIdx = null;
+    }
+  } else if(origen === 'manual'){
+    v.cuentaUID = null; v.cupoIdx = null;
+  }
+
+  // Guardar costo de cuenta
+  const costoAdqNuevo = parseFloat(document.getElementById('ev-costo-cuenta').value) || 0;
+  const metodoAdqNuevo = document.getElementById('ev-metodo-adq')?.value || v.metodoAdq || 'Transferencia';
+  if(costoAdqNuevo > 0 && costoAdqNuevo !== v.costoAdq){
+    v.costoAdq = costoAdqNuevo; v.metodoAdq = metodoAdqNuevo;
+    const esUsdt = metodoAdqNuevo.toLowerCase().includes('usdt') || metodoAdqNuevo.toLowerCase().includes('binance');
+    if(esUsdt){
+      descontarUSDTBinance(costoAdqNuevo, `Costo cuenta — ${v.srvNom} (${v.cliente})`, v.cuentaUID||null, null, v.fecha||hoy());
+    } else {
+      APP.costos.push({ uid:uid(), fecha:v.fecha||hoy(), catUid:'cg-cuentas', desc:`Costo cuenta — ${v.srvNom} (${v.cliente})`, metodo:metodoAdqNuevo, montoUSD:costoAdqNuevo, usdtUsado:0, notas:`Desde edición ${v.id}` });
+    }
+  }
+  cerrarModal('modal-editar-venta');
+  renderRegistro();
+  renderVencimientos();
+  renderInventario();
+  renderBadgeVencimientos();
+  sincronizarConSheets();
 }
 
 // ══════════════════════════════════════
@@ -1460,13 +2293,47 @@ function mvGuardar(){
     }
   } else if(!_mvInvMode){
     correo = sanitizarTexto(document.getElementById('mv-cactus-correo').value, 200);
+    const costoAdq = sanitizarNumero(document.getElementById('mv-cactus-costo').value);
+    const metodoAdq = document.getElementById('mv-cactus-metodo-adq')?.value || 'Efectivo';
     if(correo){
       const nc = { uid:uid(), srvUid, srvNom: srv ? srv.nombre : srvUid, id:`${(srv?.nombre||'SRV').toUpperCase().slice(0,3)}-C${APP._ventaCounter}`,
         correo, pass:sanitizarTexto(document.getElementById('mv-cactus-pass').value, 200),
-        costo:sanitizarNumero(document.getElementById('mv-cactus-costo').value),
+        costo: costoAdq, metodoPago: metodoAdq,
         cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:'',pin:'',vence}]
       };
       APP.cuentas.push(nc); cuentaUID = nc.uid; cupoIdx = 0;
+    }
+    // Registrar costo automáticamente si fue especificado (solo en venta sin inventario = costo real)
+    if(costoAdq > 0){
+      const esUsdt = metodoAdq.toLowerCase().includes('usdt') || metodoAdq.toLowerCase().includes('binance');
+      if(esUsdt){
+        // Descontar USDT del saldo Binance y registrar salida como Kardex
+        const ok = descontarUSDTBinance(costoAdq,
+          `Adquisición cuenta — ${srv ? srv.nombre : srvUid} (${nombre})`,
+          cuentaUID, null, fechaVenta
+        );
+        if(!ok) return; // usuario canceló
+        // También registrar en costos como gasto real
+        APP.costos.push({
+          uid: uid(), tipo: 'adquisicion_cuenta',
+          fecha: fechaVenta, catUid: 'cg-cuentas',
+          desc: `Adquisición cuenta — ${srv ? srv.nombre : srvUid} (${nombre})`,
+          metodo: metodoAdq,
+          montoUSD: costoAdq * getTasaPromBinance(),
+          usdtUsado: costoAdq,
+          cuentaUID, esCostoReal: true,
+          notas: `Registrado automáticamente desde venta ${numVenta()}`
+        });
+      } else {
+        APP.costos.push({
+          uid: uid(), tipo: 'adquisicion_cuenta',
+          fecha: fechaVenta, catUid: 'cg-cuentas',
+          desc: `Adquisición cuenta — ${srv ? srv.nombre : srvUid} (${nombre})`,
+          metodo: metodoAdq, montoUSD: costoAdq, usdtUsado: 0,
+          cuentaUID, esCostoReal: true,
+          notas: `Registrado automáticamente desde venta ${numVenta()}`
+        });
+      }
     }
   }
   const venta = {
@@ -1506,9 +2373,51 @@ function invFiltrar(f, btn){
 }
 
 function renderInventario(){
-  let cuentas = [...APP.cuentas];
-  // Build filters
-  const srvUIDs = [...new Set(cuentas.map(c => c.srvUid))];
+  // ── Cuentas formales ──────────────────────────────────────
+  const cuentasFormales = [...APP.cuentas];
+
+  // ── Ventas sin cuenta asignada → cuentas virtuales ────────
+  // Incluir TODAS: activas, vencidas, sin correo también
+  const ventasSinCuenta = APP.ventas.filter(v => !v.cuentaUID);
+  // Agrupar por correo si tienen, sino cada una es su propia "cuenta"
+  const porCorreo = {};
+  ventasSinCuenta.forEach(v => {
+    const key = v.correo ? v.correo.toLowerCase() : 'sin-correo-' + v.uid;
+    if(!porCorreo[key]) porCorreo[key] = {
+      correo: v.correo || '',
+      srvUid: v.srvUid,
+      srvNom: v.srvNom,
+      ventas: []
+    };
+    porCorreo[key].ventas.push(v);
+  });
+  const cuentasVirtuales = Object.values(porCorreo).map(g => ({
+    uid: 'virtual-' + (g.correo || g.ventas[0].uid),
+    srvUid: g.srvUid,
+    srvNom: g.srvNom,
+    id: g.correo ? '📧 ' + g.correo : '👤 ' + g.ventas[0].cliente,
+    correo: g.correo,
+    pass: '',
+    costo: 0,
+    esVirtual: true,
+    ventasRef: g.ventas, // referencia para editar
+    cupos: g.ventas.map(v => ({
+      estado: v.activa === false ? 'libre' : 'ocupado',
+      cliente: v.cliente,
+      wa: v.wa || '',
+      perfil: v.perfil || '',
+      pin: v.pin || '',
+      plan: v.plan || '',
+      invCorreo: v.invCorreo || '',
+      vence: (v.vence && v.vence.match(/^\d{4}-\d{2}-\d{2}$/)) ? v.vence : null,
+      ventaUid: v.uid
+    }))
+  }));
+
+  let todasCuentas = [...cuentasFormales, ...cuentasVirtuales];
+
+  // ── Filtros de servicio ────────────────────────────────────
+  const srvUIDs = [...new Set(todasCuentas.map(c => c.srvUid))];
   const filtrosEl = document.getElementById('inv-filtros');
   filtrosEl.innerHTML = `<button class="filter-btn ${APP._filtroInv==='todos'?'active':''}" onclick="invFiltrar('todos',this)">Todos</button>`;
   srvUIDs.forEach(suid => {
@@ -1516,47 +2425,145 @@ function renderInventario(){
     const nom = srv ? esc(srv.emoji) + ' ' + esc(srv.nombre) : esc(suid);
     filtrosEl.innerHTML += `<button class="filter-btn ${APP._filtroInv===suid?'active':''}" onclick="invFiltrar('${esc(suid)}',this)">${nom}</button>`;
   });
+
+  let cuentas = [...todasCuentas];
   if(APP._filtroInv !== 'todos') cuentas = cuentas.filter(c => c.srvUid === APP._filtroInv);
   if(_invBusq){
     const q = _invBusq.toLowerCase();
-    cuentas = cuentas.filter(c => c.id.toLowerCase().includes(q) || c.correo.toLowerCase().includes(q) || c.cupos.some(cu => cu.cliente?.toLowerCase().includes(q)));
+    cuentas = cuentas.filter(c =>
+      c.id.toLowerCase().includes(q) ||
+      c.correo.toLowerCase().includes(q) ||
+      c.cupos.some(cu => cu.cliente?.toLowerCase().includes(q))
+    );
   }
-  const libres = APP.cuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado==='libre').length, 0);
-  const ocupados = APP.cuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado==='ocupado').length, 0);
-  document.getElementById('inv-libres').textContent = libres;
-  document.getElementById('inv-ocupados').textContent = ocupados;
-  document.getElementById('inv-sub').textContent = `${APP.cuentas.length} cuentas · ${libres} cupos libres`;
-  const lista = document.getElementById('inv-lista');
-  if(!cuentas.length){
-    lista.innerHTML = '<div class="empty"><div class="e-ico">📦</div><div>Sin cuentas. Toca <b>＋ Cuenta</b>.</div></div>';
-    return;
-  }
-  lista.innerHTML = cuentas.map(c => {
+
+  // ── KPIs ──────────────────────────────────────────────────
+  const todosLibres = todasCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado==='libre').length, 0);
+  const todosOcup   = todasCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado==='ocupado').length, 0);
+  document.getElementById('inv-libres').textContent = todosLibres;
+  document.getElementById('inv-ocupados').textContent = todosOcup;
+  document.getElementById('inv-sub').textContent = `${todasCuentas.length} cuentas · ${todosLibres} cupos libres`;
+
+  // ── Separar: activas vs por renovar ───────────────────────
+  const hoyStr = hoy();
+  const activas    = cuentas.filter(c => c.cupos.some(cu => cu.estado==='ocupado' && cu.vence >= hoyStr));
+  const porRenovar = cuentas.filter(c => c.cupos.every(cu => cu.estado==='libre' || cu.vence < hoyStr));
+
+  function renderCuenta(c){
     const lib = c.cupos.filter(cu => cu.estado==='libre').length;
     const ocu = c.cupos.filter(cu => cu.estado==='ocupado').length;
     const srv = getSrv(c.srvUid);
-    const cuposHtml = c.cupos.map((cu, i) => {
-      if(cu.estado === 'libre') return `<div class="cupo-row"><div class="cupo-dot dot-libre"></div><div class="cupo-info"><div class="cupo-cliente" style="color:var(--green)">Cupo ${i+1} — Libre</div></div><button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button></div>`;
+    // Calcular costo por cupo vendido (distribución inteligente)
+    const costoPorCupoVendido = ocu > 0 && c.costo > 0 ? (c.costo / ocu).toFixed(2) : null;
+    // Badge de vigencia de cuenta madre
+    let vigenciaBadge = '';
+    if(c.hasta && !c.esVirtual){
+      const dHasta = diasHasta(c.hasta);
+      if(dHasta !== null){
+        if(dHasta < 0) vigenciaBadge = `<span class="badge badge-vencido" style="font-size:9px">Expiró</span>`;
+        else if(dHasta === 0) vigenciaBadge = `<span class="badge badge-hoy" style="font-size:9px">Vence hoy</span>`;
+        else if(dHasta <= 7) vigenciaBadge = `<span class="badge badge-pronto" style="font-size:9px">En ${dHasta}d</span>`;
+        else vigenciaBadge = `<span class="badge badge-ok" style="font-size:9px">Vence ${fmtFechaCorta(c.hasta)}</span>`;
+      }
+    }
+  const cuposHtml = c.cupos.map((cu, i) => {
+      if(cu.estado === 'libre') return `
+        <div class="cupo-row">
+          <div class="cupo-dot dot-libre"></div>
+          <div class="cupo-info"><div class="cupo-cliente" style="color:var(--green)">Cupo ${i+1} — Libre</div></div>
+          ${!c.esVirtual ? `<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button>` : ''}
+        </div>`;
       const wa = cu.wa ? cu.wa.replace(/\D/g,'') : '';
-      return `<div class="cupo-row"><div class="cupo-dot dot-ocupado"></div><div class="cupo-info"><div class="cupo-cliente">${esc(cu.cliente||'Cupo '+(i+1))}</div><div class="cupo-sub">${cu.perfil?'Perfil: '+esc(cu.perfil)+' · ':''}Vence: ${esc(fmtFecha(cu.vence))} ${badgeVen(cu.vence)}</div></div><div style="display:flex;gap:4px">${wa?`<a href="https://wa.me/${encodeURIComponent(wa)}" target="_blank" rel="noopener noreferrer"><button class="btn-sm">📱</button></a>`:''}<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button></div></div>`;
+      const editBtn = c.esVirtual && cu.ventaUid
+        ? `<button class="btn-sm" onclick="abrirEditarVenta('${esc(cu.ventaUid)}')">✏️</button>`
+        : (!c.esVirtual ? `<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button>` : '');
+      // Fecha vencimiento — solo mostrar si es fecha válida
+      const venceStr = cu.vence && cu.vence.match(/^\d{4}-\d{2}-\d{2}$/) ? fmtFecha(cu.vence) : null;
+      const venceBadge = venceStr ? badgeVen(cu.vence) : '';
+      const planStr = cu.plan ? `<span class="chip" style="font-size:9px;background:var(--surface3)">${esc(cu.plan)}</span>` : '';
+      const invStr = cu.invCorreo ? `<div style="font-size:10px;color:var(--text3)">✉️ ${esc(cu.invCorreo)}</div>` : '';
+      return `
+        <div class="cupo-row" style="flex-direction:column;align-items:stretch;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="cupo-dot dot-ocupado" style="flex-shrink:0"></div>
+            <div class="cupo-info" style="flex:1">
+              <div class="cupo-cliente">${esc(cu.cliente||'Cupo '+(i+1))} ${planStr}</div>
+              <div class="cupo-sub">${cu.perfil?'Perfil: '+esc(cu.perfil)+' · ':''}${venceStr ? 'Vence: '+venceStr+' '+venceBadge : '<span style="color:var(--text3);font-size:10px">Sin fecha</span>'}</div>
+              ${invStr}
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+              ${wa ? `<a href="https://wa.me/${encodeURIComponent(wa)}" target="_blank" rel="noopener noreferrer"><button class="btn-sm">📱</button></a>` : ''}
+              ${editBtn}
+            </div>
+          </div>
+        </div>`;
     }).join('');
     return `<div class="cuenta-card">
       <div class="cuenta-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
           <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
+          ${costoPorCupoVendido ? `<div style="font-size:10px;color:var(--orange);margin-top:2px">💡 $${costoPorCupoVendido}/cupo vendido</div>` : ''}
+          ${c.desde||c.hasta ? `<div style="font-size:10px;color:var(--text3);margin-top:1px">📅 ${c.desde?fmtFechaCorta(c.desde):'—'} → ${c.hasta?fmtFechaCorta(c.hasta):'—'} ${vigenciaBadge}</div>` : ''}
         </div>
-        <div style="display:flex;gap:6px;align-items:center">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0">
           <span class="chip verde">${lib} libre${lib!==1?'s':''}</span>
           <span class="chip rojo">${ocu} ocup.</span>
-          <button class="btn-sm" onclick="event.stopPropagation();abrirEditarCuenta('${esc(c.uid)}')">✏️</button>
-          <button class="btn-sm" onclick="event.stopPropagation();eliminarCuenta('${esc(c.uid)}')">🗑️</button>
+          ${!c.esVirtual
+            ? `<button class="btn-sm" onclick="event.stopPropagation();abrirEditarCuenta('${esc(c.uid)}')">✏️</button>
+               <button class="btn-sm" onclick="event.stopPropagation();abrirCuentaCaida('${esc(c.uid)}')" title="Cuenta caída" style="color:var(--red)">⚡</button>
+               <button class="btn-sm" onclick="event.stopPropagation();eliminarCuenta('${esc(c.uid)}')">🗑️</button>`
+            : `<span class="chip amarillo" style="font-size:9px">Auto</span>`}
           <span style="color:var(--text3)">▾</span>
         </div>
       </div>
       <div class="cupos-list" style="display:none">${cuposHtml}</div>
     </div>`;
-  }).join('');
+  }
+
+  const lista = document.getElementById('inv-lista');
+  if(!cuentas.length){
+    lista.innerHTML = '<div class="empty"><div class="e-ico">📦</div><div>Sin cuentas. Toca <b>＋ Cuenta</b>.</div></div>';
+    return;
+  }
+
+  // ── Agrupar por servicio → plan ──────────────────────────────
+  // Si hay filtro activo (un solo srv) no hace falta agrupar por srv, solo por plan
+  const filtrando = APP._filtroInv !== 'todos';
+
+  // Construir grupos: { srvUid, srvNom, emoji, planes: { planNom: [cuentas] } }
+  const srvGrupos = {};
+  cuentas.forEach(c => {
+    if(!srvGrupos[c.srvUid]) srvGrupos[c.srvUid] = { srvUid: c.srvUid, srvNom: c.srvNom, emoji: getSrv(c.srvUid)?.emoji||'📦', planes: {} };
+    // Determinar el "plan" de la cuenta — puede venir de c.plan, c.notas, o inferirse de cupos
+    const planNom = c.plan || c.subplan || 'General';
+    if(!srvGrupos[c.srvUid].planes[planNom]) srvGrupos[c.srvUid].planes[planNom] = [];
+    srvGrupos[c.srvUid].planes[planNom].push(c);
+  });
+
+  let html = '';
+  Object.values(srvGrupos).forEach(sg => {
+    // Título de servicio (solo si no estamos filtrando por uno)
+    if(!filtrando){
+      html += `<div style="font-size:12px;font-weight:700;color:var(--white);margin:16px 0 8px;display:flex;align-items:center;gap:6px">
+        <span style="font-size:16px">${sg.emoji}</span> ${esc(sg.srvNom)}
+      </div>`;
+    }
+    Object.entries(sg.planes).forEach(([planNom, planCuentas]) => {
+      const libTot = planCuentas.reduce((s,c) => s+c.cupos.filter(cu=>cu.estado==='libre').length, 0);
+      const ocuTot = planCuentas.reduce((s,c) => s+c.cupos.filter(cu=>cu.estado==='ocupado').length, 0);
+      if(planNom !== 'General'){
+        html += `<div style="font-size:10px;font-weight:600;color:var(--text2);margin:10px 0 5px;text-transform:uppercase;letter-spacing:0.8px;display:flex;align-items:center;gap:6px">
+          <span style="flex:1">${esc(planNom)}</span>
+          <span style="color:var(--green);font-weight:400">${libTot} libre${libTot!==1?'s':''}</span>
+          <span style="color:var(--red);font-weight:400;margin-left:4px">${ocuTot} ocup.</span>
+        </div>`;
+      }
+      html += planCuentas.map(renderCuenta).join('');
+    });
+  });
+
+  lista.innerHTML = html;
 }
 
 // Abrir editar cuenta
@@ -1581,8 +2588,79 @@ function abrirEditarCuenta(cuentaUID){
     document.getElementById('nc-costo').value = c.costo || '';
     document.getElementById('nc-pventa').value = c.pventa || '';
     document.getElementById('nc-notas').value = c.notas || '';
+    // Nuevos campos
+    document.getElementById('nc-desde').value = c.desde || '';
+    document.getElementById('nc-hasta').value = c.hasta || '';
+    if(document.getElementById('nc-metodo-pago')) document.getElementById('nc-metodo-pago').value = c.metodoPago || 'Efectivo';
+    // Calcular cupos vendidos
+    const vendidos = c.cupos.filter(cu => cu.estado === 'ocupado').length;
+    document.getElementById('nc-vendidos').value = vendidos;
+    // Mostrar costo por cupo si hay vendidos
+    const cpDiv = document.getElementById('nc-costo-por-cupo');
+    if(vendidos > 0 && c.costo > 0){
+      document.getElementById('nc-costo-cupo-val').textContent = '$' + (c.costo / vendidos).toFixed(2);
+      cpDiv.style.display = 'block';
+    } else { cpDiv.style.display = 'none'; }
+    // Mostrar bloque de renovación
+    document.getElementById('nc-renovar-bloque').style.display = 'block';
+    document.getElementById('nc-ren-desde').value = c.hasta || hoy();
+    // Sugerir hasta: mismo periodo que la cuenta
+    if(c.desde && c.hasta){
+      const diffMs = new Date(c.hasta+'T12:00:00') - new Date(c.desde+'T12:00:00');
+      const diffDias = Math.round(diffMs / 86400000);
+      document.getElementById('nc-ren-hasta').value = sumarDias(c.hasta || hoy(), diffDias || 30);
+    } else {
+      document.getElementById('nc-ren-hasta').value = sumarDias(c.hasta || hoy(), 30);
+    }
+    document.getElementById('nc-ren-costo').value = c.costo || '';
+    if(document.getElementById('nc-ren-metodo')) document.getElementById('nc-ren-metodo').value = c.metodoPago || 'Efectivo';
   }, 50);
   abrirModal('modal-nueva-cuenta');
+}
+
+// Renovar cuenta madre desde inventario
+function ncRenovarCuenta(){
+  const cuentaUID = document.getElementById('nc-edit-uid').value;
+  if(!cuentaUID){ alert('Guarda primero la cuenta'); return; }
+  const c = APP.cuentas.find(x => x.uid === cuentaUID);
+  if(!c) return;
+  const renDesde = document.getElementById('nc-ren-desde').value;
+  const renHasta = document.getElementById('nc-ren-hasta').value;
+  const renCosto = parseFloat(document.getElementById('nc-ren-costo').value)||0;
+  const renMetodo = document.getElementById('nc-ren-metodo').value;
+  if(!renDesde || !renHasta){ alert('Indica la fecha desde y hasta de renovación'); return; }
+  // Actualizar vigencia en la cuenta
+  c.desde = renDesde;
+  c.hasta = renHasta;
+  c.metodoPago = renMetodo;
+  // Registrar el costo automáticamente en gastos
+  if(renCosto > 0){
+    const desc = `Renovación ${c.id} (${c.srvNom||''})`;
+    const esUsdt = renMetodo.toLowerCase().includes('usdt') || renMetodo.toLowerCase().includes('binance');
+    if(esUsdt){
+      const ok = descontarUSDTBinance(renCosto, desc, c.uid, null, renDesde);
+      if(!ok) return;
+      alert(`✅ Renovación registrada.\n💱 ${renCosto.toFixed(2)} USDT descontados del saldo Binance.`);
+    } else {
+      APP.costos.push({
+        uid: uid(),
+        fecha: renDesde,
+        catUid: 'cg-cuentas',
+        desc,
+        metodo: renMetodo,
+        montoUSD: renCosto,
+        usdtUsado: 0,
+        notas: `Renovación automática desde inventario. Período: ${renDesde} → ${renHasta}`
+      });
+      alert(`✅ Renovación registrada.\n💰 Costo $${renCosto.toFixed(2)} agregado automáticamente a gastos.`);
+    }
+  } else {
+    alert('✅ Vigencia actualizada.');
+  }
+  cerrarModal('modal-nueva-cuenta');
+  renderInventario();
+  renderCostos();
+  sincronizarConSheets();
 }
 
 function eliminarCuenta(uid){
@@ -1595,6 +2673,7 @@ function abrirEditarCupo(cuentaUID, cupoIdx){
   const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
   if(!cuenta) return;
   const cupo = cuenta.cupos[cupoIdx];
+  const srv = getSrv(cuenta.srvUid);
   _editCupoUID = cuentaUID; _editCupoIdx = cupoIdx;
   document.getElementById('ec-titulo').innerHTML = `✏️ Cupo ${cupoIdx+1} — ${cuenta.id} <button class="modal-close" onclick="cerrarModal('modal-editar-cupo')">×</button>`;
   document.getElementById('ec-cuenta-uid').value = cuentaUID;
@@ -1603,7 +2682,12 @@ function abrirEditarCupo(cuentaUID, cupoIdx){
   document.getElementById('ec-wa').value = cupo.wa || '';
   document.getElementById('ec-perfil').value = cupo.perfil || '';
   document.getElementById('ec-pin').value = cupo.pin || '';
-  document.getElementById('ec-vence').value = cupo.vence || '';
+  document.getElementById('ec-inv-correo').value = cupo.invCorreo || '';
+  document.getElementById('ec-plan').value = cupo.plan || '';
+  document.getElementById('ec-vence').value = (cupo.vence && cupo.vence.match(/^\d{4}-\d{2}-\d{2}$/)) ? cupo.vence : '';
+  // Mostrar correo invitación solo para servicios que lo usan
+  const usaInv = srv && srv.tieneInvitacion;
+  document.getElementById('ec-inv-correo-field').style.display = usaInv ? '' : 'none';
   abrirModal('modal-editar-cupo');
 }
 function ecGuardar(){
@@ -1617,6 +2701,8 @@ function ecGuardar(){
     wa: document.getElementById('ec-wa').value,
     perfil: document.getElementById('ec-perfil').value,
     pin: document.getElementById('ec-pin').value,
+    invCorreo: document.getElementById('ec-inv-correo').value,
+    plan: document.getElementById('ec-plan').value,
     vence: document.getElementById('ec-vence').value
   };
   cerrarModal('modal-editar-cupo');
@@ -1635,6 +2721,19 @@ function ecLiberar(){
 }
 
 // Nueva cuenta
+// Nueva cuenta
+function abrirNuevaCuenta(){
+  document.getElementById('nc-edit-uid').value = '';
+  document.getElementById('nc-titulo').innerHTML = '📦 Nueva cuenta <button class="modal-close" onclick="cerrarModal(\'modal-nueva-cuenta\')">×</button>';
+  document.getElementById('nc-renovar-bloque').style.display = 'none';
+  document.getElementById('nc-costo-por-cupo').style.display = 'none';
+  ['nc-cat','nc-srv','nc-id','nc-correo','nc-pass','nc-cupos','nc-costo','nc-pventa','nc-notas','nc-desde','nc-hasta','nc-vendidos'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  ncPoblarCategorias();
+  abrirModal('modal-nueva-cuenta');
+}
 function ncPoblarCategorias(){
   const sel = document.getElementById('nc-cat');
   sel.innerHTML = '<option value="">— Selecciona —</option>';
@@ -1660,33 +2759,118 @@ function ncGuardar(){
   const srv = getSrv(srvUid);
   const idVal = document.getElementById('nc-id').value.trim() || `${(srv?.nombre||'SRV').toUpperCase().slice(0,3)}-0${APP.cuentas.length+1}`;
   const editUID = document.getElementById('nc-edit-uid').value;
+  const costoTotal = parseFloat(document.getElementById('nc-costo').value)||0;
+  const metodoPago = document.getElementById('nc-metodo-pago').value;
+  const ncDesde = document.getElementById('nc-desde').value;
+  const ncHasta = document.getElementById('nc-hasta').value;
+  const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
   if(editUID){
     const i = APP.cuentas.findIndex(c => c.uid === editUID);
     if(i > -1){
+      const costoAnterior = APP.cuentas[i].costo || 0;
       const old = APP.cuentas[i].cupos;
       APP.cuentas[i] = {
         ...APP.cuentas[i], srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo,
         pass: document.getElementById('nc-pass').value,
-        costo: parseFloat(document.getElementById('nc-costo').value)||0,
-        pventa: parseFloat(document.getElementById('nc-pventa').value)||0,
+        costo: costoTotal, metodoPago, desde: ncDesde, hasta: ncHasta,
+        pventa,
         notas: document.getElementById('nc-notas').value,
         cupos: Array.from({length:numCupos}, (_,k) => old[k] || {estado:'libre'})
       };
+      // FIX Bug #7: Si hay costo y NO existe ya un costo registrado para esta cuenta, registrarlo
+      if(costoTotal > 0){
+        const yaExisteCosto = APP.costos.some(c =>
+          c.cuentaUID === editUID && c.tipo === 'adquisicion_cuenta'
+        );
+        if(!yaExisteCosto){
+          const esUsdt = metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
+          let montoUSDReal = costoTotal;
+          let usdtUsado = 0;
+          if(esUsdt){
+            const fifo = calcFIFO(costoTotal);
+            usdtUsado = costoTotal;
+            montoUSDReal = fifo.total || costoTotal;
+            descontarUSDTBinance(costoTotal,
+              `Adquisición cuenta madre — ${idVal} (${srv ? srv.nombre : srvUid})`,
+              editUID, null, ncDesde || hoy()
+            );
+          }
+          APP.costos.push({
+            uid: uid(),
+            tipo: 'adquisicion_cuenta',
+            cuentaUID: editUID,
+            fecha: ncDesde || hoy(),
+            catUid: 'cg-cuentas',
+            desc: `Adquisición cuenta madre — ${srv ? srv.nombre : srvUid} · ${idVal}`,
+            metodo: metodoPago || 'Transferencia',
+            montoUSD: montoUSDReal,
+            usdtUsado,
+            esCostoReal: true,
+            notas: `Registrado al editar cuenta ${idVal}`
+          });
+        }
+      }
     }
   } else {
+    const nuevaCuentaUID = uid();
     APP.cuentas.push({
-      uid: uid(), srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo,
+      uid: nuevaCuentaUID, srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo,
       pass: document.getElementById('nc-pass').value,
-      costo: parseFloat(document.getElementById('nc-costo').value)||0,
-      pventa: parseFloat(document.getElementById('nc-pventa').value)||0,
+      costo: costoTotal, metodoPago, desde: ncDesde, hasta: ncHasta,
+      pventa,
       notas: document.getElementById('nc-notas').value,
       cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
     });
+
+    // ── Auto-registrar costo real al crear cuenta madre ──
+    if(costoTotal > 0){
+      // Evitar duplicados: verificar si ya existe costo para esta cuenta
+      const yaExisteCosto = APP.costos.some(c =>
+        c.cuentaUID === nuevaCuentaUID && c.tipo === 'adquisicion_cuenta'
+      );
+      if(!yaExisteCosto){
+        const esUsdt = metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
+        let montoUSDReal = costoTotal;
+        let usdtUsado = 0;
+        if(esUsdt){
+          // Calcular costo USD exacto FIFO ANTES de descontar
+          const fifo = calcFIFO(costoTotal);
+          usdtUsado = costoTotal;
+          montoUSDReal = fifo.total || costoTotal; // costo USD exacto por lote, fallback al costo
+          // FIX: Descontar de Binance pero NO cancelar el registro del costo si el usuario cancela
+          // El costo se registra siempre — el saldo de Binance se ajusta si el usuario acepta
+          descontarUSDTBinance(costoTotal,
+            `Adquisición cuenta madre — ${idVal} (${srv ? srv.nombre : srvUid})`,
+            nuevaCuentaUID, null,
+            ncDesde || hoy()
+          );
+        }
+        // FIX: El costo se registra SIEMPRE, independiente del confirm de Binance
+        APP.costos.push({
+          uid: uid(),
+          tipo: 'adquisicion_cuenta',
+          cuentaUID: nuevaCuentaUID,
+          fecha: ncDesde || hoy(),
+          catUid: 'cg-cuentas',
+          desc: `Adquisición cuenta madre — ${srv ? srv.nombre : srvUid} · ${idVal}`,
+          metodo: metodoPago || 'Transferencia',
+          montoUSD: montoUSDReal,
+          usdtUsado,
+          esCostoReal: true,
+          notas: `Registrado automáticamente al crear cuenta ${idVal}`
+        });
+      }
+    }
   }
   document.getElementById('nc-edit-uid').value = '';
   document.getElementById('nc-titulo').innerHTML = '📦 Nueva cuenta <button class="modal-close" onclick="cerrarModal(\'modal-nueva-cuenta\')">×</button>';
+  document.getElementById('nc-renovar-bloque').style.display = 'none';
   cerrarModal('modal-nueva-cuenta');
   renderInventario();
+  renderCostos();
+  // FIX: refrescar dashboard si está visible
+  const _dashEl = document.getElementById('s-dashboard');
+  if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
   sincronizarConSheets();
 }
 
@@ -1773,37 +2957,209 @@ function renderVencimientos(){
   }).join('');
 }
 
+// ══════════════════════════════════════
+// RENOVAR — con flujo completo Cat→Srv→Plan→Cuenta
+// ══════════════════════════════════════
+function renActCat(){
+  const catUid = document.getElementById('ren-cat').value;
+  const srvSel = document.getElementById('ren-srv');
+  srvSel.innerHTML = '<option value="">— Elige servicio —</option>';
+  document.getElementById('ren-plan').innerHTML = '<option value="">— Elige servicio —</option>';
+  document.getElementById('ren-cuenta-inv').innerHTML = '<option value="">— Sin cuenta asignada —</option>';
+  document.getElementById('ren-cuenta-info').style.display = 'none';
+  document.getElementById('ren-cupo-wrap').style.display = 'none';
+  if(!catUid) return;
+  CATALOGO_SERVICIOS.filter(s => s.catUid === catUid).forEach(s => {
+    const o = document.createElement('option'); o.value = s.uid; o.textContent = s.emoji + ' ' + s.nombre; srvSel.appendChild(o);
+  });
+}
+function renActSrv(){
+  const srvUid = document.getElementById('ren-srv').value;
+  const planSel = document.getElementById('ren-plan');
+  const cuentaSel = document.getElementById('ren-cuenta-inv');
+  planSel.innerHTML = '<option value="">— Elige plan —</option>';
+  cuentaSel.innerHTML = '<option value="">— Sin cuenta asignada —</option>';
+  document.getElementById('ren-cuenta-info').style.display = 'none';
+  document.getElementById('ren-cupo-wrap').style.display = 'none';
+  if(!srvUid) return;
+  const srv = getSrv(srvUid);
+  if(!srv) return;
+  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = p; planSel.appendChild(o); });
+  const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
+  if(origen === 'inventario'){
+    APP.cuentas.filter(c => c.srvUid === srvUid).forEach(c => {
+      const libres = c.cupos ? c.cupos.filter(cu => cu.estado === 'libre').length : 0;
+      const o = document.createElement('option');
+      o.value = c.uid;
+      o.textContent = `${c.id}${c.correo?' · '+c.correo:''} (${libres} libre${libres!==1?'s':''})`;
+      cuentaSel.appendChild(o);
+    });
+  }
+}
+function renToggleOrigen(){
+  const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
+  document.getElementById('ren-inv-bloque').style.display = origen === 'inventario' ? 'block' : 'none';
+  document.getElementById('ren-manual-bloque').style.display = origen === 'manual' ? 'block' : 'none';
+  if(origen === 'inventario') renActSrv();
+  else {
+    document.getElementById('ren-correo').value = '';
+    document.getElementById('ren-correo').readOnly = false;
+  }
+}
+function renSelCupo(){
+  const cuentaUID = document.getElementById('ren-cuenta-inv').value;
+  const cupoIdx = document.getElementById('ren-cupo-inv').value;
+  if(!cuentaUID || cupoIdx === '') return;
+  const c = APP.cuentas.find(x => x.uid === cuentaUID);
+  if(!c || !c.cupos[cupoIdx]) return;
+  const cu = c.cupos[cupoIdx];
+  document.getElementById('ren-correo').value = c.correo || '';
+}
 function abrirRenovar(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
   document.getElementById('ren-venta-uid').value = ventaUid;
-  document.getElementById('ren-info').textContent = `${v.cliente} · ${v.srvNom} · ${v.id}`;
+  document.getElementById('ren-info').textContent = `${v.cliente} · ${v.srvNom||'?'} · ${v.id}`;
   document.getElementById('ren-perfil').value = '';
   document.getElementById('ren-precio').value = v.precio;
   document.getElementById('ren-wa').value = v.wa || '';
-  document.getElementById('ren-correo').value = v.correo || '';
 
-  // Calcular nueva fecha de vencimiento inteligente:
-  // Partir desde el vencimiento original (no desde hoy), para no perder días de prórroga
+  // Calcular nueva fecha de vencimiento
   const diasSuscripcion = v.dias || 30;
   const baseDate = v.vence && v.vence > hoy() ? v.vence : v.vence || hoy();
   const nuevaFechaCalculada = sumarDias(baseDate, diasSuscripcion);
   document.getElementById('ren-vence').value = nuevaFechaCalculada;
-
-  // Mostrar preview de la fecha calculada
   const previewEl = document.getElementById('ren-vence-preview');
-  if(previewEl){
-    previewEl.textContent = `📅 Calculado: ${fmtFecha(nuevaFechaCalculada)} (${diasSuscripcion} días desde vencimiento original)`;
-    previewEl.style.display = 'block';
+  if(previewEl){ previewEl.textContent = `📅 Calculado: ${fmtFecha(nuevaFechaCalculada)} (${diasSuscripcion} días)`; previewEl.style.display = 'block'; }
+
+  // Poblar categorías
+  const catSel = document.getElementById('ren-cat');
+  catSel.innerHTML = '<option value="">— Selecciona —</option>';
+  CATALOGO_CATEGORIAS.forEach(c => {
+    const o = document.createElement('option'); o.value = c.uid; o.textContent = c.emoji + ' ' + c.nombre; catSel.appendChild(o);
+  });
+
+  // Preseleccionar servicio si la venta lo tiene
+  const srv = v.srvUid ? getSrv(v.srvUid) : null;
+  if(srv){
+    catSel.value = srv.catUid;
+    renActCat();
+    setTimeout(() => {
+      document.getElementById('ren-srv').value = v.srvUid;
+      renActSrv();
+      setTimeout(() => {
+        // Preseleccionar plan
+        const planOpts = document.getElementById('ren-plan').options;
+        for(let i=0; i<planOpts.length; i++){
+          if(planOpts[i].textContent === v.plan){ planOpts[i].selected = true; break; }
+        }
+        // Preseleccionar cuenta si tiene
+        if(v.cuentaUID){
+          document.getElementById('ren-cuenta-inv').value = v.cuentaUID;
+          renSelCuenta();
+          setTimeout(() => {
+            if(v.cupoIdx !== null && v.cupoIdx !== undefined){
+              document.getElementById('ren-cupo-inv').value = v.cupoIdx;
+            }
+          }, 60);
+        }
+      }, 60);
+    }, 60);
+  }
+
+  // Origen: inventario si tiene cuentaUID, manual si no
+  const origenRadios = document.querySelectorAll('input[name="ren-origen"]');
+  if(v.cuentaUID){
+    origenRadios.forEach(r => r.checked = r.value === 'inventario');
+    document.getElementById('ren-inv-bloque').style.display = 'block';
+    document.getElementById('ren-manual-bloque').style.display = 'none';
+  } else {
+    origenRadios.forEach(r => r.checked = r.value === (v.correo ? 'inventario' : 'manual'));
+    // Si tiene correo pero no cuentaUID, mostrar manual
+    if(!v.cuentaUID){
+      origenRadios.forEach(r => r.checked = r.value === 'manual');
+      document.getElementById('ren-inv-bloque').style.display = 'none';
+      document.getElementById('ren-manual-bloque').style.display = 'block';
+      document.getElementById('ren-correo-manual').value = v.correo || '';
+    }
+  }
+
+  // Correo resultante
+  document.getElementById('ren-correo').value = v.correo || '';
+  document.getElementById('ren-costo-cuenta').value = '';
+  document.getElementById('ren-cuenta-info').style.display = 'none';
+
+  // Auto-rellenar costo si la cuenta tiene uno
+  if(v.cuentaUID){
+    const c = APP.cuentas.find(x => x.uid === v.cuentaUID);
+    if(c && c.costo > 0){
+      const cuposOcup = Math.max(c.cupos ? c.cupos.filter(cu => cu.estado==='ocupado').length : 1, 1);
+      const costoPorCupo = (c.costo / cuposOcup).toFixed(2);
+      document.getElementById('ren-costo-cuenta').value = costoPorCupo;
+      if(document.getElementById('ren-metodo-adq')) document.getElementById('ren-metodo-adq').value = c.metodoPago || 'Transferencia';
+      const infoEl = document.getElementById('ren-cuenta-info');
+      infoEl.style.display = 'block';
+      infoEl.textContent = `📦 ${c.id} · $${c.costo.toFixed(2)} / ${cuposOcup} cupo${cuposOcup!==1?'s':''} = $${costoPorCupo}/cupo`;
+    }
   }
   abrirModal('modal-renovar');
+}
+
+function renSelCuenta(){
+  const selVal = document.getElementById('ren-cuenta-inv').value;
+  const infoEl = document.getElementById('ren-cuenta-info');
+  const costoEl = document.getElementById('ren-costo-cuenta');
+  const cupoWrap = document.getElementById('ren-cupo-wrap');
+  const cupoSel = document.getElementById('ren-cupo-inv');
+  cupoSel.innerHTML = '<option value="">— Selecciona cupo —</option>';
+  cupoWrap.style.display = 'none';
+  document.getElementById('ren-correo').value = '';
+  if(!selVal){ infoEl.style.display = 'none'; costoEl.value = ''; return; }
+  const c = APP.cuentas.find(x => x.uid === selVal);
+  if(!c){ infoEl.style.display = 'none'; return; }
+  document.getElementById('ren-correo').value = c.correo || '';
+  // Mostrar cupos libres
+  c.cupos.forEach((cu, i) => {
+    if(cu.estado === 'libre'){
+      const o = document.createElement('option');
+      o.value = i; o.textContent = `Cupo ${i+1} — Libre`;
+      cupoSel.appendChild(o);
+    }
+  });
+  cupoWrap.style.display = 'block';
+  if(c.costo > 0){
+    const cuposOcup = Math.max(c.cupos ? c.cupos.filter(cu => cu.estado === 'ocupado').length : 1, 1);
+    const costoPorCupo = (c.costo / cuposOcup).toFixed(2);
+    costoEl.value = costoPorCupo;
+    if(document.getElementById('ren-metodo-adq')) document.getElementById('ren-metodo-adq').value = c.metodoPago || 'Transferencia';
+    infoEl.style.display = 'block';
+    infoEl.textContent = `📦 ${c.id} · $${c.costo.toFixed(2)} / ${cuposOcup} cupo${cuposOcup!==1?'s':''} = $${costoPorCupo}/cupo`;
+  } else {
+    infoEl.style.display = 'block';
+    infoEl.style.background = 'rgba(240,180,41,0.1)';
+    infoEl.style.borderColor = 'rgba(240,180,41,0.3)';
+    infoEl.style.color = 'var(--yellow)';
+    infoEl.textContent = `📦 ${c.id} · Sin costo registrado`;
+  }
 }
 function renGuardar(){
   const ventaUid = document.getElementById('ren-venta-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
-  const nuevoWA = document.getElementById('ren-wa').value.trim();
-  const nuevoCorreo = document.getElementById('ren-correo').value.trim();
+  const nuevoWA = sanitizarTexto(document.getElementById('ren-wa').value, 20);
+  const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
+
+  // Leer correo según origen
+  const nuevoCorreo = origen === 'manual'
+    ? sanitizarTexto(document.getElementById('ren-correo-manual').value || document.getElementById('ren-correo').value, 200)
+    : sanitizarTexto(document.getElementById('ren-correo').value, 200);
+
+  // Leer servicio/plan si se seleccionaron
+  const catUid = document.getElementById('ren-cat').value;
+  const srvUid = document.getElementById('ren-srv').value;
+  const planSel = document.getElementById('ren-plan');
+  const planVal = planSel.options[planSel.selectedIndex]?.textContent || '';
+
   const nuevaVenta = {
     ...v, uid:uid(), id:numVenta(), fecha:hoy(),
     vence: document.getElementById('ren-vence').value || sumarDias(v.vence || hoy(), v.dias || 30),
@@ -1812,27 +3168,82 @@ function renGuardar(){
     metodo: document.getElementById('ren-metodo').value,
     wa: nuevoWA || v.wa,
     correo: nuevoCorreo || v.correo,
-    estado: 'pagado', activa: true, creado: new Date().toISOString()
+    estado: document.getElementById('ren-estado').value || 'pagado', activa: true, creado: new Date().toISOString()
   };
+
+  // Actualizar categoría/servicio/plan si se modificaron
+  if(catUid) nuevaVenta.catUid = catUid;
+  if(srvUid){ nuevaVenta.srvUid = srvUid; const srv = getSrv(srvUid); nuevaVenta.srvNom = srv ? srv.nombre : v.srvNom; }
+  if(planVal && planVal !== '— Elige plan —' && planVal !== '— Elige servicio —') nuevaVenta.plan = planVal;
+
   if(document.getElementById('ren-perfil').value) nuevaVenta.perfil = document.getElementById('ren-perfil').value;
-  // Actualizar WA y correo en la venta original también
+
+  // Actualizar datos en la venta original
   v.wa = nuevoWA || v.wa;
   v.correo = nuevoCorreo || v.correo;
-  if(v.cuentaUID && v.cupoIdx !== null){
+  if(catUid) v.catUid = catUid;
+  if(srvUid){ v.srvUid = srvUid; const srv = getSrv(srvUid); v.srvNom = srv ? srv.nombre : v.srvNom; }
+
+  // Manejar cuenta de inventario
+  const cuentaInvUID = origen === 'inventario' ? document.getElementById('ren-cuenta-inv').value : '';
+  const cupoInvIdx   = origen === 'inventario' && document.getElementById('ren-cupo-inv') ? document.getElementById('ren-cupo-inv').value : '';
+
+  if(origen === 'inventario' && cuentaInvUID){
+    nuevaVenta.cuentaUID = cuentaInvUID;
+    if(cupoInvIdx !== '') nuevaVenta.cupoIdx = parseInt(cupoInvIdx);
+    const cuenta = APP.cuentas.find(c => c.uid === cuentaInvUID);
+    if(cuenta){
+      if(nuevoCorreo) nuevaVenta.correo = cuenta.correo || nuevoCorreo;
+      else nuevaVenta.correo = cuenta.correo || v.correo;
+      // Marcar el cupo como ocupado
+      if(nuevaVenta.cupoIdx !== null && nuevaVenta.cupoIdx !== undefined){
+        cuenta.cupos[nuevaVenta.cupoIdx] = {
+          estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
+          perfil: nuevaVenta.perfil || v.perfil || '', pin: v.pin || '',
+          vence: nuevaVenta.vence, ventaUid: nuevaVenta.uid
+        };
+      }
+    }
+    v.cuentaUID = cuentaInvUID;
+    if(cupoInvIdx !== '') v.cupoIdx = parseInt(cupoInvIdx);
+  } else if(cuentaInvUID === '' && v.cuentaUID){
+    // Si había cuenta pero no se seleccionó ninguna en renovar, mantener la misma
+    nuevaVenta.cuentaUID = v.cuentaUID;
+    nuevaVenta.cupoIdx = v.cupoIdx;
     const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-    if(cuenta && cuenta.cupos[v.cupoIdx]){
-      cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
-      if(nuevoWA) cuenta.cupos[v.cupoIdx].wa = nuevoWA;
+    if(cuenta){
+      if(v.cupoIdx !== null && cuenta.cupos[v.cupoIdx]){
+        cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
+        if(nuevoWA) cuenta.cupos[v.cupoIdx].wa = nuevoWA;
+        if(nuevaVenta.perfil) cuenta.cupos[v.cupoIdx].perfil = nuevaVenta.perfil;
+        cuenta.cupos[v.cupoIdx].ventaUid = nuevaVenta.uid;
+      }
     }
   }
+
+  // Registrar costo si aplica
+  const costoAdq = parseFloat(document.getElementById('ren-costo-cuenta').value) || 0;
+  const metodoAdq = document.getElementById('ren-metodo-adq')?.value || 'Transferencia';
+  const usaInventario = !!nuevaVenta.cuentaUID;
+
+  if(costoAdq > 0 && !usaInventario){
+    const esUsdt = metodoAdq.toLowerCase().includes('usdt') || metodoAdq.toLowerCase().includes('binance');
+    if(esUsdt){
+      descontarUSDTBinance(costoAdq, `Venta manual — ${nuevaVenta.srvNom} (${v.cliente})`, nuevaVenta.cuentaUID || null, null, hoy());
+    } else {
+      APP.costos.push({ uid:uid(), tipo:'otro', fecha:hoy(), catUid:'cg-cuentas', desc:`Cuenta nueva/manual — ${nuevaVenta.srvNom} (${v.cliente})`, metodo:metodoAdq, montoUSD:costoAdq, usdtUsado:0, esCostoReal:true, notas:`Desde renovación ${nuevaVenta.id}` });
+    }
+  }
+  nuevaVenta.costoAsignadoUSD = usaInventario ? costoAdq : 0;
+
   v.activa = false;
   APP.ventas.push(nuevaVenta);
   APP._ventaCounter++;
   cerrarModal('modal-renovar');
   renderVencimientos();
   renderRegistro();
+  renderInventario();
   alert(`✅ Renovación ${nuevaVenta.id} guardada`);
-  // Sincronizar en background sin bloquear la UI
   sincronizarConSheetsSilencioso();
 }
 
@@ -1846,6 +3257,7 @@ async function sincronizarConSheetsSilencioso(){
     const payload = {
       ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
       recargas: APP.recargas, reembolsos: APP.reembolsos,
+      movimientosBinance: APP.movimientosBinance || [],
       catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
       catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
     };
@@ -1887,42 +3299,58 @@ function nrGuardar(){
 // DASHBOARD
 // ══════════════════════════════════════
 function initDashSelectors(){
-  const selMes = document.getElementById('dash-sel-mes');
-  const selAnio = document.getElementById('dash-sel-anio');
-  selMes.innerHTML = MESES_LARGOS.map((m,i) => `<option value="${i}" ${i===_dashMes?'selected':''}>${m}</option>`).join('');
-  const anioActual = new Date().getFullYear();
-  selAnio.innerHTML = '';
-  for(let y = anioActual - 2; y <= anioActual + 3; y++){
-    const o = document.createElement('option');
-    o.value = y; o.textContent = y;
-    if(y === _dashAnio) o.selected = true;
-    selAnio.appendChild(o);
-  }
+  // Inicializar fechas de rango con el mes actual
+  const hoyStr = hoy();
+  const primerDiaMes = hoyStr.slice(0,7) + '-01';
+  const elDesde = document.getElementById('dash-desde');
+  const elHasta = document.getElementById('dash-hasta');
+  if(elDesde && !elDesde.value) elDesde.value = primerDiaMes;
+  if(elHasta && !elHasta.value) elHasta.value = hoyStr;
 }
 function dashActualizar(){
-  _dashMes = parseInt(document.getElementById('dash-sel-mes').value);
-  _dashAnio = parseInt(document.getElementById('dash-sel-anio').value);
+  _dashDesde = document.getElementById('dash-desde')?.value || '';
+  _dashHasta = document.getElementById('dash-hasta')?.value || '';
   renderDashboard();
 }
 function dashPeriodo(p, btn){
   _dashPeriodo = p;
   document.querySelectorAll('#dash-filtros .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const rangoWrap = document.getElementById('dash-rango-wrap');
+  if(p === 'rango'){
+    rangoWrap.style.display = 'block';
+    // Si no hay valores, inicializar con este mes
+    const elDesde = document.getElementById('dash-desde');
+    const elHasta = document.getElementById('dash-hasta');
+    if(!elDesde.value){ elDesde.value = hoy().slice(0,7) + '-01'; }
+    if(!elHasta.value){ elHasta.value = hoy(); }
+    _dashDesde = elDesde.value;
+    _dashHasta = elHasta.value;
+  } else {
+    rangoWrap.style.display = 'none';
+  }
   renderDashboard();
 }
 function filtrarVentasDash(){
-  const mesStr = String(_dashAnio) + '-' + String(_dashMes+1).padStart(2,'0');
-  if(_dashPeriodo === 'mes'){
+  const hoyStr = hoy();
+  if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta){
+    return APP.ventas.filter(v => v.fecha && v.fecha >= _dashDesde && v.fecha <= _dashHasta);
+  } else if(_dashPeriodo === 'mes'){
+    const mesStr = String(_dashAnio) + '-' + String(_dashMes+1).padStart(2,'0');
     return APP.ventas.filter(v => v.fecha && v.fecha.startsWith(mesStr));
   } else if(_dashPeriodo === 'semana'){
     const d = new Date(); d.setDate(d.getDate()-7);
     return APP.ventas.filter(v => v.fecha >= d.toISOString().split('T')[0]);
   }
-  return APP.ventas;
+  // 'todo' — todas las ventas sin excepción (incluye históricas)
+  return [...APP.ventas];
 }
 function filtrarGastosDash(){
-  const mesStr = String(_dashAnio) + '-' + String(_dashMes+1).padStart(2,'0');
-  if(_dashPeriodo === 'mes'){
+  const hoyStr = hoy();
+  if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta){
+    return APP.costos.filter(g => g.fecha && g.fecha >= _dashDesde && g.fecha <= _dashHasta);
+  } else if(_dashPeriodo === 'mes'){
+    const mesStr = String(_dashAnio) + '-' + String(_dashMes+1).padStart(2,'0');
     return APP.costos.filter(g => g.fecha && g.fecha.startsWith(mesStr));
   } else if(_dashPeriodo === 'semana'){
     const d = new Date(); d.setDate(d.getDate()-7);
@@ -1930,16 +3358,60 @@ function filtrarGastosDash(){
   }
   return APP.costos;
 }
+
+// Inversión real de bolsillo = recargas P2P + pagos directos (tarjeta/transferencia/efectivo)
+function filtrarInversionDash(){
+  // Recargas P2P filtradas por período
+  let recargas = APP.recargas || [];
+  let costosDirect = APP.costos || [];
+  if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta){
+    recargas = recargas.filter(r => r.fecha && r.fecha >= _dashDesde && r.fecha <= _dashHasta);
+    costosDirect = costosDirect.filter(g => g.fecha && g.fecha >= _dashDesde && g.fecha <= _dashHasta);
+  } else if(_dashPeriodo === 'mes'){
+    const mesStr = String(_dashAnio) + '-' + String(_dashMes+1).padStart(2,'0');
+    recargas = recargas.filter(r => r.fecha && r.fecha.startsWith(mesStr));
+    costosDirect = costosDirect.filter(g => g.fecha && g.fecha.startsWith(mesStr));
+  } else if(_dashPeriodo === 'semana'){
+    const d = new Date(); d.setDate(d.getDate()-7);
+    const lim = d.toISOString().split('T')[0];
+    recargas = recargas.filter(r => r.fecha >= lim);
+    costosDirect = costosDirect.filter(g => g.fecha >= lim);
+  }
+  // Solo costos directos: tarjeta, transferencia, efectivo (NO binance porque esos ya van como recarga P2P)
+  const metodoKey = m => {
+    const ml = (m||'').toLowerCase();
+    if(ml.includes('binance') || ml.includes('usdt')) return 'binance';
+    return 'directo';
+  };
+  const directosSum = costosDirect
+    .filter(g => metodoKey(g.metodo) === 'directo')
+    .reduce((s,g) => s + g.montoUSD, 0);
+  const p2pSum = recargas.reduce((s,r) => s + parseFloat((r.usdt * (r.tasa||1)).toFixed(2)), 0);
+  return { p2pSum, directosSum, total: p2pSum + directosSum, recargasCnt: recargas.length };
+}
 function renderDashboard(){
-  const periodoLbl = `${MESES_LARGOS[_dashMes]} ${_dashAnio}`;
-  document.getElementById('dash-periodo-lbl').textContent = _dashPeriodo === 'todo' ? 'Histórico completo' : periodoLbl;
+  // Actualizar label de periodo
+  let periodoLbl;
+  if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta){
+    periodoLbl = `${fmtFechaCorta(_dashDesde)} — ${fmtFechaCorta(_dashHasta)}`;
+  } else if(_dashPeriodo === 'mes'){
+    periodoLbl = `${MESES_LARGOS[_dashMes]} ${_dashAnio}`;
+  } else if(_dashPeriodo === 'semana'){
+    periodoLbl = 'Últimos 7 días';
+  } else {
+    periodoLbl = 'Histórico completo';
+  }
+  document.getElementById('dash-periodo-lbl').textContent = periodoLbl;
   const ventas = filtrarVentasDash();
   const gastos = filtrarGastosDash();
   const activas = ventas.filter(v => v.activa !== false);
   const cobradas = activas.filter(v => v.estado === 'pagado');
   const ingresos = cobradas.reduce((s,v) => s+v.precio, 0);
   const remPeriodo = APP.reembolsos.filter(r => {
+    if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta)
+      return r.fecha && r.fecha >= _dashDesde && r.fecha <= _dashHasta;
     if(_dashPeriodo === 'mes') return r.fecha && r.fecha.startsWith(String(_dashAnio)+'-'+String(_dashMes+1).padStart(2,'0'));
+    if(_dashPeriodo === 'semana'){ const d = new Date(); d.setDate(d.getDate()-7); return r.fecha >= d.toISOString().split('T')[0]; }
     return true;
   });
   const totalRemb = remPeriodo.reduce((s,r) => s+r.monto, 0);
@@ -1954,10 +3426,15 @@ function renderDashboard(){
   document.getElementById('d-ingresos').textContent = '$' + ingresoNeto.toFixed(2);
   document.getElementById('d-ingresos-s').textContent = cobradas.length + ' cobradas';
   document.getElementById('d-costos').textContent = '$' + costosTot.toFixed(2);
+  const costosSub = document.getElementById('d-costos-sub');
+  if(costosSub) costosSub.textContent = gastos.length + ' gasto' + (gastos.length!==1?'s':'') + ' · costo FIFO exacto';
   document.getElementById('d-ganancia').textContent = '$' + ganancia.toFixed(2);
   document.getElementById('d-ganancia').style.color = ganancia >= 0 ? 'var(--green)' : 'var(--red)';
   document.getElementById('d-margen').textContent = 'Margen: ' + margen + '%';
-  document.getElementById('d-roi').textContent = (roi >= 0?'+':'') + roi + '%';
+  const elRoi = document.getElementById('d-roi');
+  const elRoiSub = document.getElementById('d-roi-sub');
+  if(elRoi){ elRoi.textContent = (roi >= 0?'+':'') + roi + '%'; elRoi.style.color = roi >= 0 ? 'var(--green)' : 'var(--red)'; }
+  if(elRoiSub) elRoiSub.textContent = 'retorno s/ inversión';
   document.getElementById('d-ticket').textContent = '$' + ticket;
   document.getElementById('d-por-cobrar').textContent = '$' + porCobrar.toFixed(2);
   document.getElementById('d-gan-cuenta').textContent = '$' + ganCuenta;
@@ -1972,19 +3449,92 @@ function renderDashboard(){
   document.getElementById('d-activos').textContent = activosSet;
   document.getElementById('d-inactivos').textContent = inactivosSet;
   document.getElementById('d-tasa').textContent = (totalClientes>0?((activosSet/totalClientes)*100).toFixed(0):0) + '%';
-  // Gráfica semanal
-  const sem = [0,0,0,0];
-  cobradas.forEach(v => {
-    const d2 = new Date(v.fecha+'T12:00:00');
-    const s = Math.min(Math.floor((d2.getDate()-1)/7), 3);
-    sem[s] += v.precio;
-  });
-  const ctx1 = document.getElementById('chart-ingresos').getContext('2d');
-  if(_chartIngresos) _chartIngresos.destroy();
+  // Gráfica: agrupar según período
+  let chartLabels, chartData;
+  if(_dashPeriodo === 'todo'){
+    // Agrupar por mes para vista histórica
+    const porMes = {};
+    cobradas.forEach(v => {
+      const mes = v.fecha ? v.fecha.slice(0,7) : '';
+      if(!mes) return;
+      porMes[mes] = (porMes[mes] || 0) + v.precio;
+    });
+    const mesesOrdenados = Object.keys(porMes).sort();
+    chartLabels = mesesOrdenados.map(m => {
+      const [y,mo] = m.split('-');
+      return MESES_CORTOS[parseInt(mo)-1] + ' ' + y.slice(2);
+    });
+    chartData = mesesOrdenados.map(m => porMes[m]);
+  } else if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta){
+    // Si el rango es <= 31 días, agrupar por día; si es mayor, por semana
+    const dDesde = new Date(_dashDesde+'T12:00:00');
+    const dHasta = new Date(_dashHasta+'T12:00:00');
+    const diffDias = Math.round((dHasta - dDesde) / 86400000) + 1;
+    if(diffDias <= 35){
+      // Por día
+      const porDia = {};
+      for(let i=0; i<diffDias; i++){
+        const d = new Date(dDesde); d.setDate(d.getDate()+i);
+        const k = d.toISOString().split('T')[0];
+        porDia[k] = 0;
+      }
+      cobradas.forEach(v => { if(porDia.hasOwnProperty(v.fecha)) porDia[v.fecha] += v.precio; });
+      chartLabels = Object.keys(porDia).map(d => { const dd = new Date(d+'T12:00:00'); return dd.getDate()+'/'+( dd.getMonth()+1); });
+      chartData = Object.values(porDia);
+    } else {
+      // Por semana
+      const porSem = {};
+      cobradas.forEach(v => {
+        const d2 = new Date(v.fecha+'T12:00:00');
+        const diffD = Math.floor((d2 - dDesde)/86400000);
+        const semKey = 'S' + (Math.floor(diffD/7)+1);
+        porSem[semKey] = (porSem[semKey]||0) + v.precio;
+      });
+      chartLabels = Object.keys(porSem).sort();
+      chartData = chartLabels.map(k => porSem[k]);
+    }
+  } else {
+    // Agrupar por semana del mes
+    const sem = [0,0,0,0];
+    cobradas.forEach(v => {
+      const d2 = new Date(v.fecha+'T12:00:00');
+      const s = Math.min(Math.floor((d2.getDate()-1)/7), 3);
+      sem[s] += v.precio;
+    });
+    chartLabels = ['S1','S2','S3','S4'];
+    chartData = sem;
+  }
+  // Destruir charts previos antes de recrear — reemplazar canvas para limpiar completamente
+  if(_chartIngresos){ try{ _chartIngresos.destroy(); }catch(e){} _chartIngresos = null; }
+  if(_chartCostos){ try{ _chartCostos.destroy(); }catch(e){} _chartCostos = null; }
+
+  // Reemplazar canvas para limpiar estado previo de Chart.js
+  function resetCanvas(id){
+    const old = document.getElementById(id);
+    if(!old) return null;
+    const wrap = old.parentNode;
+    const nuevo = document.createElement('canvas');
+    nuevo.id = id;
+    nuevo.style.maxHeight = '160px';
+    wrap.replaceChild(nuevo, old);
+    return nuevo;
+  }
+  const canvasIngresos = resetCanvas('chart-ingresos');
+  const canvasCostos = resetCanvas('chart-costos');
+  if(!canvasIngresos || !canvasCostos) return;
+
+  const ctx1 = canvasIngresos.getContext('2d');
   _chartIngresos = new Chart(ctx1, {
-    type:'bar', data:{labels:['S1','S2','S3','S4'],datasets:[{data:sem,backgroundColor:'rgba(245,166,35,0.7)',borderColor:'var(--orange)',borderWidth:1,borderRadius:6}]},
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#8fa8c8'}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#8fa8c8',callback:v=>'$'+v}}}}
+    type:'bar', data:{labels:chartLabels,datasets:[{data:chartData,backgroundColor:'rgba(245,166,35,0.7)',borderColor:'var(--orange)',borderWidth:1,borderRadius:6}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#8fa8c8',maxRotation:45}},y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#8fa8c8',callback:v=>'$'+v}}}}
   });
+  // Actualizar título de la sección del gráfico
+  const dashChartTit = document.getElementById('dash-chart-titulo');
+  if(dashChartTit){
+    if(_dashPeriodo === 'todo') dashChartTit.textContent = '📈 Ingresos por mes';
+    else if(_dashPeriodo === 'rango') dashChartTit.textContent = '📈 Ingresos — rango seleccionado';
+    else dashChartTit.textContent = '📈 Ingresos por semana';
+  }
   // Ranking servicios
   const porSrv = {};
   cobradas.forEach(v => {
@@ -2010,18 +3560,21 @@ function renderDashboard(){
     return `<div style="display:flex;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);font-size:13px"><span>${emojis[m]||'💳'} ${m}</span><span style="font-weight:600">$${v.toFixed(2)} <span style="font-size:11px;color:var(--text3)">(${pct}%)</span></span></div>`;
   }).join('') : '<div class="empty" style="padding:16px 0"><div class="e-ico">💳</div><div>Sin datos</div></div>';
   // Dona costos — categorías dinámicas
-  const ctx2 = document.getElementById('chart-costos').getContext('2d');
-  if(_chartCostos) _chartCostos.destroy();
+  const ctx2 = canvasCostos.getContext('2d');
   const costosPorCat = {};
   CATALOGO_CAT_GASTOS.forEach(cg => {
     const total = gastos.filter(g => g.catUid === cg.uid).reduce((s,g) => s+g.montoUSD, 0);
     if(total > 0) costosPorCat[cg.nombre] = { total, color: cg.color };
   });
+  const costoLabels = Object.keys(costosPorCat);
+  const costoValues = Object.values(costosPorCat).map(c=>c.total);
+  const costoColors = Object.values(costosPorCat).map(c=>c.color);
+  // Si no hay datos, mostrar gráfico vacío con placeholder
   _chartCostos = new Chart(ctx2, {
     type:'doughnut',
     data:{
-      labels: Object.keys(costosPorCat),
-      datasets:[{data:Object.values(costosPorCat).map(c=>c.total),backgroundColor:Object.values(costosPorCat).map(c=>c.color),borderWidth:0}]
+      labels: costoLabels.length ? costoLabels : ['Sin gastos registrados'],
+      datasets:[{data: costoValues.length ? costoValues : [1], backgroundColor: costoColors.length ? costoColors : ['rgba(255,255,255,0.05)'],borderWidth:0}]
     },
     options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{color:'#8fa8c8',font:{size:11},padding:10}}}}
   });
@@ -2040,12 +3593,250 @@ function renderDashboard(){
 }
 
 // ══════════════════════════════════════
+// CUENTA CAÍDA
+// ══════════════════════════════════════
+function abrirCuentaCaida(cuentaUID){
+  const c = cuentaUID ? APP.cuentas.find(x => x.uid === cuentaUID) : null;
+  document.getElementById('cc-cuenta-uid').value = cuentaUID || '';
+  if(c){
+    const srv = getSrv(c.srvUid);
+    const ocu = c.cupos ? c.cupos.filter(cu => cu.estado === 'ocupado').length : 0;
+    document.getElementById('cc-info').innerHTML =
+      `⚡ <b>${srv ? srv.emoji + ' ' + srv.nombre : c.id}</b> · ${c.correo || 'sin correo'}<br>` +
+      `<span style="color:var(--red);font-size:12px">${ocu} cliente${ocu !== 1 ? 's' : ''} afectado${ocu !== 1 ? 's' : ''}</span>`;
+  } else {
+    document.getElementById('cc-info').innerHTML =
+      `⚡ <b>Cuenta caída</b><br><span style="color:var(--text2);font-size:12px">Sin cuenta asignada — selecciona una cuenta del inventario</span>`;
+  }
+  // Reset form
+  document.querySelector('input[name="cc-accion"][value="reembolso"]').checked = true;
+  ccToggleAccion();
+  document.querySelector('input[name="cc-repo-tipo"][value="inventario"]').checked = true;
+  ccToggleRepo();
+  // Fecha por defecto hoy
+  const hoyStr = hoy();
+  document.getElementById('cc-rem-fecha').value = hoyStr;
+  document.getElementById('cc-repo-desde').value = hoyStr;
+  document.getElementById('cc-repo-hasta').value = '';
+  // Limpiar campos
+  ['cc-rem-monto','cc-rem-notas','cc-repo-costo','cc-repo-correo','cc-repo-pass','cc-repo-nueva-costo'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('cc-repo-cupos').value = 5;
+  // Poblar selector de cuentas del inventario para reposición
+  const selCuenta = document.getElementById('cc-repo-cuenta-sel');
+  selCuenta.innerHTML = '<option value="">— Selecciona cuenta —</option>';
+  APP.cuentas.filter(x => x.uid !== cuentaUID).forEach(x => {
+    const xsrv = getSrv(x.srvUid);
+    const lib = x.cupos ? x.cupos.filter(cu => cu.estado === 'libre').length : 0;
+    if(lib > 0){
+      const o = document.createElement('option');
+      o.value = x.uid;
+      o.textContent = `${xsrv ? xsrv.emoji + ' ' : ''}${x.id}${x.correo ? ' · ' + x.correo : ''} (${lib} libre${lib !== 1 ? 's' : ''})`;
+      selCuenta.appendChild(o);
+    }
+  });
+  document.getElementById('cc-repo-cupo-wrap').style.display = 'none';
+  // Poblar selector de ventas afectadas
+  const selVenta = document.getElementById('cc-venta-sel');
+  selVenta.innerHTML = '<option value="">— Todos los clientes de esta cuenta —</option>';
+  if(c && c.cupos){
+    c.cupos.forEach((cu, i) => {
+      if(cu.estado === 'ocupado' && cu.cliente){
+        const o = document.createElement('option');
+        o.value = i;
+        o.textContent = `Cupo ${i + 1} — ${cu.cliente}`;
+        selVenta.appendChild(o);
+      }
+    });
+  }
+  abrirModal('modal-cuenta-caida');
+}
+
+function ccToggleAccion(){
+  const accion = document.querySelector('input[name="cc-accion"]:checked').value;
+  document.getElementById('cc-bloque-reembolso').style.display = accion === 'reembolso' ? 'block' : 'none';
+  document.getElementById('cc-bloque-reposicion').style.display = accion === 'reposicion' ? 'block' : 'none';
+}
+
+function ccToggleRepo(){
+  const tipo = document.querySelector('input[name="cc-repo-tipo"]:checked').value;
+  document.getElementById('cc-repo-inv-bloque').style.display = tipo === 'inventario' ? 'block' : 'none';
+  document.getElementById('cc-repo-nueva-bloque').style.display = tipo === 'nueva' ? 'block' : 'none';
+}
+
+function ccSelCuentaRepo(){
+  const selVal = document.getElementById('cc-repo-cuenta-sel').value;
+  const cupoWrap = document.getElementById('cc-repo-cupo-wrap');
+  const selCupo = document.getElementById('cc-repo-cupo-sel');
+  if(!selVal){ cupoWrap.style.display = 'none'; return; }
+  const c = APP.cuentas.find(x => x.uid === selVal);
+  if(!c){ cupoWrap.style.display = 'none'; return; }
+  selCupo.innerHTML = '<option value="">— Selecciona cupo —</option>';
+  if(c.cupos) c.cupos.forEach((cu, i) => {
+    if(cu.estado === 'libre'){
+      const o = document.createElement('option');
+      o.value = i;
+      o.textContent = `Cupo ${i + 1} — Libre`;
+      selCupo.appendChild(o);
+    }
+  });
+  cupoWrap.style.display = 'block';
+}
+
+function ccRegistrarCostoConFIFO(monto, metodo, desc, fecha, catUid, cuentaUID){
+  const esUsdt = metodo.toLowerCase().includes('usdt') || metodo.toLowerCase().includes('binance');
+  let montoUSD = monto, usdtUsado = 0;
+  if(esUsdt && monto > 0){
+    const tasa = getTasaPromBinance();
+    montoUSD = monto * tasa;
+    usdtUsado = monto;
+    const ok = descontarUSDTBinance(monto, desc, cuentaUID, null, fecha);
+    if(!ok) return false;
+  }
+  APP.costos.push({
+    uid: uid(), fecha, catUid, desc, metodo, montoUSD, usdtUsado,
+    cuentaUID: cuentaUID || null,
+    tipo: 'reposicion_cuenta',
+    esCostoReal: true,
+    notas: 'Registrado por cuenta caída'
+  });
+  return true;
+}
+
+function ccGuardar(){
+  const cuentaUID = document.getElementById('cc-cuenta-uid').value;
+  const c = APP.cuentas.find(x => x.uid === cuentaUID);
+  if(!c) return;
+  const accion = document.querySelector('input[name="cc-accion"]:checked').value;
+  const ventaCupoIdx = document.getElementById('cc-venta-sel').value;
+  const hoyStr = hoy();
+
+  if(accion === 'reembolso'){
+    // Registrar reembolso por cada cliente afectado (o solo el seleccionado)
+    const monto = parseFloat(document.getElementById('cc-rem-monto').value) || 0;
+    if(monto <= 0){ alert('Ingresa el monto del reembolso'); return; }
+    const metodo = document.getElementById('cc-rem-metodo').value;
+    const fecha = document.getElementById('cc-rem-fecha').value || hoyStr;
+    const notas = document.getElementById('cc-rem-notas').value || 'Cuenta caída';
+    const srv = getSrv(c.srvUid);
+    const srvNom = srv ? srv.emoji + ' ' + srv.nombre : c.id;
+    if(ventaCupoIdx !== ''){
+      // Solo el cupo seleccionado
+      const cu = c.cupos[parseInt(ventaCupoIdx)];
+      if(cu){
+        APP.reembolsos.push({ uid: uid(), fecha, cliente: cu.cliente || 'Cliente', servicio: srvNom + ' (' + c.id + ')', motivo: '⚡ ' + notas, monto, metodo });
+        cu.estado = 'libre';
+        // Buscar venta relacionada y marcar inactiva
+        const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === parseInt(ventaCupoIdx) && v.activa !== false);
+        if(ventaRel){ ventaRel.activa = false; ventaRel.motivoSalida = 'Cuenta caída — reembolso dado'; }
+      }
+    } else {
+      // Todos los cupos ocupados
+      if(c.cupos) c.cupos.forEach((cu, i) => {
+        if(cu.estado === 'ocupado'){
+          APP.reembolsos.push({ uid: uid(), fecha, cliente: cu.cliente || 'Cliente', servicio: srvNom + ' (' + c.id + ')', motivo: '⚡ ' + notas, monto, metodo });
+          cu.estado = 'libre';
+          const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === i && v.activa !== false);
+          if(ventaRel){ ventaRel.activa = false; ventaRel.motivoSalida = 'Cuenta caída — reembolso dado'; }
+        }
+      });
+    }
+    // Registrar el reembolso también como gasto
+    ccRegistrarCostoConFIFO(monto, metodo, `Reembolso por cuenta caída — ${srvNom} (${c.id})`, fecha, 'cg-otro', cuentaUID);
+
+  } else {
+    // REPOSICIÓN
+    const tipo = document.querySelector('input[name="cc-repo-tipo"]:checked').value;
+    const srv = getSrv(c.srvUid);
+    const srvNom = srv ? srv.emoji + ' ' + srv.nombre : c.id;
+
+    // Determinar cliente afectado (cupo específico o primero ocupado)
+    let cupoAfectadoIdx = ventaCupoIdx !== '' ? parseInt(ventaCupoIdx) : (c.cupos ? c.cupos.findIndex(cu => cu.estado === 'ocupado') : -1);
+    const cupoAfectado = cupoAfectadoIdx >= 0 && c.cupos ? c.cupos[cupoAfectadoIdx] : null;
+
+    if(tipo === 'inventario'){
+      const cuentaRepoUID = document.getElementById('cc-repo-cuenta-sel').value;
+      const cupoRepoIdx = document.getElementById('cc-repo-cupo-sel').value;
+      if(!cuentaRepoUID){ alert('Selecciona una cuenta del inventario'); return; }
+      if(cupoRepoIdx === ''){ alert('Selecciona un cupo disponible'); return; }
+      const cuentaRepo = APP.cuentas.find(x => x.uid === cuentaRepoUID);
+      if(!cuentaRepo){ alert('Cuenta no encontrada'); return; }
+      const cupoIdxNum = parseInt(cupoRepoIdx);
+      // Mover cliente al nuevo cupo
+      if(cupoAfectado){
+        cuentaRepo.cupos[cupoIdxNum] = { ...cuentaRepo.cupos[cupoIdxNum], estado: 'ocupado', cliente: cupoAfectado.cliente, wa: cupoAfectado.wa || '', perfil: cupoAfectado.perfil || '', pin: cupoAfectado.pin || '', vence: cupoAfectado.vence };
+        // Actualizar venta relacionada
+        const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
+        if(ventaRel){ ventaRel.cuentaUID = cuentaRepoUID; ventaRel.cupoIdx = cupoIdxNum; ventaRel.correo = cuentaRepo.correo; }
+        // Liberar cupo original
+        c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
+      }
+      // Registrar costo de reposición
+      const costoRepo = parseFloat(document.getElementById('cc-repo-costo').value) || 0;
+      if(costoRepo > 0){
+        const metodoRepo = document.getElementById('cc-repo-metodo').value;
+        ccRegistrarCostoConFIFO(costoRepo, metodoRepo, `Reposición cuenta caída — ${srvNom} → ${cuentaRepo.id}`, hoyStr, 'cg-cuentas', cuentaUID);
+      }
+    } else {
+      // Nueva cuenta
+      const correoNuevo = document.getElementById('cc-repo-correo').value.trim();
+      if(!correoNuevo){ alert('Ingresa el correo de la nueva cuenta'); return; }
+      const passNuevo = document.getElementById('cc-repo-pass').value;
+      const cuposNum = parseInt(document.getElementById('cc-repo-cupos').value) || 5;
+      const costoNuevo = parseFloat(document.getElementById('cc-repo-nueva-costo').value) || 0;
+      const metodoNuevo = document.getElementById('cc-repo-nueva-metodo').value;
+      const desde = document.getElementById('cc-repo-desde').value || hoyStr;
+      const hasta = document.getElementById('cc-repo-hasta').value || '';
+      // Crear nueva cuenta
+      const cuposArr = [];
+      for(let i = 0; i < cuposNum; i++) cuposArr.push({ estado: 'libre' });
+      // Asignar el cliente afectado al primer cupo de la nueva cuenta
+      if(cupoAfectado && cuposArr.length > 0){
+        cuposArr[0] = { estado: 'ocupado', cliente: cupoAfectado.cliente, wa: cupoAfectado.wa || '', perfil: cupoAfectado.perfil || '', pin: cupoAfectado.pin || '', vence: cupoAfectado.vence };
+      }
+      const nuevaCuenta = {
+        uid: uid(), srvUid: c.srvUid, srvNom: srvNom,
+        id: `${(srv?.nombre || 'SRV').toUpperCase().slice(0,3)}-R${Date.now().toString(36).slice(-3).toUpperCase()}`,
+        correo: correoNuevo, pass: passNuevo, costo: costoNuevo, metodoPago: metodoNuevo,
+        desde, hasta, cupos: cuposArr, creado: new Date().toISOString()
+      };
+      APP.cuentas.push(nuevaCuenta);
+      // Actualizar venta relacionada
+      if(cupoAfectado){
+        const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
+        if(ventaRel){ ventaRel.cuentaUID = nuevaCuenta.uid; ventaRel.cupoIdx = 0; ventaRel.correo = correoNuevo; }
+        c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
+      }
+      // Registrar costo
+      if(costoNuevo > 0){
+        ccRegistrarCostoConFIFO(costoNuevo, metodoNuevo, `Nueva cuenta reposición — ${srvNom} (${nuevaCuenta.id})`, hoyStr, 'cg-cuentas', nuevaCuenta.uid);
+      }
+    }
+  }
+
+  cerrarModal('modal-cuenta-caida');
+  renderInventario();
+  renderCostos();
+  renderDashboard();
+  sincronizarConSheets();
+  alert('✅ Cuenta caída registrada correctamente');
+}
+
+// ══════════════════════════════════════
 // COSTOS
 // ══════════════════════════════════════
-function costoFiltrar(f, btn){
+function costoFiltrar(f, tipo, btn){
   APP._filtroCosto = f;
-  document.querySelectorAll('#costos-filtros .filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  APP._filtroCostoTipo = tipo || 'cat';
+  // Quitar highlight de todos los KPIs
+  ['kpi-total','kpi-m-binance','kpi-m-tarjeta','kpi-m-transferencia','kpi-m-efectivo'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.outline = 'none';
+  });
+  document.querySelectorAll('#kpi-cats-grid .kpi').forEach(el => el.style.outline = 'none');
+  // Highlight el seleccionado
+  if(btn) btn.style.outline = '2px solid var(--orange)';
   renderCostos();
 }
 function costoToggleBinance(){
@@ -2058,21 +3849,25 @@ function costoCalcFIFO(){
   const prev = document.getElementById('costo-fifo-preview');
   const rowsEl = document.getElementById('costo-fifo-rows');
   if(!usdt){ prev.style.display = 'none'; return; }
-  const { rows, total, faltante } = calcFIFO(usdt);
-  if(faltante > 0.001){
-    prev.style.display = 'block';
-    rowsEl.innerHTML = `<div style="color:var(--red);font-size:12px">⚠️ Saldo insuficiente. Faltan ${faltante.toFixed(4)} USDT.</div>`;
-    document.getElementById('costo-fifo-total').textContent = '—';
-    return;
-  }
+
+  const fifo = calcFIFO(usdt);
+  const saldo = getSaldoBinance();
   prev.style.display = 'block';
-  rowsEl.innerHTML = rows.map(r =>
+
+  rowsEl.innerHTML = fifo.rows.map(r =>
     `<div class="fifo-row-item">
-      <div><span style="color:var(--yellow)">${r.usdt.toFixed(4)} USDT × $${r.tasa}</span><div class="fifo-src">Recarga ${fmtFecha(r.fecha)}</div></div>
-      <span style="color:var(--yellow)">$${r.subtotal.toFixed(2)}</span>
+      <div>
+        <span style="color:var(--yellow)">${r.usdt.toFixed(4)} USDT × $${r.tasa.toFixed(4)}</span>
+        <div class="fifo-src">${r.sinSaldo ? '⚠️ Sin saldo — tasa estimada' : 'Lote ' + r.fecha}</div>
+      </div>
+      <span style="color:${r.sinSaldo?'var(--red)':'var(--yellow)'}">$${r.subtotal.toFixed(4)}</span>
     </div>`
-  ).join('');
-  document.getElementById('costo-fifo-total').textContent = '$' + total.toFixed(2);
+  ).join('') +
+  `<div style="color:${(saldo-usdt)<0?'var(--red)':'var(--green)'};font-size:12px;margin-top:6px">
+    ${(saldo-usdt)<0 ? '⚠️' : '✅'} Saldo resultante: ${(saldo-usdt).toFixed(4)} USDT
+  </div>`;
+
+  document.getElementById('costo-fifo-total').textContent = '$' + fifo.total.toFixed(4);
 }
 function costoGuardar(){
   const met = document.getElementById('costo-metodo').value;
@@ -2083,25 +3878,21 @@ function costoGuardar(){
   if(met === 'binance'){
     const usdt = parseFloat(document.getElementById('costo-usdt').value) || 0;
     if(usdt <= 0){ alert('Ingresa la cantidad de USDT'); return; }
-    const { rows, total, faltante } = calcFIFO(usdt);
-    if(faltante > 0.001){ alert('Saldo Binance insuficiente'); return; }
-    montoUSD = total; usdtUsado = usdt;
-    // Descontar del saldo FIFO
-    let restante = usdt;
-    for(const r of APP.recargas){
-      if(r.usado >= r.usdt) continue;
-      const disp = r.usdt - r.usado;
-      const usar = Math.min(restante, disp);
-      r.usado += usar; restante -= usar;
-      if(restante <= 0) break;
-    }
-    actualizarSaldoBinance();
+    // Calcular costo USD exacto FIFO ANTES de descontar
+    const fifo = calcFIFO(usdt);
+    montoUSD = fifo.total || usdt; // fallback al valor USDT si no hay lotes
+    usdtUsado = usdt;
+    // FIX: No cancelar el registro del costo aunque el usuario cancele el confirm de saldo
+    descontarUSDTBinance(usdt, desc, null, null,
+      document.getElementById('costo-fecha').value || hoy()
+    );
   } else {
     montoUSD = parseFloat(document.getElementById('costo-usd').value) || 0;
   }
   const datos = {
     fecha: document.getElementById('costo-fecha').value || hoy(),
     catUid, desc, metodo: met, montoUSD, usdtUsado,
+    esCostoReal: true,  // FIX: marcar siempre para que no se filtre al recargar de Sheets
     notas: document.getElementById('costo-notas').value
   };
   const editUID = document.getElementById('costo-edit-uid').value;
@@ -2114,6 +3905,9 @@ function costoGuardar(){
   document.getElementById('costo-edit-uid').value = '';
   cerrarModal('modal-nuevo-costo');
   renderCostos();
+  // FIX: refrescar dashboard también
+  const _dashElC = document.getElementById('s-dashboard');
+  if(_dashElC && _dashElC.classList.contains('active')) renderDashboard();
   sincronizarConSheets();
 }
 function abrirEditarCosto(costoUID){
@@ -2134,6 +3928,7 @@ function eliminarCosto(uid){
   if(!confirm('¿Eliminar este gasto?')) return;
   APP.costos = APP.costos.filter(g => g.uid !== uid);
   renderCostos();
+  sincronizarConSheets(); // FIX: guardar en Sheets para que no reaparezca al sincronizar
 }
 function renderCostos(){
   // Poblar select de categorías de gasto dinámicamente
@@ -2141,36 +3936,132 @@ function renderCostos(){
   if(catSel){
     catSel.innerHTML = CATALOGO_CAT_GASTOS.map(cg => `<option value="${cg.uid}">${cg.emoji} ${cg.nombre}</option>`).join('');
   }
-  // Filtros dinámicos
-  const filtrosEl = document.getElementById('costos-filtros');
-  filtrosEl.innerHTML = `<button class="filter-btn ${APP._filtroCosto==='todos'?'active':''}" onclick="costoFiltrar('todos',this)">Todos</button>`;
-  CATALOGO_CAT_GASTOS.forEach(cg => {
-    filtrosEl.innerHTML += `<button class="filter-btn ${APP._filtroCosto===cg.uid?'active':''}" onclick="costoFiltrar('${cg.uid}',this)">${cg.emoji} ${cg.nombre.split(' ')[0]}</button>`;
+
+  // ── Base: excluir formato antiguo de renovaciones ──
+  const base = APP.costos.filter(g => {
+    if(g.desc && /^Costo cuenta renovación —/.test(g.desc)) return false;
+    return true;
   });
-  let costos = APP._filtroCosto === 'todos' ? [...APP.costos] : APP.costos.filter(g => g.catUid === APP._filtroCosto);
-  costos = costos.sort((a,b) => b.fecha.localeCompare(a.fecha));
-  const total = APP.costos.reduce((s,g) => s+g.montoUSD, 0);
-  document.getElementById('c-total').textContent = '$' + total.toFixed(2);
-  document.getElementById('c-cuentas').textContent = '$' + APP.costos.filter(g => g.catUid === 'cg-cuentas').reduce((s,g) => s+g.montoUSD, 0).toFixed(2);
-  document.getElementById('c-pub').textContent = '$' + APP.costos.filter(g => g.catUid === 'cg-publicidad').reduce((s,g) => s+g.montoUSD, 0).toFixed(2);
-  document.getElementById('c-otros').textContent = '$' + APP.costos.filter(g => !['cg-cuentas','cg-publicidad'].includes(g.catUid)).reduce((s,g) => s+g.montoUSD, 0).toFixed(2);
-  const lista = document.getElementById('costos-lista');
-  if(!costos.length){
-    lista.innerHTML = '<div class="empty"><div class="e-ico">💸</div><div>Sin gastos registrados</div></div>';
+
+  // ── Helpers de método ──
+  const metodoKey = m => {
+    const ml = (m||'').toLowerCase();
+    if(ml.includes('binance') || ml.includes('usdt')) return 'binance';
+    if(ml.includes('tarjeta')) return 'tarjeta';
+    if(ml.includes('transfer')) return 'transferencia';
+    if(ml.includes('efectivo')) return 'efectivo';
+    return 'otro';
+  };
+
+  // ── KPI Fila 1: Total gastos reales (solo APP.costos — recargas NO son gasto) ──
+  const totalReal = base.reduce((s,g) => s+g.montoUSD, 0);
+  document.getElementById('c-total').textContent = '$' + totalReal.toFixed(2);
+  // Desglose: cuánto fue pagado con USDT vs métodos directos
+  const costosBinance = base.filter(g => metodoKey(g.metodo) === 'binance');
+  const directosTotal = base.filter(g => metodoKey(g.metodo) !== 'binance').reduce((s,g) => s+g.montoUSD, 0);
+  const binanceTotal  = costosBinance.reduce((s,g) => s+g.montoUSD, 0);
+  document.getElementById('c-total-sub').textContent = `USDT $${binanceTotal.toFixed(2)} + directos $${directosTotal.toFixed(2)}`;
+
+  // ── KPI Fila 2: Por método ──
+  // Binance USDT = costos pagados con USDT (adquisiciones de cuentas, etc.) — NO las recargas
+  document.getElementById('c-m-binance').textContent = '$' + binanceTotal.toFixed(2);
+  document.getElementById('c-m-binance-sub').textContent = costosBinance.length + ' gasto' + (costosBinance.length!==1?'s':'') + ' en USDT';
+
+  const metodosDirect = [
+    { key:'tarjeta',       id:'c-m-tarjeta',       sub:'c-m-tarjeta-sub' },
+    { key:'transferencia', id:'c-m-transferencia', sub:'c-m-transferencia-sub' },
+    { key:'efectivo',      id:'c-m-efectivo',      sub:'c-m-efectivo-sub' },
+  ];
+  metodosDirect.forEach(({ key, id, sub }) => {
+    const grupo = base.filter(g => metodoKey(g.metodo) === key);
+    document.getElementById(id).textContent = '$' + grupo.reduce((s,g)=>s+g.montoUSD,0).toFixed(2);
+    document.getElementById(sub).textContent = grupo.length + ' gasto' + (grupo.length !== 1 ? 's' : '');
+  });
+
+  // ── KPI Fila 3: Por categoría (dinámica) ──
+  const catsGrid = document.getElementById('kpi-cats-grid');
+  const coloresCat = ['azul','morado','amarillo','verde','naranja','gris'];
+  catsGrid.innerHTML = CATALOGO_CAT_GASTOS.map((cg, i) => {
+    const grupo = base.filter(g => g.catUid === cg.uid);
+    const suma = grupo.reduce((s,g) => s+g.montoUSD, 0);
+    const color = coloresCat[i % coloresCat.length];
+    const activo = APP._filtroCosto === cg.uid && APP._filtroCostoTipo === 'cat';
+    return `<div class="kpi ${color}" id="kpi-cat-${esc(cg.uid)}" style="cursor:pointer;${activo?'outline:2px solid var(--orange)':''}" onclick="costoFiltrar('${esc(cg.uid)}','cat',this)">
+      <div class="kl">${esc(cg.emoji)} ${esc(cg.nombre)}</div>
+      <div class="kv">$${suma.toFixed(2)}</div>
+      <div class="ksub">${grupo.length} gasto${grupo.length!==1?'s':''}</div>
+    </div>`;
+  }).join('');
+
+  // ── Lista de gastos — solo APP.costos, sin recargas ──
+  let costos;
+  if(APP._filtroCosto === 'todos'){
+    costos = [...base];
+  } else if(APP._filtroCostoTipo === 'metodo'){
+    costos = base.filter(g => metodoKey(g.metodo) === APP._filtroCosto);
   } else {
-    lista.innerHTML = costos.map(g => {
+    costos = base.filter(g => g.catUid === APP._filtroCosto);
+
+  }
+  costos = costos.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+
+  // ── Etiqueta del filtro activo ──
+  let filtroLabel = 'Todos los gastos';
+  if(APP._filtroCosto !== 'todos'){
+    if(APP._filtroCostoTipo === 'metodo'){
+      const lbls = {binance:'💱 Binance USDT', tarjeta:'💳 Tarjeta', transferencia:'🏦 Transferencia', efectivo:'💵 Efectivo'};
+      filtroLabel = 'Filtrando: ' + (lbls[APP._filtroCosto] || APP._filtroCosto);
+    } else {
+      const cg = getCatGasto(APP._filtroCosto);
+      filtroLabel = 'Filtrando: ' + (cg ? cg.emoji + ' ' + cg.nombre : APP._filtroCosto);
+    }
+  }
+
+  const lista = document.getElementById('costos-lista');
+  const headerFiltro = APP._filtroCosto !== 'todos'
+    ? `<div style="padding:8px 14px 0;font-size:11px;color:var(--orange);font-weight:600">${esc(filtroLabel)} · <span style="color:var(--text3);font-weight:400;cursor:pointer" onclick="costoFiltrar('todos','cat',document.getElementById('kpi-total'))">Ver todos ×</span></div>`
+    : '';
+
+  if(!costos.length){
+    lista.innerHTML = headerFiltro + '<div class="empty"><div class="e-ico">💸</div><div>Sin gastos en esta categoría</div></div>';
+  } else {
+    lista.innerHTML = headerFiltro + costos.map(g => {
+      // ── Fila de gasto ──
       const cg = getCatGasto(g.catUid) || CATALOGO_CAT_GASTOS[CATALOGO_CAT_GASTOS.length-1];
-      return `<div class="cost-row">
-        <div class="cost-ico" style="color:${esc(cg.color)}">${esc(cg.emoji)}</div>
-        <div class="cost-info">
-          <div class="cost-desc">${esc(g.desc)}</div>
-          <div class="cost-sub">${esc(fmtFecha(g.fecha))} · ${esc(g.metodo)}${g.usdtUsado?' · '+g.usdtUsado.toFixed(2)+' USDT':''}</div>
+      const mk = metodoKey(g.metodo);
+      const metIco = {binance:'💱',tarjeta:'💳',transferencia:'🏦',efectivo:'💵'}[mk] || '💰';
+
+      let cuposHtml = '';
+      if(g.cuentaUID){
+        const cuenta = APP.cuentas.find(c => c.uid === g.cuentaUID);
+        if(cuenta){
+          const totalCupos = cuenta.cupos ? cuenta.cupos.length : 0;
+          const ocupados = cuenta.cupos ? cuenta.cupos.filter(cu => cu.estado === 'ocupado').length : 0;
+          const costoAsig = ocupados > 0 && cuenta.costo > 0 ? (cuenta.costo / ocupados).toFixed(2) : '—';
+          const iconos = (cuenta.cupos || []).map(cu =>
+            `<span style="font-size:13px;color:${cu.estado==='ocupado'?'var(--green)':'var(--text3)'}">${cu.estado==='ocupado'?'👤':'○'}</span>`
+          ).join('');
+          cuposHtml = `<div style="margin-top:5px">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${iconos}</div>
+            <div style="font-size:11px;color:var(--text2)">${ocupados}/${totalCupos} ocupados · <span style="color:var(--orange)">$${costoAsig}/cupo vendido</span></div>
+          </div>`;
+        }
+      }
+
+      return `<div class="cost-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px">
+        <div style="display:flex;align-items:center;width:100%;gap:10px">
+          <div class="cost-ico" style="color:${esc(cg.color)}">${esc(cg.emoji)}</div>
+          <div class="cost-info" style="flex:1">
+            <div class="cost-desc">${esc(g.desc)}</div>
+            <div class="cost-sub">${esc(fmtFecha(g.fecha))} · ${metIco} ${esc(g.metodo)}${g.usdtUsado?' · '+g.usdtUsado.toFixed(2)+' USDT':''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <div class="cost-monto">-$${g.montoUSD.toFixed(2)}</div>
+            <button class="btn-sm" onclick="abrirEditarCosto('${esc(g.uid)}')">✏️</button>
+            <button class="btn-sm" onclick="eliminarCosto('${esc(g.uid)}')">🗑️</button>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px">
-          <div class="cost-monto">-$${g.montoUSD.toFixed(2)}</div>
-          <button class="btn-sm" onclick="abrirEditarCosto('${esc(g.uid)}')">✏️</button>
-          <button class="btn-sm" onclick="eliminarCosto('${esc(g.uid)}')">🗑️</button>
-        </div>
+        ${cuposHtml}
       </div>`;
     }).join('');
   }
@@ -2195,16 +4086,35 @@ function binGuardar(){
   const tasa = parseFloat(document.getElementById('bin-tasa').value) || 0;
   if(!usdt || !tasa){ alert('Completa USDT y tasa'); return; }
   const editUID = document.getElementById('bin-edit-uid').value;
+  const fechaRecarga = document.getElementById('bin-fecha').value || hoy();
+  const notasRecarga = document.getElementById('bin-notas').value;
   const datos = {
-    fecha: document.getElementById('bin-fecha').value || hoy(),
-    usdt, tasa, usado: 0, notas: document.getElementById('bin-notas').value
+    fecha: fechaRecarga,
+    usdt, tasa, usado: 0, notas: notasRecarga
   };
+  let recargaUID;
   if(editUID){
     const i = APP.recargas.findIndex(r => r.uid === editUID);
-    if(i > -1) APP.recargas[i] = {...APP.recargas[i], ...datos};
+    if(i > -1){
+      // Eliminar movimiento de entrada anterior si existe
+      APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m =>
+        !(m.recargaUID === editUID && m.tipo === 'entrada')
+      );
+      APP.recargas[i] = {...APP.recargas[i], ...datos};
+      recargaUID = editUID;
+    }
   } else {
-    APP.recargas.push({ uid:uid(), ...datos });
+    recargaUID = uid();
+    APP.recargas.push({ uid: recargaUID, ...datos, esCostoReal: true });
   }
+  // Registrar entrada en Kardex Binance
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  APP.movimientosBinance.push({
+    uid: uid(), fecha: fechaRecarga, tipo: 'entrada',
+    concepto: 'Recarga P2P' + (notasRecarga ? ' — ' + notasRecarga : ''),
+    usdt, tasa, montoUSD: usdt * tasa,
+    recargaUID, esCostoReal: true
+  });
   document.getElementById('bin-edit-uid').value = '';
   document.getElementById('bin-modal-titulo').innerHTML = '💱 Nueva recarga Binance <button class="modal-close" onclick="cerrarModal(\'modal-recarga-binance\')">×</button>';
   cerrarModal('modal-recarga-binance');
@@ -2224,41 +4134,115 @@ function abrirEditarRecarga(uid){
   document.getElementById('bin-preview').style.display = 'none';
   abrirModal('modal-recarga-binance');
 }
-function eliminarRecarga(uid){
-  if(!confirm('¿Eliminar esta recarga?')) return;
-  APP.recargas = APP.recargas.filter(r => r.uid !== uid);
+function eliminarRecarga(ruid){
+  if(!confirm('¿Eliminar esta recarga? También se eliminarán los movimientos asociados.')) return;
+  APP.recargas = APP.recargas.filter(r => r.uid !== ruid);
+  // También eliminar movimientos asociados a esta recarga del Kardex
+  APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.recargaUID !== ruid);
   actualizarSaldoBinance();
   renderBinance();
 }
+
+function eliminarMovBinance(movUid){
+  if(!confirm('¿Eliminar este movimiento Binance? Esto afectará el saldo calculado.')) return;
+  const mov = (APP.movimientosBinance||[]).find(m => m.uid === movUid);
+  // Si es una entrada migrada, también eliminar la recarga original para que no se regenere
+  if(mov && mov.tipo === 'entrada' && mov.recargaUID){
+    APP.recargas = (APP.recargas||[]).filter(r => r.uid !== mov.recargaUID);
+    // Eliminar todos los movimientos asociados a esa recarga
+    APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.recargaUID !== mov.recargaUID);
+  } else {
+    APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.uid !== movUid);
+  }
+  actualizarSaldoBinance();
+  renderBinance();
+  sincronizarConSheets();
+}
 function renderBinance(){
   const cont = document.getElementById('bin-historial');
-  if(!APP.recargas.length){
-    cont.innerHTML = '<div class="empty"><div class="e-ico">🟡</div><div>Sin recargas P2P registradas</div></div>';
-    return;
-  }
-  const ordenadas = [...APP.recargas].sort((a,b) => b.fecha.localeCompare(a.fecha));
-  cont.innerHTML = ordenadas.map(r => {
-    const usado = r.usado || 0;
-    const rest = r.usdt - usado;
-    const pct = r.usdt > 0 ? Math.round((usado/r.usdt)*100) : 100;
-    return `<div style="background:var(--surface);border:1px solid var(--yellow-border);border-radius:12px;padding:12px 14px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--yellow)">📥 ${r.usdt} USDT @ $${r.tasa}/USDT</div>
-          <div style="font-size:11px;color:var(--text3)">${fmtFecha(r.fecha)}${r.notas?' · '+r.notas:''}</div>
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  migrarBinanceLegacy();
+
+  const saldoActual = getSaldoBinance();
+  const totalEntradas = APP.movimientosBinance.filter(m=>m.tipo==='entrada').reduce((s,m)=>s+m.usdt,0);
+  const totalSalidas  = APP.movimientosBinance.filter(m=>m.tipo==='salida').reduce((s,m)=>s+m.usdt,0);
+
+  // Mostrar resumen Kardex
+  const resumenHtml = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📊 Resumen Kardex USDT</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--green)">↑ Entradas</div>
+          <div style="font-size:15px;font-weight:700;color:var(--green)">${totalEntradas.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--text3)">USDT</div>
         </div>
-        <div style="display:flex;gap:4px">
-          <button class="btn-sm" onclick="abrirEditarRecarga('${r.uid}')">✏️</button>
-          <button class="btn-sm" onclick="eliminarRecarga('${r.uid}')">🗑️</button>
+        <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--red)">↓ Salidas</div>
+          <div style="font-size:15px;font-weight:700;color:var(--red)">${totalSalidas.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--text3)">USDT</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:${saldoActual>=0?'var(--yellow)':'var(--red)'}">= Saldo</div>
+          <div style="font-size:15px;font-weight:700;color:${saldoActual>=0?'var(--yellow)':'var(--red)'}">${saldoActual.toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--text3)">USDT</div>
         </div>
       </div>
-      <div class="bin-bar-bg"><div class="bin-bar-fill" style="width:${pct}%"></div></div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">
-        <span>${usado.toFixed(2)} USDT usados · $${(usado*r.tasa).toFixed(2)}</span>
-        <span style="color:${rest>0?'var(--green)':'var(--red)'}">${rest.toFixed(2)} USDT ${rest>0?'disponibles':'agotados'}</span>
+      ${saldoActual < 0 ? `<div style="margin-top:8px;font-size:11px;color:var(--red);background:var(--red-bg);border:1px solid var(--red-border);border-radius:6px;padding:6px 10px">⚠️ Saldo negativo — pendiente de cubrir con próxima recarga</div>` : ''}
+    </div>`;
+
+  if(!APP.movimientosBinance.length){
+    cont.innerHTML = resumenHtml + '<div class="empty"><div class="e-ico">🟡</div><div>Sin movimientos Binance registrados</div></div>';
+    return;
+  }
+
+  const ordenados = [...APP.movimientosBinance].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'') || (b.uid||'').localeCompare(a.uid||''));
+  cont.innerHTML = resumenHtml + ordenados.map(m => {
+    const esEntrada = m.tipo === 'entrada';
+    const color = esEntrada ? 'var(--green)' : 'var(--red)';
+    const ico = esEntrada ? '📥' : '📤';
+    const signo = esEntrada ? '+' : '-';
+    // Botones: para entradas mostrar editar y eliminar recarga (si tiene recargaUID) o el movimiento
+    let botonesHtml = '';
+    if(esEntrada && m.recargaUID){
+      botonesHtml = `<button class="btn-sm" onclick="abrirEditarRecarga('${esc(m.recargaUID)}')" style="margin-top:2px;font-size:12px" title="Editar recarga">✏️</button>
+        <button class="btn-sm" onclick="confirmarEliminarRecarga('${esc(m.recargaUID)}')" style="margin-top:2px;font-size:12px;color:var(--red)" title="Eliminar recarga P2P">🗑️</button>`;
+    } else {
+      botonesHtml = `<button class="btn-sm" onclick="eliminarMovBinance('${esc(m.uid)}')" style="margin-top:2px;font-size:12px;color:var(--red)" title="Eliminar movimiento">🗑️</button>`;
+    }
+    return `<div style="background:var(--surface);border:1px solid ${esEntrada?'var(--green-border)':'var(--red-border)'};border-left:3px solid ${color};border-radius:10px;padding:11px 13px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:${color}">${ico} ${esEntrada?'Entrada':'Salida'}</div>
+          <div style="font-size:13px;color:var(--white);margin-top:2px">${esc(m.concepto)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${fmtFecha(m.fecha)} · @$${(m.tasa||1).toFixed(3)}/USDT</div>
+        </div>
+        <div style="text-align:right;margin-left:8px;flex-shrink:0">
+          <div style="font-size:15px;font-weight:700;color:${color}">${signo}${m.usdt.toFixed(4)} USDT</div>
+          <div style="font-size:11px;color:var(--text3)">≈ $${(m.montoUSD||0).toFixed(2)}</div>
+          ${botonesHtml}
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function confirmarEliminarRecarga(ruid){
+  const r = APP.recargas.find(x => x.uid === ruid);
+  if(!r){ alert('Recarga no encontrada'); return; }
+  // Verificar si tiene salidas asociadas en el kardex
+  const salidasAsoc = (APP.movimientosBinance||[]).filter(m => m.tipo === 'salida' && !m.migrado);
+  const hayAdvertencia = salidasAsoc.length > 0;
+  const msgConfirm = hayAdvertencia
+    ? `⚠️ Esta recarga P2P (${r.usdt} USDT) ya fue usada en movimientos de salida.\nSi la eliminas, el saldo puede quedar negativo o cambiar la tasa de conversión.\n\n¿Seguro que deseas eliminarla? Esto recalculará el saldo Binance.`
+    : `¿Seguro que deseas eliminar esta recarga P2P (${r.usdt} USDT)?\nEsto recalculará el saldo Binance.`;
+  if(!confirm(msgConfirm)) return;
+  APP.recargas = APP.recargas.filter(x => x.uid !== ruid);
+  APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.recargaUID !== ruid);
+  actualizarSaldoBinance();
+  renderBinance();
+  renderCostos();
+  sincronizarConSheets();
 }
 
 // ══════════════════════════════════════
@@ -2272,10 +4256,12 @@ function remGuardar(){
     uid: uid(), fecha: document.getElementById('rem-fecha').value || hoy(),
     cliente, servicio: document.getElementById('rem-servicio').value,
     motivo: document.getElementById('rem-motivo').value,
-    monto, metodo: document.getElementById('rem-metodo').value
+    monto, metodo: document.getElementById('rem-metodo').value,
+    esCostoReal: true
   });
   cerrarModal('modal-reembolso');
   renderDashboard();
+  sincronizarConSheets();
 }
 
 // ══════════════════════════════════════
@@ -2671,7 +4657,7 @@ function restaurarBackupJSON(input){
       if(!confirm('⚠️ Esto reemplazará TODOS tus datos actuales. ¿Continuar?')) return;
       // SECURITY: Only copy known safe keys, not arbitrary properties
       if(datos.APP && typeof datos.APP === 'object'){
-        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','config'];
+        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','movimientosBinance','config'];
         safeAPPKeys.forEach(k => { if(datos.APP[k] !== undefined) APP[k] = datos.APP[k]; });
         APP._ventaCounter = datos.APP._ventaCounter || 1;
       }
@@ -2812,11 +4798,30 @@ async function _verificarYActualizarDesdeSheets(){
         : [];
       const idsSheets = new Set(ventasSheets.map(v=>v.uid));
       const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid)).map(v => normalizarVenta(v));
-      APP.ventas = [...ventasSheets, ...historicasNuevas];
-      APP.cuentas    = Array.isArray(data.cuentas)    ? data.cuentas    : APP.cuentas;
-      APP.costos     = Array.isArray(data.costos)      ? data.costos.map(g=>({...g, montoUSD:parseFloat(g.montoUSD)||0, usdtUsado:parseFloat(g.usdtUsado)||0})) : APP.costos;
-      APP.recargas   = Array.isArray(data.recargas)    ? data.recargas.map(r=>({...r, usdt:parseFloat(r.usdt)||0, tasa:parseFloat(r.tasa)||0, usado:parseFloat(r.usado)||0})) : APP.recargas;
-      APP.reembolsos = Array.isArray(data.reembolsos)  ? data.reembolsos.map(r=>({...r, monto:parseFloat(r.monto)||0})) : APP.reembolsos;
+      // Históricas siempre con precio $0
+      APP.ventas = [...ventasSheets, ...historicasNuevas].map(v => {
+        if(v.uid && v.uid.startsWith('hist-')) return { ...v, precio: 0, costoAdq: 0 };
+        return v;
+      });
+      APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas : APP.cuentas;
+
+      // ── CORTE FINANCIERO 2026-06-07 ──
+      const FECHA_CORTE = '2026-06-07';
+      APP.costos = Array.isArray(data.costos)
+        ? data.costos.filter(g => g.esCostoReal == true || (g.fecha && g.fecha >= FECHA_CORTE)).map(g => ({...g, montoUSD: parseFloat(g.montoUSD)||0, usdtUsado: parseFloat(g.usdtUsado)||0, esCostoReal: true}))
+        : APP.costos;
+      // FIX: recargas y movimientosBinance sin filtro por fecha (ver fix en cargarDesdeSheets)
+      APP.recargas = Array.isArray(data.recargas)
+        ? data.recargas.map(r => ({...r, usdt: parseFloat(r.usdt)||0, tasa: parseFloat(r.tasa)||0, usado: parseFloat(r.usado)||0, esCostoReal: true}))
+        : APP.recargas;
+      APP.reembolsos = Array.isArray(data.reembolsos)
+        ? data.reembolsos.filter(r => r.esCostoReal == true || (r.fecha && r.fecha >= FECHA_CORTE)).map(r => ({...r, monto: parseFloat(r.monto)||0, esCostoReal: true}))
+        : APP.reembolsos;
+      APP.movimientosBinance = Array.isArray(data.movimientosBinance)
+        ? data.movimientosBinance.map(m => ({...m, usdt: parseFloat(m.usdt)||0, tasa: parseFloat(m.tasa)||0, montoUSD: parseFloat(m.montoUSD)||0, esCostoReal: true}))
+        : APP.movimientosBinance;
+
+      inyectarDatosPDF();
       if(Array.isArray(data.catalogoCategorias) && data.catalogoCategorias.length)
         CATALOGO_CATEGORIAS.splice(0, CATALOGO_CATEGORIAS.length, ...data.catalogoCategorias);
       if(Array.isArray(data.catalogoServicios) && data.catalogoServicios.length)
@@ -2830,6 +4835,12 @@ async function _verificarYActualizarDesdeSheets(){
       renderRegistro();
       renderBadgeVencimientos();
       renderVencimientos();
+      // Re-renderizar dashboard si está activo
+      const dashScreen = document.getElementById('s-dashboard');
+      if(dashScreen && dashScreen.classList.contains('active')) renderDashboard();
+      // Re-renderizar costos si está activo
+      const costosScreen = document.getElementById('s-costos');
+      if(costosScreen && costosScreen.classList.contains('active')) renderCostos();
       guardarLocal(construirPayload());
     }
   } catch(e){ /* sin internet, quedar con caché */ }
@@ -2869,6 +4880,7 @@ function construirPayload(){
   return {
     ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
     recargas: APP.recargas, reembolsos: APP.reembolsos,
+    movimientosBinance: APP.movimientosBinance || [],
     catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
     catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
   };
@@ -2896,7 +4908,7 @@ async function _sincronizarBackground(payload){
 }
 
 // Alias para compatibilidad con renGuardar
-async function sincronizarConSheetsSilencioso(){ return sincronizarConSheets(); }
+// sincronizarConSheetsSilencioso ya está definida arriba
 
 // ══════════════════════════════════════
 // NORMALIZACIÓN DE VENTAS
@@ -2933,9 +4945,38 @@ function parsearFecha(s){
   return null; // No se pudo parsear
 }
 
+// Mapa de números de teléfono correctos por UID histórico
+// Se usa para corregir números truncados guardados en Sheets/localStorage
+const _WA_CORRECTO = {};
+
+function _poblarWACorrectosMap(){
+  // Poblar desde VENTAS_HISTORICAS que tienen los números correctos del PDF
+  VENTAS_HISTORICAS.forEach(v => {
+    if(v.uid && v.wa) _WA_CORRECTO[v.uid] = v.wa;
+  });
+}
+
+function _waEsValido(wa){
+  if(!wa) return false;
+  const digits = wa.replace(/\D/g,'');
+  // Ecuador: +593 + 9 dígitos = 12 dígitos numéricos sin el +
+  return digits.length >= 12;
+}
+
+function normalizarWA(waRaw, vuid){
+  if(!waRaw) return '';
+  // Si el número ya es válido (12+ dígitos numéricos), no modificar
+  if(_waEsValido(waRaw)) return waRaw;
+  // Si el UID coincide con una histírica que tiene el número correcto, corregir
+  if(vuid && _WA_CORRECTO[vuid]) return _WA_CORRECTO[vuid];
+  return waRaw; // devolver como está si no podemos corregirlo
+}
+
 function normalizarVenta(v){
   const fecha = parsearFecha(v.fecha) || hoy();
   const vence = parsearFecha(v.vence) || fecha;
+  // Corregir número WA si está truncado
+  const waCorregido = normalizarWA(v.wa, v.uid);
   return {
     ...v,
     fecha,
@@ -2943,10 +4984,12 @@ function normalizarVenta(v){
     dias:   (parseInt(v.dias) > 0) ? parseInt(v.dias) : 30,
     precio: isNaN(parseFloat(v.precio)) ? 0 : parseFloat(v.precio),
     activa: (v.activa === 'false' || v.activa === false) ? false : true,
-    wa:     v.wa     || '',
+    wa:     waCorregido,
     correo: v.correo || '',
     metodo: v.metodo || 'Transferencia',
     estado: v.estado || 'pagado',
+    costoAdq: parseFloat(v.costoAdq) || 0,
+    metodoAdq: v.metodoAdq || 'Transferencia',
     notas:  v.notas  || '',
     id:     v.id     || ('#VTA-' + String(APP._ventaCounter||1).padStart(4,'0')),
     uid:    v.uid    || uid(),
@@ -2962,14 +5005,49 @@ function cargarDesdeSheets(data){
     ? data.ventas.map(v => normalizarVenta(v))
     : [];
   const idsSheets = new Set(ventasSheets.map(v => v.uid));
-  // Agregar históricas que no estén ya en Sheets (también normalizarlas)
   const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid)).map(v => normalizarVenta(v));
-  APP.ventas = [...ventasSheets, ...historicasNuevas];
 
-  APP.cuentas    = Array.isArray(data.cuentas)    ? data.cuentas    : [];
-  APP.costos     = Array.isArray(data.costos)      ? data.costos.map(g=>({...g, montoUSD:parseFloat(g.montoUSD)||0, usdtUsado:parseFloat(g.usdtUsado)||0})) : [];
-  APP.recargas   = Array.isArray(data.recargas)    ? data.recargas.map(r=>({...r, usdt:parseFloat(r.usdt)||0, tasa:parseFloat(r.tasa)||0, usado:parseFloat(r.usado)||0})) : [];
-  APP.reembolsos = Array.isArray(data.reembolsos)  ? data.reembolsos.map(r=>({...r, monto:parseFloat(r.monto)||0})) : [];
+  // Todas las ventas históricas (uid empieza con 'hist-') van con precio $0
+  APP.ventas = [...ventasSheets, ...historicasNuevas].map(v => {
+    if(v.uid && v.uid.startsWith('hist-')) return { ...v, precio: 0, costoAdq: 0 };
+    return v;
+  });
+
+  APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas : [];
+
+  // ── CORTE FINANCIERO 2026-06-07 ──
+  // Conservar costos con fecha >= corte O marcados como esCostoReal
+  const FECHA_CORTE = '2026-06-07';
+  // FIX: usar comparación laxa (==) para que "true" (string de Sheets) también pase el filtro
+  APP.costos = Array.isArray(data.costos)
+    ? data.costos
+        .filter(g => g.esCostoReal == true || (g.fecha && g.fecha >= FECHA_CORTE))
+        .map(g => ({...g, montoUSD: parseFloat(g.montoUSD)||0, usdtUsado: parseFloat(g.usdtUsado)||0, esCostoReal: true}))
+    : [];
+  // FIX: recargas y movimientosBinance NO se filtran por fecha — un saldo de USDT
+  // puede haberse recargado antes del corte y sus salidas seguirán siendo válidas.
+  // Filtrar por fecha aquí causaba que recargas antiguas desaparecieran pero sus
+  // salidas permanecieran, dejando el saldo incorrecto (negativo o en cero).
+  APP.recargas = Array.isArray(data.recargas)
+    ? data.recargas
+        .map(r => ({...r, usdt: parseFloat(r.usdt)||0, tasa: parseFloat(r.tasa)||0, usado: parseFloat(r.usado)||0, esCostoReal: true}))
+    : [];
+  APP.reembolsos = Array.isArray(data.reembolsos)
+    ? data.reembolsos
+        .filter(r => r.esCostoReal == true || (r.fecha && r.fecha >= FECHA_CORTE))
+        .map(r => ({...r, monto: parseFloat(r.monto)||0, esCostoReal: true}))
+    : [];
+  APP.movimientosBinance = Array.isArray(data.movimientosBinance)
+    ? data.movimientosBinance
+        .map(m => ({...m, usdt: parseFloat(m.usdt)||0, tasa: parseFloat(m.tasa)||0, montoUSD: parseFloat(m.montoUSD)||0, esCostoReal: true}))
+    : [];
+
+  // Deduplicar cuentas
+  const dedupByUid = arr => {
+    const seen = new Set();
+    return arr.filter(x => { if(!x.uid || seen.has(x.uid)) return false; seen.add(x.uid); return true; });
+  };
+  APP.cuentas = dedupByUid(APP.cuentas);
 
   if(Array.isArray(data.catalogoCategorias) && data.catalogoCategorias.length)
     CATALOGO_CATEGORIAS.splice(0, CATALOGO_CATEGORIAS.length, ...data.catalogoCategorias);
@@ -2987,17 +5065,67 @@ function cargarDesdeSheets(data){
     return n > m ? n : m;
   }, 0);
   APP._ventaCounter = maxN + 1;
+  inyectarDatosPDF();
 
-  // Guardar backup local
   guardarLocal(construirPayload());
-
   inicializarUI();
 }
 
+function inyectarDatosPDF(){
+  // ── CORTE FINANCIERO 2026-06-07 ──
+  // Los costos, recargas y movimientos Binance anteriores al corte
+  // NO se inyectan. Solo se mantiene el inventario de cuentas.
+
+  // ── CUENTAS INVENTARIO (solo estructura, sin costos ni movimientos) ──
+  const cuentasPDF = [
+    { uid:'pdf-cnt-01', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF01', correo:'26ixrbnu5d@huunghiammo.site', pass:'capcut123', costo:0, metodoPago:'Binance USDT', desde:'2026-06-05', hasta:'2026-07-05', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-02', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF02', correo:'5vm5hctacp@huongcapcut.click', pass:'capcut123', costo:0, metodoPago:'Binance USDT', desde:'2026-06-05', hasta:'2026-07-05', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-04', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF04', correo:'bq97t8eh20@chebou.cutpro.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:4.00, notas:'CapCut Pro', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-05', srvUid:'srv-spotify', srvNom:'Spotify Familiar', id:'SPT-PDF01', correo:'yoritex7@gmail.com', pass:'', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:0, notas:'Spotify Familiar', cupos:[{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'}] },
+    { uid:'pdf-cnt-06', srvUid:'srv-spotify', srvNom:'Spotify Familiar', id:'SPT-PDF02', correo:'yoritex10@gmail.com', pass:'', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:0, notas:'Spotify Familiar', cupos:[{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'}] },
+    { uid:'pdf-cnt-07', srvUid:'srv-spotify', srvNom:'Paramount+', id:'PMT-PDF01', correo:'mundial@yori-tex.com', pass:'', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:0, notas:'Paramount+', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-08', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF05', correo:'45fi4jw6co@nierdeecapedit.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-05-30', hasta:'2026-06-30', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-09', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF06', correo:'z7zltu1z29@plaesoseditzone.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-05-30', hasta:'2026-06-30', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-10', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF07', correo:'s4flds9d44@greacar.capspace.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-05-30', hasta:'2026-06-30', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-11', srvUid:'srv-disney', srvNom:'Disney+', id:'DIS-PDF01', correo:'labprisztm@streampez.xyz', pass:'Marlon800', costo:0, metodoPago:'Binance USDT', desde:'2026-05-29', hasta:'2026-06-29', pventa:3.50, notas:'Perfil Disney Premium', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-12', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF01', correo:'GlennMasteller378177@hotmail.com', pass:'fsvclg884585', costo:0, metodoPago:'Binance USDT', desde:'2026-05-29', hasta:'2026-06-29', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-13', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF02', correo:'BlancheSamuels333671@hotmail.com', pass:'pcrxm1441200', costo:0, metodoPago:'Binance USDT', desde:'2026-05-28', hasta:'2026-06-28', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-14', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF03', correo:'kauanquetanle@hotmail.com', pass:'trial@123456', costo:0, metodoPago:'Binance USDT', desde:'2026-06-02', hasta:'2026-07-02', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-15', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF04', correo:'anluisjardo@hotmail.com', pass:'trial@123456', costo:0, metodoPago:'Binance USDT', desde:'2026-06-02', hasta:'2026-07-02', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-16', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF08', correo:'gentlecanvas074@flews.app', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-28', hasta:'2026-06-28', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-17', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF09', correo:'pandadelta91l9@delot.dev', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-28', hasta:'2026-06-28', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-18', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF10', correo:'36ntv8az@Kiwkiw.shop', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-27', hasta:'2026-06-27', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
+    { uid:'pdf-cnt-19', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF11', correo:'vgxfjahh@Kiwkiw.shop', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-27', hasta:'2026-06-27', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
+  ];
+
+  // Solo agregar cuentas al inventario — sin costos ni movimientos Binance
+  cuentasPDF.forEach(c => {
+    if(!APP.cuentas.find(x => x.uid === c.uid)){
+      APP.cuentas.push({
+        uid: c.uid, srvUid: c.srvUid, srvNom: c.srvNom,
+        id: c.id, correo: c.correo, pass: c.pass,
+        costo: c.costo, pventa: c.pventa, metodoPago: c.metodoPago,
+        desde: c.desde, hasta: c.hasta, notas: c.notas,
+        cupos: c.cupos, esVirtual: false
+      });
+    }
+  });
+
+  // ── ACTUALIZAR CORREO DE JIMMY ──
+  const cuentaJimmy = APP.cuentas.find(c => c.id === 'CAP-C104' || (c.srvUid === 'srv-capcut' && c.cupos && c.cupos.some(cu => cu.cliente === 'JIMMY')));
+  if(cuentaJimmy){ cuentaJimmy.correo = 'cremattaxuce-7148@ves.ink'; cuentaJimmy.pass = '123456'; }
+  const ventaJimmy = APP.ventas.find(v => v.cliente === 'JIMMY' && v.srvUid === 'srv-capcut');
+  if(ventaJimmy) ventaJimmy.correo = 'cremattaxuce-7148@ves.ink';
+}
 function inyectarHistorico(){
   // Primera vez: solo históricas
   APP.ventas = [...VENTAS_HISTORICAS];
   APP._ventaCounter = VENTAS_HISTORICAS.length + 1;
+  if(!APP.recargas) APP.recargas = [];
+  if(!APP.cuentas) APP.cuentas = [];
+  if(!APP.costos) APP.costos = [];
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  inyectarDatosPDF();
   inicializarUI();
   // Guardar en Sheets automáticamente
   setTimeout(sincronizarConSheets, 1500);
@@ -3026,6 +5154,7 @@ function cerrarSesion(){
   APP.costos = [];
   APP.recargas = [];
   APP.reembolsos = [];
+  APP.movimientosBinance = [];
   // SECURITY: Remove local cache so it isn't accessible without PIN
   localStorage.removeItem('yoritex_local');
   pinActualizarDots();
@@ -3041,6 +5170,11 @@ function inicializarUI(){
   ['mv-fecha','costo-fecha','bin-fecha','rem-fecha'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = hoy();
   });
+  // Migrar Binance legacy si es necesario
+  if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  if(!APP.movimientosBinance.length && APP.recargas.length){
+    migrarBinanceLegacy();
+  }
   initDashSelectors();
   mvPoblarCategorias();
   ncPoblarCategorias();
@@ -3058,16 +5192,24 @@ function inicializarUI(){
       document.getElementById('logo-hex').innerHTML = `<img src="${esc(APP.config.logo)}" alt="logo">`;
     }
   }
+  // Si el dashboard ya está visible al cargar datos (ej. recarga en background), re-renderizarlo
+  const dashScreen = document.getElementById('s-dashboard');
+  if(dashScreen && dashScreen.classList.contains('active')){
+    renderDashboard();
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
   document.getElementById('pin-brand').textContent = APP.config.nombre || 'YORI-TEX';
+  // Poblar mapa de WA correctos desde VENTAS_HISTORICAS
+  _poblarWACorrectosMap();
   // PWA: registrar service worker
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
   // Limpiar caché corrupto — usar parsearFecha para corregir cualquier formato
+  // y también corregir números WA truncados en el caché local
   try {
     const local = localStorage.getItem('yoritex_local');
     if(local){
@@ -3075,13 +5217,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const ventas = d?.data?.ventas || [];
       const fechaOk = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
       const tieneCorruptos = ventas.some(v => !fechaOk(v.vence) || !fechaOk(v.fecha));
-      if(tieneCorruptos){
-        // Intentar reparar con parsearFecha antes de borrar
+      // Corregir WA truncados: si un número tiene menos de 12 dígitos y hay corrección disponible, aplicarla
+      const tieneWAMalos = ventas.some(v => v.wa && !_waEsValido(v.wa));
+      if(tieneCorruptos || tieneWAMalos){
         d.data.ventas = ventas.map(v => {
           const fechaBase = parsearFecha(v.fecha) || hoy();
           const diasPeriodo = parseInt(v.dias) > 0 ? parseInt(v.dias) : 30;
           const venceRep = parsearFecha(v.vence) || sumarDias(fechaBase, diasPeriodo);
-          return { ...v, fecha: fechaBase, vence: venceRep, dias: diasPeriodo };
+          // Corregir WA si está truncado
+          const waFixed = v.wa && !_waEsValido(v.wa) && v.uid && _WA_CORRECTO[v.uid]
+            ? _WA_CORRECTO[v.uid]
+            : v.wa;
+          return { ...v, fecha: fechaBase, vence: venceRep, dias: diasPeriodo, wa: waFixed };
         });
         localStorage.setItem('yoritex_local', JSON.stringify(d));
       }
