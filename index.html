@@ -216,6 +216,13 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .plantilla-txt{font-size:12px;color:var(--text2);line-height:1.55;white-space:pre-wrap}
 .var-tag{display:inline-block;background:rgba(245,166,35,0.15);color:var(--orange);border:1px solid rgba(245,166,35,0.3);border-radius:4px;font-size:10px;padding:1px 6px;margin:2px 1px;cursor:pointer;font-family:monospace}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* ── Selección masiva vencimientos ── */
+.ven-selbar{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;background:var(--surface);border:1px solid var(--orange);border-radius:14px;padding:10px 12px;display:none;flex-wrap:nowrap;gap:7px;z-index:60;box-shadow:0 -4px 24px rgba(0,0,0,0.5);align-items:center}
+.ven-selbar.open{display:flex}
+.ven-chk{width:22px;height:22px;border-radius:6px;border:2px solid var(--text3);background:var(--surface2);cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;font-size:13px;color:transparent;font-weight:800;line-height:1}
+.ven-chk.sel{background:var(--orange);border-color:var(--orange);color:var(--bg)}
+.ven-card.ven-seleccionada{border-color:var(--orange)!important;background:rgba(245,166,35,0.07)!important}
+.ven-card.ven-selmode{cursor:pointer;user-select:none}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .screen.active>*{animation:fadeUp .2s ease both}
 .pin-btn{width:72px;height:72px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--white);font-size:22px;font-weight:600;cursor:pointer;transition:background .1s}
@@ -279,8 +286,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
     <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirModal('modal-nueva-venta')">＋ Venta</button>
   </div>
   <div class="kpi-grid" style="margin-bottom:12px">
-    <div class="kpi verde"><div class="kl">Cobrado hoy</div><div class="kv" id="kpi-cobrado-hoy">$0.00</div></div>
-    <div class="kpi amarillo"><div class="kl">Por cobrar</div><div class="kv" id="kpi-por-cobrar">$0.00</div></div>
+    <div class="kpi verde"><div class="kl" id="kpi-cobrado-lbl">Cobrado hoy</div><div class="kv" id="kpi-cobrado-hoy">$0.00</div></div>
+    <div class="kpi amarillo"><div class="kl" id="kpi-porcobrar-lbl">Por cobrar</div><div class="kv" id="kpi-por-cobrar">$0.00</div></div>
   </div>
   <div class="filters" id="reg-filtros">
     <button class="filter-btn active" onclick="regFiltrar('hoy',this)">Hoy</button>
@@ -325,8 +332,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 
 <!-- VENCIMIENTOS -->
 <div id="s-vencimientos" class="screen">
-  <div class="page-title">Vencimientos</div>
-  <div class="page-sub">Seguimiento de renovaciones</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+    <div class="page-title">Vencimientos</div>
+    <button class="btn btn-navy" id="ven-sel-btn" style="width:auto;padding:7px 14px;font-size:12px;border-radius:9px" onclick="venToggleSelMode()">☑️ Seleccionar</button>
+  </div>
+  <div class="page-sub" style="margin-bottom:14px">Seguimiento de renovaciones</div>
   <div class="kpi-grid" style="grid-template-columns:1fr 1fr 1fr">
     <div class="kpi rojo"><div class="kl">Vencidos</div><div class="kv" id="ven-cnt-vencido">0</div></div>
     <div class="kpi amarillo"><div class="kl">Hoy</div><div class="kv" id="ven-cnt-hoy">0</div></div>
@@ -554,6 +564,59 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
       </div>
     </div>
   </div>
+</div>
+
+<!-- BARRA ACCIONES MASIVAS — VENCIMIENTOS -->
+<div class="ven-selbar" id="ven-selbar">
+  <div style="flex:1;font-size:12px;font-weight:700;color:var(--orange);white-space:nowrap" id="ven-sel-cnt">0 selec.</div>
+  <button class="btn btn-navy" style="width:auto;padding:6px 10px;font-size:11px;white-space:nowrap" onclick="venSelAll()" id="ven-sel-all-btn">☑ Todo</button>
+  <button class="btn btn-green" style="width:auto;padding:6px 11px;font-size:11px;white-space:nowrap" onclick="venBulkRenovar()">✅ Renovar</button>
+  <button class="btn btn-red" style="width:auto;padding:6px 11px;font-size:11px;white-space:nowrap" onclick="venBulkEliminar()">🗑️ Eliminar</button>
+  <button class="btn btn-navy" style="width:auto;padding:6px 10px;font-size:13px;border-color:var(--text3);color:var(--text3)" onclick="venToggleSelMode()">✕</button>
+</div>
+
+<!-- MODAL BULK RENOVAR -->
+<div class="modal-overlay" id="modal-bulk-renovar">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">✅ Renovar en conjunto <button class="modal-close" onclick="cerrarModal('modal-bulk-renovar')">×</button></div>
+  <div class="aviso" id="bulk-ren-info" style="margin-bottom:12px">0 clientes seleccionados</div>
+  <div class="field">
+    <label>Método de cobro</label>
+    <select id="bulk-ren-metodo">
+      <option value="Transferencia">Transferencia</option>
+      <option value="Efectivo">Efectivo</option>
+      <option value="Nequi">Nequi</option>
+      <option value="PayPal">PayPal</option>
+      <option value="Binance USDT">Binance USDT</option>
+    </select>
+  </div>
+  <div class="info-box verde" style="margin-bottom:14px">
+    <div class="ib-lbl">📅 ¿Cómo se calcula la nueva fecha?</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px">Cada cliente se renueva por su período habitual (los días de su suscripción). Si ya venció, se calcula desde hoy. Si aún no vence, se extiende desde su fecha actual.</div>
+  </div>
+  <button class="btn btn-green" onclick="venBulkRenovarConfirmar()">✅ Confirmar renovación</button>
+</div>
+</div>
+
+<!-- MODAL BULK ELIMINAR -->
+<div class="modal-overlay" id="modal-bulk-eliminar">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">🗑️ Eliminar en conjunto <button class="modal-close" onclick="cerrarModal('modal-bulk-eliminar')">×</button></div>
+  <div class="aviso-red" id="bulk-eli-info" style="margin-bottom:14px">0 clientes seleccionados</div>
+  <div class="sec">¿Qué hacer con los ingresos registrados?</div>
+  <label class="radio-opt">
+    <input type="radio" name="bulk-eli-ingreso" value="mantener" checked>
+    <div><div class="ro-title">Mantener en historial financiero</div><div class="ro-sub">La venta queda en el dashboard pero no aparece en vencimientos ni listas de clientes</div></div>
+  </label>
+  <label class="radio-opt">
+    <input type="radio" name="bulk-eli-ingreso" value="eliminar">
+    <div><div class="ro-title" style="color:var(--red)">Eliminar completamente</div><div class="ro-sub">Se borra todo el registro incluyendo el ingreso del dashboard. No se puede deshacer.</div></div>
+  </label>
+  <div style="height:10px"></div>
+  <button class="btn btn-red" onclick="venBulkEliminarConfirmar()">🗑️ Confirmar eliminación</button>
+</div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -834,7 +897,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
         </select>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:6px">Solo modifica si el costo cambió.</div>
+    <div id="ev-costo-nota" style="font-size:11px;color:var(--text3);margin-top:6px">Solo modifica si el costo cambió.</div>
   </div>
   <button class="btn btn-green" onclick="editarVentaGuardar()">💾 Guardar cambios</button>
 </div>
@@ -937,11 +1000,29 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   <div class="modal-title">❌ No renovó <button class="modal-close" onclick="cerrarModal('modal-no-renovo')">×</button></div>
   <div id="nr-info" style="font-size:13px;color:var(--text2);margin-bottom:14px"></div>
   <input type="hidden" id="nr-venta-uid"/>
-  <label class="radio-opt"><input type="radio" name="nr-accion" value="liberar" checked><div><div class="ro-title">🟢 Liberar cupo</div><div class="ro-sub">La cuenta sigue activa para otros clientes</div></div></label>
-  <label class="radio-opt"><input type="radio" name="nr-accion" value="solo-inactivar"><div><div class="ro-title">📋 Solo marcar inactivo</div><div class="ro-sub">El cupo queda ocupado, sin eliminar datos</div></div></label>
+  <label class="radio-opt"><input type="radio" name="nr-accion" value="liberar" checked onchange="nrToggleAviso()"><div><div class="ro-title">🟢 Liberar cupo</div><div class="ro-sub">La cuenta sigue activa para otros clientes</div></div></label>
+  <label class="radio-opt"><input type="radio" name="nr-accion" value="solo-inactivar" onchange="nrToggleAviso()"><div><div class="ro-title">📋 Solo marcar inactivo</div><div class="ro-sub">El cupo queda ocupado, sin eliminar datos</div></div></label>
+  <label class="radio-opt" style="border-color:var(--red-border);background:var(--red-bg)"><input type="radio" name="nr-accion" value="eliminar-todo" onchange="nrToggleAviso()"><div><div class="ro-title" style="color:var(--red)">🗑️ Eliminar todo</div><div class="ro-sub">Libera el cupo Y elimina el registro de esta venta</div></div></label>
   <div class="field" style="margin-top:4px"><label>Motivo (opcional)</label><input type="text" id="nr-motivo" placeholder="Ej: No contestó, canceló..."/></div>
-  <div class="aviso-red">⚠️ El historial de pagos anteriores no se borra.</div>
+  <div class="aviso-red" id="nr-aviso-normal">⚠️ El historial de pagos anteriores no se borra.</div>
+  <div class="aviso-red" id="nr-aviso-eliminar" style="display:none">🗑️ <strong>Esta acción elimina el registro de la venta.</strong> El cupo quedará libre y los datos del cliente se borrarán de esta cuenta. El historial de pagos sí se elimina.</div>
   <button class="btn btn-red" onclick="nrGuardar()">Confirmar</button>
+</div>
+</div>
+
+<!-- MODAL CONFIRMAR ELIMINACIÓN (segundo paso de "Eliminar todo") -->
+<div class="modal-overlay" id="modal-nr-confirmar-eliminar">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title" style="color:var(--red)">🗑️ Confirmar eliminación <button class="modal-close" onclick="cerrarModal('modal-nr-confirmar-eliminar')">×</button></div>
+  <div id="nrce-info" style="font-size:13px;color:var(--text2);margin-bottom:14px;padding:10px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:9px"></div>
+  <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:10px">¿Qué hacer con el ingreso registrado?</div>
+  <label class="radio-opt"><input type="radio" name="nrce-ingreso" value="mantener" checked><div><div class="ro-title">✅ Mantener en historial financiero</div><div class="ro-sub">El ingreso sigue contando en el dashboard y reportes</div></div></label>
+  <label class="radio-opt" style="border-color:var(--red-border)"><input type="radio" name="nrce-ingreso" value="eliminar"><div><div class="ro-title" style="color:var(--red)">🗑️ Eliminar también el ingreso</div><div class="ro-sub">Como si esta venta nunca hubiera existido</div></div></label>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+    <button class="btn btn-navy" onclick="cerrarModal('modal-nr-confirmar-eliminar')">Cancelar</button>
+    <button class="btn btn-red" onclick="nrEjecutarEliminar()">Eliminar</button>
+  </div>
 </div>
 </div>
 
@@ -1239,6 +1320,7 @@ let APP = {
   recargas: [],
   reembolsos: [],
   movimientosBinance: [], // NUEVO: Kardex de movimientos Binance
+  ventasEliminadas: [],   // lista negra de UIDs eliminados (para no reinyectar históricas)
   _ventaCounter: 1,
   _filtroReg: 'hoy',
   _filtroInv: 'todos',
@@ -1441,8 +1523,9 @@ let PLANTILLAS_WA = [
 ];
 
 // ESTADO DASHBOARD
-let _dashMes = new Date().getMonth();
-let _dashAnio = new Date().getFullYear();
+const _hoyEC = new Date(Date.now()-5*3600000); // UTC-5 Ecuador
+let _dashMes = _hoyEC.getUTCMonth();
+let _dashAnio = _hoyEC.getUTCFullYear();
 let _dashPeriodo = 'mes';
 let _dashDesde = ''; // para modo rango
 let _dashHasta = '';
@@ -1453,7 +1536,7 @@ let _editCupoUID = null, _editCupoIdx = null;
 // ══════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════
-function hoy(){ return new Date().toISOString().split('T')[0]; }
+function hoy(){ const ec=new Date(Date.now()-5*3600000); return ec.toISOString().split('T')[0]; } // UTC-5 Ecuador/Machala
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function sumarDias(base, dias){
   const d = new Date(base + 'T12:00:00');
@@ -1492,6 +1575,17 @@ function badgeVen(s){
   if(st === 'pronto' && d !== null) return `<span class="badge badge-pronto">En ${d}d</span>`;
   if(st === 'ok') return `<span class="badge badge-ok">${fmtFechaCorta(s)}</span>`;
   return '';
+}
+// Badge de inventario: siempre muestra "Vence DD MMM · Nd" para tener fecha + días a la vista
+function badgeVenInv(s){
+  if(!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const d = diasHasta(s);
+  if(d === null) return '';
+  const fechaStr = fmtFechaCorta(s);
+  if(d < 0)  return `<span class="badge badge-vencido" style="font-size:10px">Venció ${fechaStr} · hace ${Math.abs(d)}d</span>`;
+  if(d === 0) return `<span class="badge badge-hoy" style="font-size:10px">Vence HOY · ${fechaStr}</span>`;
+  if(d <= 7)  return `<span class="badge badge-pronto" style="font-size:10px">Vence ${fechaStr} · en ${d}d ⚠️</span>`;
+  return `<span class="badge badge-ok" style="font-size:10px">Vence ${fechaStr} · ${d}d</span>`;
 }
 function togglePass(inputId, btn){
   const el = document.getElementById(inputId);
@@ -1794,7 +1888,8 @@ function renderRegistro(){
   }
   else if(APP._filtroReg === 'semana'){
     const d = new Date(hoyStr + 'T12:00:00'); d.setDate(d.getDate() - 7);
-    ventas = ventas.filter(v => v.fecha >= d.toISOString().split('T')[0]);
+    const semanaDesde = d.toISOString().slice(0,10); // hoyStr ya es UTC-5, T12 evita desfase
+    ventas = ventas.filter(v => v.fecha >= semanaDesde);
   } else if(APP._filtroReg === 'mes'){
     ventas = ventas.filter(v => v.fecha >= hoyStr.slice(0,7) + '-01');
   } else if(APP._filtroReg === 'pendiente'){
@@ -1806,17 +1901,55 @@ function renderRegistro(){
   }
   ventas = ventas.sort((a,b) => (b.creado||'').localeCompare(a.creado||''));
 
-  // KPIs — siempre basados en el día seleccionado/hoy
-  const diaKpi = APP._filtroReg === 'dia'
-    ? (document.getElementById('reg-dia-fecha')?.value || hoyStr)
-    : hoyStr;
-  const hoyV = APP.ventas.filter(v => v.fecha === diaKpi);
-  const cobradoHoy = hoyV.filter(v => v.estado === 'pagado').reduce((s,v) => s+v.precio, 0);
-  const porCobrar = APP.ventas.filter(v => ['por_cobrar','pendiente','parcial'].includes(v.estado)).reduce((s,v) => s+v.precio, 0);
-  const lblDia = diaKpi === hoyStr ? 'Hoy' : fmtFecha(diaKpi);
-  document.getElementById('reg-sub').textContent = `${lblDia}: ${hoyV.length} venta${hoyV.length!==1?'s':''} · $${cobradoHoy.toFixed(2)}`;
-  document.getElementById('kpi-cobrado-hoy').textContent = '$' + cobradoHoy.toFixed(2);
-  document.getElementById('kpi-por-cobrar').textContent = '$' + porCobrar.toFixed(2);
+  // KPIs — responden al filtro activo
+  const filtro = APP._filtroReg;
+  let kpiVentas; // ventas del período para calcular cobrado
+  let kpiLblCobrado, kpiLblPorCobrar;
+
+  if(filtro === 'hoy'){
+    kpiVentas = APP.ventas.filter(v => v.fecha === hoyStr);
+    kpiLblCobrado = 'Cobrado hoy';
+    kpiLblPorCobrar = 'Por cobrar hoy';
+  } else if(filtro === 'dia'){
+    const diaEl = document.getElementById('reg-dia-fecha');
+    const diaVal = diaEl ? diaEl.value : hoyStr;
+    kpiVentas = APP.ventas.filter(v => v.fecha === diaVal);
+    kpiLblCobrado = 'Cobrado ese día';
+    kpiLblPorCobrar = 'Por cobrar ese día';
+  } else if(filtro === 'semana'){
+    const d = new Date(hoyStr + 'T12:00:00'); d.setDate(d.getDate() - 7);
+    const desde = d.toISOString().slice(0,10);
+    kpiVentas = APP.ventas.filter(v => v.fecha >= desde);
+    kpiLblCobrado = 'Cobrado (7 días)';
+    kpiLblPorCobrar = 'Por cobrar (7 días)';
+  } else if(filtro === 'mes'){
+    const mesDesde = hoyStr.slice(0,7) + '-01';
+    kpiVentas = APP.ventas.filter(v => v.fecha >= mesDesde);
+    kpiLblCobrado = 'Cobrado este mes';
+    kpiLblPorCobrar = 'Por cobrar este mes';
+  } else {
+    // pendiente / todos
+    kpiVentas = APP.ventas;
+    kpiLblCobrado = 'Total cobrado';
+    kpiLblPorCobrar = 'Total por cobrar';
+  }
+
+  const cobradoKpi = kpiVentas.filter(v => v.estado === 'pagado').reduce((s,v) => s + (v.precio||0), 0);
+  const porCobrarKpi = kpiVentas.filter(v => ['por_cobrar','pendiente','parcial'].includes(v.estado)).reduce((s,v) => s + (v.precio||0), 0);
+  const subVentasCount = kpiVentas.length;
+  const subLbl = filtro === 'hoy' ? 'Hoy'
+    : filtro === 'semana' ? 'Esta semana'
+    : filtro === 'mes' ? 'Este mes'
+    : filtro === 'dia' ? (document.getElementById('reg-dia-fecha')?.value || hoyStr)
+    : 'Total';
+
+  document.getElementById('reg-sub').textContent = `${subLbl}: ${subVentasCount} venta${subVentasCount!==1?'s':''} · $${cobradoKpi.toFixed(2)}`;
+  document.getElementById('kpi-cobrado-hoy').textContent = '$' + cobradoKpi.toFixed(2);
+  document.getElementById('kpi-por-cobrar').textContent = '$' + porCobrarKpi.toFixed(2);
+  const lblCobEl = document.getElementById('kpi-cobrado-lbl');
+  const lblPorEl = document.getElementById('kpi-porcobrar-lbl');
+  if(lblCobEl) lblCobEl.textContent = kpiLblCobrado;
+  if(lblPorEl) lblPorEl.textContent = kpiLblPorCobrar;
   const cont = document.getElementById('reg-lista-container');
   if(!ventas.length){
     cont.innerHTML = '<div class="empty"><div class="e-ico">📋</div><div>Sin ventas para mostrar.</div></div>';
@@ -2012,6 +2145,17 @@ function abrirEditarVenta(ventaUid){
       if(document.getElementById('ev-metodo-adq')) document.getElementById('ev-metodo-adq').value = c.metodoPago || 'Transferencia';
     }
   }
+  // Nota dinámica: si viene de inventario, el costo es solo referencial
+  const notaEl = document.getElementById('ev-costo-nota');
+  if(notaEl){
+    if(v.cuentaUID){
+      notaEl.innerHTML = '📊 <strong>Solo referencial.</strong> El costo ya se registró cuando añadiste la cuenta al inventario. No se sumará de nuevo a Costos.';
+      notaEl.style.color = 'var(--orange)';
+    } else {
+      notaEl.textContent = 'Modifica si el costo cambió. Se registrará en Costos.';
+      notaEl.style.color = 'var(--text3)';
+    }
+  }
   abrirModal('modal-editar-venta');
 }
 
@@ -2090,12 +2234,18 @@ function editarVentaGuardar(){
   const metodoAdqNuevo = document.getElementById('ev-metodo-adq')?.value || v.metodoAdq || 'Transferencia';
   if(costoAdqNuevo > 0 && costoAdqNuevo !== v.costoAdq){
     v.costoAdq = costoAdqNuevo; v.metodoAdq = metodoAdqNuevo;
-    const esUsdt = metodoAdqNuevo.toLowerCase().includes('usdt') || metodoAdqNuevo.toLowerCase().includes('binance');
-    if(esUsdt){
-      descontarUSDTBinance(costoAdqNuevo, `Costo cuenta — ${v.srvNom} (${v.cliente})`, v.cuentaUID||null, null, v.fecha||hoy());
-    } else {
-      APP.costos.push({ uid:uid(), fecha:v.fecha||hoy(), catUid:'cg-cuentas', desc:`Costo cuenta — ${v.srvNom} (${v.cliente})`, metodo:metodoAdqNuevo, montoUSD:costoAdqNuevo, usdtUsado:0, notas:`Desde edición ${v.id}` });
+    // ⚠️ Solo registrar en Costos si la venta NO viene de inventario.
+    // Si viene de inventario, el costo ya fue registrado cuando se añadió la cuenta.
+    // El campo costoAdq aquí es solo referencial para calcular margen/rendimiento.
+    if(origen === 'manual'){
+      const esUsdt = metodoAdqNuevo.toLowerCase().includes('usdt') || metodoAdqNuevo.toLowerCase().includes('binance');
+      if(esUsdt){
+        descontarUSDTBinance(costoAdqNuevo, `Costo cuenta — ${v.srvNom} (${v.cliente})`, v.cuentaUID||null, null, v.fecha||hoy());
+      } else {
+        APP.costos.push({ uid:uid(), fecha:v.fecha||hoy(), catUid:'cg-cuentas', desc:`Costo cuenta — ${v.srvNom} (${v.cliente})`, metodo:metodoAdqNuevo, montoUSD:costoAdqNuevo, usdtUsado:0, notas:`Desde edición ${v.id}` });
+      }
     }
+    // Si es de inventario: solo guardamos el valor en v.costoAdq para referencia visual. No toca APP.costos.
   }
   cerrarModal('modal-editar-venta');
   renderRegistro();
@@ -2409,6 +2559,7 @@ function renderInventario(){
       pin: v.pin || '',
       plan: v.plan || '',
       invCorreo: v.invCorreo || '',
+      // Tomar vence de la venta directamente
       vence: (v.vence && v.vence.match(/^\d{4}-\d{2}-\d{2}$/)) ? v.vence : null,
       ventaUid: v.uid
     }))
@@ -2446,8 +2597,8 @@ function renderInventario(){
 
   // ── Separar: activas vs por renovar ───────────────────────
   const hoyStr = hoy();
-  const activas    = cuentas.filter(c => c.cupos.some(cu => cu.estado==='ocupado' && cu.vence >= hoyStr));
-  const porRenovar = cuentas.filter(c => c.cupos.every(cu => cu.estado==='libre' || cu.vence < hoyStr));
+  const activas    = cuentas.filter(c => c.cupos.some(cu => cu.estado==='ocupado' && (!cu.vence || cu.vence >= hoyStr)));
+  const porRenovar = cuentas.filter(c => c.cupos.every(cu => cu.estado==='libre' || (cu.vence && cu.vence < hoyStr)));
 
   function renderCuenta(c){
     const lib = c.cupos.filter(cu => cu.estado==='libre').length;
@@ -2460,10 +2611,11 @@ function renderInventario(){
     if(c.hasta && !c.esVirtual){
       const dHasta = diasHasta(c.hasta);
       if(dHasta !== null){
-        if(dHasta < 0) vigenciaBadge = `<span class="badge badge-vencido" style="font-size:9px">Expiró</span>`;
-        else if(dHasta === 0) vigenciaBadge = `<span class="badge badge-hoy" style="font-size:9px">Vence hoy</span>`;
-        else if(dHasta <= 7) vigenciaBadge = `<span class="badge badge-pronto" style="font-size:9px">En ${dHasta}d</span>`;
-        else vigenciaBadge = `<span class="badge badge-ok" style="font-size:9px">Vence ${fmtFechaCorta(c.hasta)}</span>`;
+        const fStr = fmtFechaCorta(c.hasta);
+        if(dHasta < 0) vigenciaBadge = `<span class="badge badge-vencido" style="font-size:9px">Expiró ${fStr} · hace ${Math.abs(dHasta)}d</span>`;
+        else if(dHasta === 0) vigenciaBadge = `<span class="badge badge-hoy" style="font-size:9px">Vence HOY</span>`;
+        else if(dHasta <= 7) vigenciaBadge = `<span class="badge badge-pronto" style="font-size:9px">Vence ${fStr} · en ${dHasta}d ⚠️</span>`;
+        else vigenciaBadge = `<span class="badge badge-ok" style="font-size:9px">Vence ${fStr} · ${dHasta}d</span>`;
       }
     }
   const cuposHtml = c.cupos.map((cu, i) => {
@@ -2477,9 +2629,10 @@ function renderInventario(){
       const editBtn = c.esVirtual && cu.ventaUid
         ? `<button class="btn-sm" onclick="abrirEditarVenta('${esc(cu.ventaUid)}')">✏️</button>`
         : (!c.esVirtual ? `<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button>` : '');
-      // Fecha vencimiento — solo mostrar si es fecha válida
-      const venceStr = cu.vence && cu.vence.match(/^\d{4}-\d{2}-\d{2}$/) ? fmtFecha(cu.vence) : null;
-      const venceBadge = venceStr ? badgeVen(cu.vence) : '';
+      // Fecha vencimiento — usar la del cupo, o c.hasta de la cuenta como fallback
+      const venceRaw = cu.vence || (!c.esVirtual ? c.hasta : null);
+      const venceStr = venceRaw && venceRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? fmtFecha(venceRaw) : null;
+      const venceBadge = venceRaw && venceRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? badgeVenInv(venceRaw) : '';
       const planStr = cu.plan ? `<span class="chip" style="font-size:9px;background:var(--surface3)">${esc(cu.plan)}</span>` : '';
       const invStr = cu.invCorreo ? `<div style="font-size:10px;color:var(--text3)">✉️ ${esc(cu.invCorreo)}</div>` : '';
       return `
@@ -2488,7 +2641,7 @@ function renderInventario(){
             <div class="cupo-dot dot-ocupado" style="flex-shrink:0"></div>
             <div class="cupo-info" style="flex:1">
               <div class="cupo-cliente">${esc(cu.cliente||'Cupo '+(i+1))} ${planStr}</div>
-              <div class="cupo-sub">${cu.perfil?'Perfil: '+esc(cu.perfil)+' · ':''}${venceStr ? 'Vence: '+venceStr+' '+venceBadge : '<span style="color:var(--text3);font-size:10px">Sin fecha</span>'}</div>
+              <div class="cupo-sub">${cu.perfil?'Perfil: '+esc(cu.perfil)+' · ':''}${venceBadge || '<span style="color:var(--text3);font-size:10px">Sin fecha asignada</span>'}</div>
               ${invStr}
             </div>
             <div style="display:flex;gap:4px;flex-shrink:0">
@@ -2504,7 +2657,22 @@ function renderInventario(){
           <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
           <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
           ${costoPorCupoVendido ? `<div style="font-size:10px;color:var(--orange);margin-top:2px">💡 $${costoPorCupoVendido}/cupo vendido</div>` : ''}
-          ${c.desde||c.hasta ? `<div style="font-size:10px;color:var(--text3);margin-top:1px">📅 ${c.desde?fmtFechaCorta(c.desde):'—'} → ${c.hasta?fmtFechaCorta(c.hasta):'—'} ${vigenciaBadge}</div>` : ''}
+          ${!c.esVirtual ? (()=>{
+            if(!c.hasta){
+              return `<div style="font-size:10px;color:var(--text3);margin-top:3px">📅 Cuenta: sin fecha de vencimiento <span style="color:var(--orange)">(✏️ edita para agregar)</span></div>`;
+            }
+            const dH = diasHasta(c.hasta);
+            const fH = fmtFecha(c.hasta);
+            let color = 'var(--green)', icono = '📅';
+            if(dH !== null){
+              if(dH < 0){ color='var(--red)'; icono='🔴'; }
+              else if(dH === 0){ color='var(--red)'; icono='🔴'; }
+              else if(dH <= 7){ color='var(--orange)'; icono='⚠️'; }
+              else if(dH <= 15){ color='var(--yellow,#f5c518)'; icono='⏳'; }
+            }
+            const diasTxt = dH === null ? '' : dH < 0 ? ` · venció hace ${Math.abs(dH)}d` : dH === 0 ? ' · vence HOY' : ` · ${dH}d restantes`;
+            return `<div style="font-size:11px;color:${color};margin-top:3px;font-weight:600">${icono} Cuenta vence: ${fH}${diasTxt}</div>`;
+          })() : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0">
           <span class="chip verde">${lib} libre${lib!==1?'s':''}</span>
@@ -2767,8 +2935,10 @@ function ncGuardar(){
   if(editUID){
     const i = APP.cuentas.findIndex(c => c.uid === editUID);
     if(i > -1){
-      const costoAnterior = APP.cuentas[i].costo || 0;
       const old = APP.cuentas[i].cupos;
+      // Al EDITAR: solo actualizar datos de la cuenta, NUNCA re-registrar costo.
+      // El costo ya fue registrado cuando se creó. Si cambió, el usuario debe
+      // usar la sección de Costos directamente para ajustarlo.
       APP.cuentas[i] = {
         ...APP.cuentas[i], srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo,
         pass: document.getElementById('nc-pass').value,
@@ -2777,39 +2947,6 @@ function ncGuardar(){
         notas: document.getElementById('nc-notas').value,
         cupos: Array.from({length:numCupos}, (_,k) => old[k] || {estado:'libre'})
       };
-      // FIX Bug #7: Si hay costo y NO existe ya un costo registrado para esta cuenta, registrarlo
-      if(costoTotal > 0){
-        const yaExisteCosto = APP.costos.some(c =>
-          c.cuentaUID === editUID && c.tipo === 'adquisicion_cuenta'
-        );
-        if(!yaExisteCosto){
-          const esUsdt = metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
-          let montoUSDReal = costoTotal;
-          let usdtUsado = 0;
-          if(esUsdt){
-            const fifo = calcFIFO(costoTotal);
-            usdtUsado = costoTotal;
-            montoUSDReal = fifo.total || costoTotal;
-            descontarUSDTBinance(costoTotal,
-              `Adquisición cuenta madre — ${idVal} (${srv ? srv.nombre : srvUid})`,
-              editUID, null, ncDesde || hoy()
-            );
-          }
-          APP.costos.push({
-            uid: uid(),
-            tipo: 'adquisicion_cuenta',
-            cuentaUID: editUID,
-            fecha: ncDesde || hoy(),
-            catUid: 'cg-cuentas',
-            desc: `Adquisición cuenta madre — ${srv ? srv.nombre : srvUid} · ${idVal}`,
-            metodo: metodoPago || 'Transferencia',
-            montoUSD: montoUSDReal,
-            usdtUsado,
-            esCostoReal: true,
-            notas: `Registrado al editar cuenta ${idVal}`
-          });
-        }
-      }
     }
   } else {
     const nuevaCuentaUID = uid();
@@ -2887,7 +3024,7 @@ function venFiltrar(f, btn){
 }
 
 function renderBadgeVencimientos(){
-  const cnt = APP.ventas.filter(v => v.activa !== false && ['vencido','hoy'].includes(estadoVen(v.vence))).length;
+  const cnt = APP.ventas.filter(v => v.activa !== false && !v.eliminadoRegistro && ['vencido','hoy'].includes(estadoVen(v.vence))).length;
   const b = document.getElementById('nav-badge-venc');
   b.style.display = cnt > 0 ? 'flex' : 'none';
   b.textContent = cnt;
@@ -2895,12 +3032,182 @@ function renderBadgeVencimientos(){
 
 let venMsgWA = {};
 
+// ══════════════════════════════════════
+// SELECCIÓN MASIVA — VENCIMIENTOS
+// ══════════════════════════════════════
+let _venSelMode = false;
+let _venSeleccionados = new Set();
+
+function venToggleSelMode(){
+  _venSelMode = !_venSelMode;
+  _venSeleccionados.clear();
+  const btn = document.getElementById('ven-sel-btn');
+  const bar = document.getElementById('ven-selbar');
+  if(_venSelMode){
+    if(btn){ btn.textContent = '✕ Cancelar'; btn.style.background='var(--red-bg)'; btn.style.borderColor='var(--red-border)'; btn.style.color='var(--red)'; }
+    if(bar) bar.classList.add('open');
+  } else {
+    if(btn){ btn.innerHTML='☑️ Seleccionar'; btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
+    if(bar) bar.classList.remove('open');
+  }
+  venActualizarSel();
+  renderVencimientos();
+}
+
+function venToggleItem(uid){
+  if(!_venSelMode) return;
+  if(_venSeleccionados.has(uid)) _venSeleccionados.delete(uid);
+  else _venSeleccionados.add(uid);
+  venActualizarSel();
+  // Actualizar solo el checkbox y el estilo de la card sin re-renderizar todo
+  const chk  = document.getElementById('vchk-' + uid);
+  const card = document.getElementById('vcard-' + uid);
+  const isS  = _venSeleccionados.has(uid);
+  if(chk)  chk.classList.toggle('sel', isS);
+  if(card) card.classList.toggle('ven-seleccionada', isS);
+}
+
+function venSelAll(){
+  const visibles = Array.from(document.querySelectorAll('[id^="vcard-"]')).map(el => el.id.replace('vcard-',''));
+  const todosSelected = visibles.length > 0 && visibles.every(uid => _venSeleccionados.has(uid));
+  if(todosSelected){
+    visibles.forEach(uid => _venSeleccionados.delete(uid));
+  } else {
+    visibles.forEach(uid => _venSeleccionados.add(uid));
+  }
+  venActualizarSel();
+  renderVencimientos(); // refrescar checkboxes
+}
+
+function venActualizarSel(){
+  const n = _venSeleccionados.size;
+  const cnt = document.getElementById('ven-sel-cnt');
+  if(cnt) cnt.textContent = n + ' selec.';
+  const allBtn = document.getElementById('ven-sel-all-btn');
+  if(allBtn){
+    const visibles = document.querySelectorAll('[id^="vcard-"]').length;
+    const todosSelected = visibles > 0 && n >= visibles;
+    allBtn.textContent = todosSelected ? '✕ Ninguno' : '☑ Todo';
+  }
+}
+
+function venBulkRenovar(){
+  if(_venSeleccionados.size === 0){ alert('Selecciona al menos un cliente'); return; }
+  const n = _venSeleccionados.size;
+  document.getElementById('bulk-ren-info').textContent =
+    '📋 ' + n + ' cliente' + (n!==1?'s':'') + ' seleccionado' + (n!==1?'s':'');
+  document.getElementById('bulk-ren-metodo').value = 'Transferencia';
+  abrirModal('modal-bulk-renovar');
+}
+
+function venBulkRenovarConfirmar(){
+  const metodo = document.getElementById('bulk-ren-metodo').value;
+  let renovados = 0;
+  // Snapshot del set porque lo vamos a modificar
+  const uids = Array.from(_venSeleccionados);
+  uids.forEach(ventaUid => {
+    const v = APP.ventas.find(x => x.uid === ventaUid);
+    if(!v) return;
+    const dias = v.dias || 30;
+    // Nueva vence: si ya venció → desde hoy; si aún vigente → extender desde vence actual
+    const baseDate = (v.vence && v.vence > hoy()) ? v.vence : hoy();
+    const nuevaVence = sumarDias(baseDate, dias);
+    const nuevaVenta = {
+      ...v,
+      uid: uid(),
+      id:  numVenta(),
+      fecha: hoy(),
+      vence: nuevaVence,
+      dias,
+      metodo,
+      estado: 'pagado',
+      activa: true,
+      creado: new Date().toISOString()
+    };
+    // Marcar la venta anterior como inactiva
+    v.activa = false;
+    APP.ventas.push(nuevaVenta);
+    APP._ventaCounter++;
+    // Si tenía cupo asignado → actualizar fecha en la cuenta madre
+    if(v.cuentaUID && v.cupoIdx !== null && v.cupoIdx !== undefined){
+      const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
+      if(cuenta && cuenta.cupos[v.cupoIdx]){
+        cuenta.cupos[v.cupoIdx].vence    = nuevaVence;
+        cuenta.cupos[v.cupoIdx].ventaUid = nuevaVenta.uid;
+      }
+      nuevaVenta.cuentaUID = v.cuentaUID;
+      nuevaVenta.cupoIdx   = v.cupoIdx;
+    }
+    renovados++;
+  });
+  cerrarModal('modal-bulk-renovar');
+  venToggleSelMode(); // salir del modo selección y limpiar
+  renderVencimientos();
+  renderRegistro();
+  renderInventario();
+  alert('✅ ' + renovados + ' cliente' + (renovados!==1?'s':'') + ' renovado' + (renovados!==1?'s':'') + ' correctamente');
+  // Usar sincronizarConSheets (no silenciosa) para garantizar que todo persiste
+  sincronizarConSheets();
+}
+
+function venBulkEliminar(){
+  if(_venSeleccionados.size === 0){ alert('Selecciona al menos un cliente'); return; }
+  const n = _venSeleccionados.size;
+  document.getElementById('bulk-eli-info').textContent =
+    '⚠️ ' + n + ' cliente' + (n!==1?'s':'') + ' seleccionado' + (n!==1?'s':'') + ' — esta acción no se puede deshacer';
+  const r = document.querySelector('input[name="bulk-eli-ingreso"][value="mantener"]');
+  if(r) r.checked = true;
+  abrirModal('modal-bulk-eliminar');
+}
+
+function venBulkEliminarConfirmar(){
+  const eliminarIngreso = document.querySelector('input[name="bulk-eli-ingreso"]:checked')?.value === 'eliminar';
+  if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
+  let procesados = 0;
+  const uids = Array.from(_venSeleccionados);
+  uids.forEach(ventaUid => {
+    const v = APP.ventas.find(x => x.uid === ventaUid);
+    if(!v) return;
+    // Liberar cupo en la cuenta madre si corresponde
+    if(v.cuentaUID){
+      const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
+      if(cuenta && v.cupoIdx !== null && v.cupoIdx !== undefined){
+        cuenta.cupos[v.cupoIdx] = { estado: 'libre' };
+      }
+    }
+    // Agregar a lista negra para que no reaparezca (crítico para históricas)
+    if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
+    if(eliminarIngreso){
+      // Eliminar completamente del array
+      const idx = APP.ventas.findIndex(x => x.uid === ventaUid);
+      if(idx !== -1) APP.ventas.splice(idx, 1);
+    } else {
+      // Mantener en historial financiero pero ocultar de vistas operativas
+      v.activa          = false;
+      v.eliminadoRegistro = true;
+      v.motivoSalida    = 'Eliminado masivo (ingreso conservado)';
+      v.cuentaUID       = null;
+      v.cupoIdx         = null;
+    }
+    procesados++;
+  });
+  cerrarModal('modal-bulk-eliminar');
+  venToggleSelMode(); // salir del modo selección y limpiar
+  renderVencimientos();
+  renderInventario();
+  renderBadgeVencimientos();
+  if(typeof renderDashboard === 'function') renderDashboard();
+  alert('🗑️ ' + procesados + ' cliente' + (procesados!==1?'s':'') + ' eliminado' + (procesados!==1?'s':''));
+  // Siempre sincronizarConSheets (garantiza que ventasEliminadas se guarda)
+  sincronizarConSheets();
+}
+
 function renderVencimientos(){
   let ventas = APP._filtroVen === 'inactivo'
-    ? APP.ventas.filter(v => v.activa === false)
-    : APP.ventas.filter(v => v.activa !== false);
+    ? APP.ventas.filter(v => v.activa === false && !v.eliminadoRegistro)
+    : APP.ventas.filter(v => v.activa !== false && !v.eliminadoRegistro);
   const cnt = { vencido:0, hoy:0, pronto:0 };
-  APP.ventas.filter(v => v.activa !== false).forEach(v => {
+  APP.ventas.filter(v => v.activa !== false && !v.eliminadoRegistro).forEach(v => {
     const st = estadoVen(v.vence);
     if(st==='vencido') cnt.vencido++;
     else if(st==='hoy') cnt.hoy++;
@@ -2929,6 +3236,7 @@ function renderVencimientos(){
     const wa = v.wa ? v.wa.replace(/\D/g,'') : '';
     const d = diasHasta(v.vence);
     const isInactivo = v.activa === false;
+    const isSel = _venSeleccionados.has(v.uid);
     let msgWA = '';
     if(d !== null && d < -2) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTe escribo para informarte que tu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' días y el período de gracia ya expiró.\n\nGracias por haber utilizado los servicios de *' + (APP.config.nombre||'YORI-TEX') + '* 🙏\n\n⚠️ Si deseas continuar, el valor de renovación es *$' + v.precio.toFixed(2) + '*. Caso contrario, el servicio será cortado a la brevedad.\n\n' + (APP.config.firma||'');
     else if(d !== null && d < 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' día' + (Math.abs(d)===1?'':'s') + '.\n\n¿Deseas renovar? El valor es *$' + v.precio.toFixed(2) + '*\n\n🔄 Cualquier consulta escríbeme.\n\n' + (APP.config.firma||'');
@@ -2945,14 +3253,23 @@ function renderVencimientos(){
         <button class="btn btn-red" style="font-size:12px;padding:8px" onclick="abrirNoRenovo('${esc(v.uid)}')">❌ No renovó</button>
         ${wa && msgWA ? `<button class="btn btn-wa" style="font-size:12px;padding:8px" onclick="enviarWA('${esc(wa)}', venMsgWA['${esc(v.uid)}'])">📱 WA</button>` : '<div></div>'}
       </div>`;
-    return `<div class="ven-card ${isInactivo?'inactivo':st}">
+    // Checkbox e interacción en modo selección
+    const chkHtml = _venSelMode
+      ? `<div id="vchk-${esc(v.uid)}" class="ven-chk${isSel?' sel':''}" onclick="event.stopPropagation();venToggleItem('${esc(v.uid)}')">✓</div>`
+      : '';
+    const cardClick  = _venSelMode ? `onclick="venToggleItem('${esc(v.uid)}')"` : '';
+    const extraClass = _venSelMode ? (' ven-selmode' + (isSel ? ' ven-seleccionada' : '')) : '';
+    return `<div id="vcard-${esc(v.uid)}" class="ven-card ${isInactivo?'inactivo':st}${extraClass}" ${cardClick}>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-        <div><div style="font-size:13px;font-weight:600;color:var(--white)">${esc(v.cliente)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(v.srvNom)} · ${esc(v.id)}</div></div>
-        ${isInactivo ? '<span class="badge badge-inactivo">Inactivo</span>' : badgeVen(v.vence)}
+        <div style="display:flex;align-items:flex-start;gap:10px;flex:1">
+          ${chkHtml}
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--white)">${esc(v.cliente)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(v.srvNom)} · ${esc(v.id)}</div></div>
+        </div>
+        ${!_venSelMode ? (isInactivo ? '<span class="badge badge-inactivo">Inactivo</span>' : badgeVen(v.vence)) : ''}
       </div>
       <div style="font-size:12px;color:var(--text3)">Vence: ${fmtFecha(v.vence)} · $${v.precio.toFixed(2)} · ${esc(v.metodo)}</div>
       ${(!isInactivo && d !== null && d < -2) ? `<div style="font-size:11px;color:var(--red);background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:6px;padding:5px 9px;margin-top:6px">⚠️ Período de gracia vencido — servicio por cortar</div>` : ''}
-      ${btns}
+      ${_venSelMode ? '' : btns}
     </div>`;
   }).join('');
 }
@@ -3254,13 +3571,10 @@ async function sincronizarConSheetsSilencioso(){
   const ind = document.getElementById('sync-indicador');
   if(ind){ ind.style.display = 'flex'; ind.textContent = '💾'; }
   try {
-    const payload = {
-      ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
-      recargas: APP.recargas, reembolsos: APP.reembolsos,
-      movimientosBinance: APP.movimientosBinance || [],
-      catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
-      catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
-    };
+    // FIX: usar construirPayload() para garantizar que ventasEliminadas
+    // siempre se incluya — antes se construía manualmente y se olvidaba ese campo,
+    // causando que las ventas eliminadas reaparecieran al recargar.
+    const payload = construirPayload();
     localStorage.setItem('yoritex_local', JSON.stringify({ _pin: _pinGuardado, data: payload, _ts: Date.now() }));
     await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload });
     if(ind){ ind.textContent = '✅'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
@@ -3274,24 +3588,99 @@ function abrirNoRenovo(ventaUid){
   document.getElementById('nr-venta-uid').value = ventaUid;
   document.getElementById('nr-info').textContent = `${v.cliente} · ${v.srvNom} · ${v.id}`;
   document.getElementById('nr-motivo').value = '';
+  // Resetear radio al primero y avisos
+  const radios = document.querySelectorAll('input[name="nr-accion"]');
+  if(radios.length) radios[0].checked = true;
+  nrToggleAviso();
   abrirModal('modal-no-renovo');
+}
+function nrToggleAviso(){
+  const accion = document.querySelector('input[name="nr-accion"]:checked')?.value;
+  const avisoNormal = document.getElementById('nr-aviso-normal');
+  const avisoEliminar = document.getElementById('nr-aviso-eliminar');
+  if(!avisoNormal || !avisoEliminar) return;
+  if(accion === 'eliminar-todo'){
+    avisoNormal.style.display = 'none';
+    avisoEliminar.style.display = 'block';
+  } else {
+    avisoNormal.style.display = 'block';
+    avisoEliminar.style.display = 'none';
+  }
 }
 function nrGuardar(){
   const ventaUid = document.getElementById('nr-venta-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
   const accion = document.querySelector('input[name="nr-accion"]:checked').value;
+  const motivo = document.getElementById('nr-motivo').value;
+
+  if(accion === 'eliminar-todo'){
+    // Mostrar segundo modal para preguntar sobre el ingreso
+    const monto = parseFloat(v.precio || v.monto || 0).toFixed(2);
+    document.getElementById('nrce-info').innerHTML =
+      `<strong>${v.cliente}</strong> · ${v.srvNom} · ${v.id}<br>` +
+      `<span style="color:var(--red);font-size:12px">Ingreso registrado: <strong>$${monto}</strong></span>`;
+    // Resetear radio del segundo modal
+    const r = document.querySelector('input[name="nrce-ingreso"][value="mantener"]');
+    if(r) r.checked = true;
+    cerrarModal('modal-no-renovo');
+    abrirModal('modal-nr-confirmar-eliminar');
+    return;
+  }
+
   v.activa = false;
-  v.motivoSalida = document.getElementById('nr-motivo').value;
+  v.motivoSalida = motivo;
   if(accion === 'liberar' && v.cuentaUID){
     const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-    if(cuenta && v.cupoIdx !== null) cuenta.cupos[v.cupoIdx] = {estado:'libre'};
+    if(cuenta && v.cupoIdx !== null && v.cupoIdx !== undefined){
+      cuenta.cupos[v.cupoIdx] = {estado:'libre'};
+    }
   }
+
   cerrarModal('modal-no-renovo');
   renderVencimientos();
   renderInventario();
   renderBadgeVencimientos();
-  // Background — no bloquea UI
+  sincronizarConSheets();
+}
+function nrEjecutarEliminar(){
+  const ventaUid = document.getElementById('nr-venta-uid').value;
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  if(!v){ cerrarModal('modal-nr-confirmar-eliminar'); return; }
+  const eliminarIngreso = document.querySelector('input[name="nrce-ingreso"]:checked')?.value === 'eliminar';
+
+  // Liberar cupo en la cuenta
+  if(v.cuentaUID){
+    const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
+    if(cuenta && v.cupoIdx !== null && v.cupoIdx !== undefined){
+      cuenta.cupos[v.cupoIdx] = {estado:'libre'};
+    }
+  }
+
+  if(eliminarIngreso){
+    // Agregar a lista negra para que no reaparezca al recargar
+    if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
+    if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
+    // Eliminar venta por completo
+    const idx = APP.ventas.findIndex(x => x.uid === ventaUid);
+    if(idx !== -1) APP.ventas.splice(idx, 1);
+  } else {
+    // Mantener venta en historial financiero pero marcar como eliminada del registro
+    v.activa = false;
+    v.eliminadoRegistro = true;  // se excluye de listas de clientes/vencimientos, no del dashboard
+    v.motivoSalida = 'Eliminado (ingreso conservado)';
+    v.cuentaUID = null;
+    v.cupoIdx = null;
+    // También agregar a lista negra para que la versión histórica no reaparezca
+    if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
+    if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
+  }
+
+  cerrarModal('modal-nr-confirmar-eliminar');
+  renderVencimientos();
+  renderInventario();
+  renderBadgeVencimientos();
+  renderDashboard && renderDashboard();
   sincronizarConSheets();
 }
 
@@ -4793,17 +5182,24 @@ async function _verificarYActualizarDesdeSheets(){
     if(res && res.ok && res.data){
       // Actualizar datos silenciosamente SIN llamar inicializarUI (no interrumpe al usuario)
       const data = res.data;
+      // Cargar lista negra de UIDs eliminados
+      APP.ventasEliminadas = Array.isArray(data.ventasEliminadas) ? data.ventasEliminadas : (APP.ventasEliminadas || []);
+      const eliminadosSet = new Set(APP.ventasEliminadas);
+
       const ventasSheets = Array.isArray(data.ventas)
         ? data.ventas.map(v => normalizarVenta(v))
         : [];
       const idsSheets = new Set(ventasSheets.map(v=>v.uid));
-      const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid)).map(v => normalizarVenta(v));
+      // Excluir históricas eliminadas
+      const historicasNuevas = VENTAS_HISTORICAS
+        .filter(v => !idsSheets.has(v.uid) && !eliminadosSet.has(v.uid))
+        .map(v => normalizarVenta(v));
       // Históricas siempre con precio $0
       APP.ventas = [...ventasSheets, ...historicasNuevas].map(v => {
         if(v.uid && v.uid.startsWith('hist-')) return { ...v, precio: 0, costoAdq: 0 };
         return v;
       });
-      APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas : APP.cuentas;
+      APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas.map(normalizarCuenta) : APP.cuentas;
 
       // ── CORTE FINANCIERO 2026-06-07 ──
       const FECHA_CORTE = '2026-06-07';
@@ -4881,6 +5277,7 @@ function construirPayload(){
     ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
     recargas: APP.recargas, reembolsos: APP.reembolsos,
     movimientosBinance: APP.movimientosBinance || [],
+    ventasEliminadas: APP.ventasEliminadas || [],  // lista negra de UIDs eliminados
     catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
     catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
   };
@@ -4972,6 +5369,19 @@ function normalizarWA(waRaw, vuid){
   return waRaw; // devolver como está si no podemos corregirlo
 }
 
+function normalizarCuenta(c){
+  if(!c) return c;
+  return {
+    ...c,
+    desde: parsearFecha(c.desde) || c.desde || '',
+    hasta: parsearFecha(c.hasta) || c.hasta || '',
+    costo: parseFloat(c.costo) || 0,
+    cupos: Array.isArray(c.cupos) ? c.cupos.map(cu => ({
+      ...cu,
+      vence: parsearFecha(cu.vence) || cu.vence || ''
+    })) : []
+  };
+}
 function normalizarVenta(v){
   const fecha = parsearFecha(v.fecha) || hoy();
   const vence = parsearFecha(v.vence) || fecha;
@@ -5000,12 +5410,19 @@ function normalizarVenta(v){
 function cargarDesdeSheets(data){
   if(!data) { inyectarHistorico(); return; }
 
+  // Cargar lista negra de UIDs eliminados
+  APP.ventasEliminadas = Array.isArray(data.ventasEliminadas) ? data.ventasEliminadas : [];
+  const eliminadosSet = new Set(APP.ventasEliminadas);
+
   // Normalizar todas las ventas de Sheets
   const ventasSheets = Array.isArray(data.ventas)
     ? data.ventas.map(v => normalizarVenta(v))
     : [];
   const idsSheets = new Set(ventasSheets.map(v => v.uid));
-  const historicasNuevas = VENTAS_HISTORICAS.filter(v => !idsSheets.has(v.uid)).map(v => normalizarVenta(v));
+  // Filtrar históricas: excluir las que ya están en Sheets Y las eliminadas
+  const historicasNuevas = VENTAS_HISTORICAS
+    .filter(v => !idsSheets.has(v.uid) && !eliminadosSet.has(v.uid))
+    .map(v => normalizarVenta(v));
 
   // Todas las ventas históricas (uid empieza con 'hist-') van con precio $0
   APP.ventas = [...ventasSheets, ...historicasNuevas].map(v => {
@@ -5013,7 +5430,7 @@ function cargarDesdeSheets(data){
     return v;
   });
 
-  APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas : [];
+  APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas.map(normalizarCuenta) : [];
 
   // ── CORTE FINANCIERO 2026-06-07 ──
   // Conservar costos con fecha >= corte O marcados como esCostoReal
