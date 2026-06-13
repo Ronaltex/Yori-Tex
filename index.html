@@ -5108,14 +5108,15 @@ async function pinVerificar(){
     try {
       const d = JSON.parse(local);
       if(d._pin === _pinIngresado){
-        // PIN correcto en caché — entrar inmediatamente
+        // PIN correcto en caché — entrar inmediatamente con datos locales
         _pinIntentos = 0;
         _pinVerificado = true;
         _pinGuardado = _pinIngresado;
         cargarDesdeSheets(d.data || {});
         document.getElementById('pin-screen').style.display = 'none';
-        // Actualizar desde Sheets en segundo plano
-        setTimeout(() => _verificarYActualizarDesdeSheets(), 800);
+        // FIX SYNC: Actualizar desde Sheets con indicador visible (no silencioso)
+        mostrarSync('🔄', 'Sincronizando con la nube...', 'Un momento...');
+        _verificarYActualizarDesdeSheets().finally(() => ocultarSync());
         return;
       } else if(d._pin && d._pin !== _pinIngresado){
         // Caché existe con PIN diferente — probablemente incorrecto, igual verificar con Sheets
@@ -5176,6 +5177,7 @@ async function pinVerificar(){
 }
 
 // Actualiza datos desde Sheets en background después de entrar con caché
+// FIX SYNC: Ahora devuelve Promise para que .finally() funcione en pinVerificar
 async function _verificarYActualizarDesdeSheets(){
   try {
     const res = await apiCall({ accion:'cargar', pin: _pinGuardado });
@@ -5239,7 +5241,12 @@ async function _verificarYActualizarDesdeSheets(){
       if(costosScreen && costosScreen.classList.contains('active')) renderCostos();
       guardarLocal(construirPayload());
     }
-  } catch(e){ /* sin internet, quedar con caché */ }
+  } catch(e){
+    // FIX SYNC: Avisar visiblemente que no se pudo sincronizar (antes era silencioso)
+    const ind = document.getElementById('sync-indicador');
+    if(ind){ ind.style.display='flex'; ind.textContent='⚠️'; setTimeout(()=>{ ind.style.display='none'; }, 4000); }
+    console.warn('[YORITEX] No se pudo sincronizar con Sheets:', e.message);
+  }
 }
 
 // ══════════════════════════════════════
@@ -5623,7 +5630,10 @@ document.addEventListener('DOMContentLoaded', () => {
   _poblarWACorrectosMap();
   // PWA: registrar service worker
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // FIX SYNC: Forzar verificación de nueva versión en cada carga
+      reg.update();
+    }).catch(()=>{});
   }
   // Limpiar caché corrupto — usar parsearFecha para corregir cualquier formato
   // y también corregir números WA truncados en el caché local
