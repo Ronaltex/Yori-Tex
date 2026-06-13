@@ -1281,7 +1281,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 // ══════════════════════════════════════
 // CONFIGURACIÓN API & PIN
 // ══════════════════════════════════════
-const API_URL = 'https://script.google.com/macros/s/AKfycbw9_W9OVxS2dV-ps2WeJYeuXtkrKF1qY86i-VHaOY2jOjY6rEkRSdOZtLHdBC9J9C0T/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxnX2gCqviSrLlhhUKCdScTKYWR8Mfu6iy1R7or4AG4S7I0o3UkoiViW_VjbnDR0lCk/exec';
 let _pinIngresado = '';
 let _pinVerificado = false;
 let _pinGuardado = ''; // Se carga desde Sheets al verificar
@@ -2232,26 +2232,29 @@ function editarVentaGuardar(){
   // Guardar costo de cuenta
   const costoAdqNuevo = parseFloat(document.getElementById('ev-costo-cuenta').value) || 0;
   const metodoAdqNuevo = document.getElementById('ev-metodo-adq')?.value || v.metodoAdq || 'Transferencia';
-  if(costoAdqNuevo > 0 && costoAdqNuevo !== v.costoAdq){
+  // FIX: Solo descontar de Binance si el costo CAMBIÓ y es mayor a 0
+  // Calcular la diferencia para no duplicar (bug 1.3)
+  const costoAnterior = parseFloat(v.costoAdq) || 0;
+  const diferenciaCosto = costoAdqNuevo - costoAnterior;
+  if(costoAdqNuevo > 0) {
     v.costoAdq = costoAdqNuevo; v.metodoAdq = metodoAdqNuevo;
-    // ⚠️ Solo registrar en Costos si la venta NO viene de inventario.
-    // Si viene de inventario, el costo ya fue registrado cuando se añadió la cuenta.
-    // El campo costoAdq aquí es solo referencial para calcular margen/rendimiento.
-    if(origen === 'manual'){
-      const esUsdt = metodoAdqNuevo.toLowerCase().includes('usdt') || metodoAdqNuevo.toLowerCase().includes('binance');
-      if(esUsdt){
-        descontarUSDTBinance(costoAdqNuevo, `Costo cuenta — ${v.srvNom} (${v.cliente})`, v.cuentaUID||null, null, v.fecha||hoy());
-      } else {
-        APP.costos.push({ uid:uid(), fecha:v.fecha||hoy(), catUid:'cg-cuentas', desc:`Costo cuenta — ${v.srvNom} (${v.cliente})`, metodo:metodoAdqNuevo, montoUSD:costoAdqNuevo, usdtUsado:0, notas:`Desde edición ${v.id}` });
-      }
+  }
+  // FIX: Descontar de Binance si es USDT y hay diferencia positiva (aplica inventario Y manual)
+  if(diferenciaCosto > 0){
+    const esUsdt = metodoAdqNuevo.toLowerCase().includes('usdt') || metodoAdqNuevo.toLowerCase().includes('binance');
+    if(esUsdt){
+      descontarUSDTBinance(diferenciaCosto, `Costo cuenta — ${v.srvNom} (${v.cliente})`, v.cuentaUID||null, null, v.fecha||hoy());
+    } else if(origen === 'manual') {
+      APP.costos.push({ uid:uid(), fecha:v.fecha||hoy(), catUid:'cg-cuentas', desc:`Costo cuenta — ${v.srvNom} (${v.cliente})`, metodo:metodoAdqNuevo, montoUSD:diferenciaCosto, usdtUsado:0, esCostoReal:true, notas:`Desde edición ${v.id}` });
     }
-    // Si es de inventario: solo guardamos el valor en v.costoAdq para referencia visual. No toca APP.costos.
   }
   cerrarModal('modal-editar-venta');
   renderRegistro();
   renderVencimientos();
   renderInventario();
   renderBadgeVencimientos();
+  actualizarSaldoBinance();
+  renderBinance();
   sincronizarConSheets();
 }
 
@@ -3005,6 +3008,8 @@ function ncGuardar(){
   cerrarModal('modal-nueva-cuenta');
   renderInventario();
   renderCostos();
+  actualizarSaldoBinance();
+  renderBinance();
   // FIX: refrescar dashboard si está visible
   const _dashEl = document.getElementById('s-dashboard');
   if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
@@ -3560,6 +3565,8 @@ function renGuardar(){
   renderVencimientos();
   renderRegistro();
   renderInventario();
+  actualizarSaldoBinance();
+  renderBinance();
   alert(`✅ Renovación ${nuevaVenta.id} guardada`);
   sincronizarConSheetsSilencioso();
 }
@@ -4294,6 +4301,8 @@ function costoGuardar(){
   document.getElementById('costo-edit-uid').value = '';
   cerrarModal('modal-nuevo-costo');
   renderCostos();
+  actualizarSaldoBinance();
+  renderBinance();
   // FIX: refrescar dashboard también
   const _dashElC = document.getElementById('s-dashboard');
   if(_dashElC && _dashElC.classList.contains('active')) renderDashboard();
