@@ -1539,22 +1539,31 @@ let _editCupoUID = null, _editCupoIdx = null;
 function hoy(){ const ec=new Date(Date.now()-5*3600000); return ec.toISOString().split('T')[0]; } // UTC-5 Ecuador/Machala
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function sumarDias(base, dias){
-  const d = new Date(base + 'T12:00:00');
+  const fecha = normalizarFechaValor(base) || hoy();
+  const d = new Date(fecha + 'T12:00:00');
   d.setDate(d.getDate() + parseInt(dias));
   return d.toISOString().split('T')[0];
 }
+function normalizarFechaValor(s){
+  return parsearFecha(s) || '';
+}
 function fmtFecha(s){
   if(!s) return '—';
-  return new Date(s + 'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const f = normalizarFechaValor(s);
+  if(!f) return '—';
+  return new Date(f + 'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function fmtFechaCorta(s){
   if(!s) return '—';
-  const d = new Date(s + 'T12:00:00');
+  const f = normalizarFechaValor(s);
+  if(!f) return '—';
+  const d = new Date(f + 'T12:00:00');
   return d.getDate() + ' ' + MESES_CORTOS[d.getMonth()];
 }
 function diasHasta(s){
-  if(!s || typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  const diff = Math.round((new Date(s + 'T12:00:00').getTime() - new Date(hoy() + 'T12:00:00').getTime()) / 86400000);
+  const f = normalizarFechaValor(s);
+  if(!f) return null;
+  const diff = Math.round((new Date(f + 'T12:00:00').getTime() - new Date(hoy() + 'T12:00:00').getTime()) / 86400000);
   return isNaN(diff) ? null : diff;
 }
 function estadoVen(s){
@@ -1578,10 +1587,11 @@ function badgeVen(s){
 }
 // Badge de inventario: siempre muestra "Vence DD MMM · Nd" para tener fecha + días a la vista
 function badgeVenInv(s){
-  if(!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
-  const d = diasHasta(s);
+  const f = normalizarFechaValor(s);
+  if(!f) return '';
+  const d = diasHasta(f);
   if(d === null) return '';
-  const fechaStr = fmtFechaCorta(s);
+  const fechaStr = fmtFechaCorta(f);
   if(d < 0)  return `<span class="badge badge-vencido" style="font-size:10px">Venció ${fechaStr} · hace ${Math.abs(d)}d</span>`;
   if(d === 0) return `<span class="badge badge-hoy" style="font-size:10px">Vence HOY · ${fechaStr}</span>`;
   if(d <= 7)  return `<span class="badge badge-pronto" style="font-size:10px">Vence ${fechaStr} · en ${d}d ⚠️</span>`;
@@ -1596,6 +1606,147 @@ function numVenta(){ return '#VTA-' + String(APP._ventaCounter).padStart(4,'0');
 function getSrv(uid){ return CATALOGO_SERVICIOS.find(s => s.uid === uid); }
 function getCat(uid){ return CATALOGO_CATEGORIAS.find(c => c.uid === uid); }
 function getCatGasto(uid){ return CATALOGO_CAT_GASTOS.find(c => c.uid === uid); }
+function normalizarFechasApp(){
+  const listas = [
+    APP.ventas || [],
+    APP.costos || [],
+    APP.recargas || [],
+    APP.reembolsos || [],
+    APP.movimientosBinance || []
+  ];
+  listas.forEach(lista => lista.forEach(x => {
+    if(x && x.fecha) x.fecha = normalizarFechaValor(x.fecha) || x.fecha;
+    if(x && x.vence) x.vence = normalizarFechaValor(x.vence) || x.vence;
+    if(x && x.desde) x.desde = normalizarFechaValor(x.desde) || x.desde;
+    if(x && x.hasta) x.hasta = normalizarFechaValor(x.hasta) || x.hasta;
+  }));
+  (APP.cuentas || []).forEach(c => {
+    if(c.desde) c.desde = normalizarFechaValor(c.desde) || c.desde;
+    if(c.hasta) c.hasta = normalizarFechaValor(c.hasta) || c.hasta;
+    (c.cupos || []).forEach(cu => {
+      if(cu.vence) cu.vence = normalizarFechaValor(cu.vence) || cu.vence;
+    });
+  });
+}
+function metodoKeyCosto(m){
+  const ml = (m||'').toLowerCase();
+  if(ml.includes('binance') || ml.includes('usdt')) return 'binance';
+  if(ml.includes('tarjeta')) return 'tarjeta';
+  if(ml.includes('transfer')) return 'transferencia';
+  if(ml.includes('efectivo')) return 'efectivo';
+  return 'otro';
+}
+function salidaBinanceTieneCosto(m, costos){
+  if(m.costoUID && costos.some(g => g.uid === m.costoUID)) return true;
+  const fecha = normalizarFechaValor(m.fecha);
+  return costos.some(g => {
+    if(metodoKeyCosto(g.metodo) !== 'binance') return false;
+    const mismaFecha = normalizarFechaValor(g.fecha) === fecha;
+    const mismoUsdt = Math.abs((parseFloat(g.usdtUsado)||0) - (parseFloat(m.usdt)||0)) < 0.0001;
+    const mismoMonto = Math.abs((parseFloat(g.montoUSD)||0) - (parseFloat(m.montoUSD)||0)) < 0.01;
+    return mismaFecha && mismoUsdt && mismoMonto;
+  });
+}
+function getGastosCompletos(){
+  const costos = (APP.costos || []).map(g => ({...g, fecha: normalizarFechaValor(g.fecha) || g.fecha}));
+  const extras = (APP.movimientosBinance || [])
+    .filter(m => m.tipo === 'salida')
+    .filter(m => !salidaBinanceTieneCosto(m, costos))
+    .map(m => ({
+      uid: 'mov-' + (m.uid || uid()),
+      fecha: normalizarFechaValor(m.fecha) || hoy(),
+      catUid: /adquisici[oó]n|cuenta|renovaci[oó]n/i.test(m.concepto || '') ? 'cg-cuentas' : 'cg-otro',
+      desc: m.concepto || 'Salida Binance',
+      metodo: 'binance',
+      montoUSD: parseFloat(m.montoUSD) || ((parseFloat(m.usdt)||0) * (parseFloat(m.tasa)||1)),
+      usdtUsado: parseFloat(m.usdt) || 0,
+      esCostoReal: true,
+      _movUid: m.uid,
+      _virtualBinance: true
+    }));
+  return [...costos, ...extras];
+}
+function textoPlano(s){
+  return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+function costoPerteneceAVenta(g, v){
+  if(!g || !v) return false;
+  if(g.ventaUID === v.uid || g.origenVentaUID === v.uid) return true;
+  const notas = textoPlano(g.notas);
+  if(v.uid && notas.includes(textoPlano(v.uid))) return true;
+  if(v.id && notas.includes(textoPlano(v.id))) return true;
+  const desc = textoPlano(g.desc);
+  const cliente = textoPlano(v.cliente);
+  const srv = textoPlano(v.srvNom).replace(/^[^a-z0-9]+/, '');
+  const mismaFecha = normalizarFechaValor(g.fecha) === normalizarFechaValor(v.fecha);
+  return !!(mismaFecha && cliente && desc.includes(cliente) && (!srv || desc.includes(srv.split(' ')[0])));
+}
+function recalcularUsadoRecargasDesdeKardex(){
+  (APP.recargas || []).forEach(r => { r.usado = 0; });
+  const recargas = [...(APP.recargas || [])].sort((a,b) => (normalizarFechaValor(a.fecha)||'').localeCompare(normalizarFechaValor(b.fecha)||''));
+  const salidas = [...(APP.movimientosBinance || [])]
+    .filter(m => m.tipo === 'salida')
+    .sort((a,b) => (normalizarFechaValor(a.fecha)||'').localeCompare(normalizarFechaValor(b.fecha)||''));
+  salidas.forEach(m => {
+    let restante = parseFloat(m.usdt) || 0;
+    for(const r of recargas){
+      if(restante <= 0) break;
+      const disponible = (parseFloat(r.usdt)||0) - (parseFloat(r.usado)||0);
+      if(disponible <= 0) continue;
+      const usar = Math.min(restante, disponible);
+      r.usado = parseFloat(((parseFloat(r.usado)||0) + usar).toFixed(6));
+      restante = parseFloat((restante - usar).toFixed(6));
+    }
+  });
+}
+function quitarCostosDeVenta(v){
+  const removidos = (APP.costos || []).filter(g => costoPerteneceAVenta(g, v));
+  if(!removidos.length) return;
+  const ids = new Set(removidos.map(g => g.uid));
+  APP.costos = (APP.costos || []).filter(g => !ids.has(g.uid));
+  APP.movimientosBinance = (APP.movimientosBinance || []).filter(m => {
+    if(m.tipo !== 'salida') return true;
+    if(m.costoUID && ids.has(m.costoUID)) return false;
+    return !removidos.some(g => {
+      const mismaFecha = normalizarFechaValor(m.fecha) === normalizarFechaValor(g.fecha);
+      const mismoUsdt = Math.abs((parseFloat(m.usdt)||0) - (parseFloat(g.usdtUsado)||0)) < 0.0001;
+      const mismaDesc = textoPlano(m.concepto) === textoPlano(g.desc);
+      return mismaFecha && mismoUsdt && mismaDesc;
+    });
+  });
+  recalcularUsadoRecargasDesdeKardex();
+}
+function registrarCostoManualVenta(v, costoAdq, metodoAdq){
+  const costoUID = uid();
+  const fecha = normalizarFechaValor(v.fecha) || hoy();
+  const desc = `Costo cuenta - ${v.srvNom} (${v.cliente})`;
+  const esUsdt = metodoKeyCosto(metodoAdq) === 'binance';
+  let montoUSD = costoAdq;
+  let usdtUsado = 0;
+  if(esUsdt){
+    const fifo = calcFIFO(costoAdq);
+    montoUSD = fifo.total || costoAdq;
+    usdtUsado = costoAdq;
+    const ok = descontarUSDTBinance(costoAdq, desc, v.cuentaUID || null, costoUID, fecha);
+    if(!ok) return false;
+  }
+  APP.costos.push({
+    uid: costoUID,
+    tipo: 'adquisicion_cuenta',
+    fecha,
+    catUid: 'cg-cuentas',
+    desc,
+    metodo: metodoAdq,
+    montoUSD,
+    usdtUsado,
+    cuentaUID: v.cuentaUID || null,
+    ventaUID: v.uid,
+    origenVentaUID: v.uid,
+    esCostoReal: true,
+    notas: `Costo vinculado a venta ${v.id || v.uid}`
+  });
+  return true;
+}
 
 // ══════════════════════════════════════
 // MODALES
@@ -1653,25 +1804,29 @@ function migrarBinanceLegacy(){
       }
     }
   });
-  // Migrar "usado" de cada recarga como salidas si no están ya
-  const uidsSalidas = new Set(APP.movimientosBinance.filter(m=>m.tipo==='salida' && m.migrado).map(m=>m.recargaUID).filter(Boolean));
-  APP.recargas.forEach(r => {
-    const usado = r.usado || 0;
-    if(usado > 0 && !uidsSalidas.has(r.uid)){
-      APP.movimientosBinance.push({
-        uid: 'mig-out-' + r.uid,
-        fecha: r.fecha,
-        tipo: 'salida',
-        concepto: 'Gasto migrado desde saldo anterior',
-        usdt: usado,
-        tasa: r.tasa,
-        montoUSD: usado * r.tasa,
-        recargaUID: r.uid,
-        migrado: true,
-        esCostoReal: true
-      });
-    }
-  });
+  // Migrar "usado" de recargas antiguas solo si todavía no existe ningún kardex real de salidas.
+  // Si ya hay salidas reales, recrear "usado" como salida migrada duplica gastos.
+  const haySalidasReales = APP.movimientosBinance.some(m => m.tipo === 'salida' && !m.migrado);
+  if(!haySalidasReales){
+    const uidsSalidas = new Set(APP.movimientosBinance.filter(m=>m.tipo==='salida' && m.migrado).map(m=>m.recargaUID).filter(Boolean));
+    APP.recargas.forEach(r => {
+      const usado = r.usado || 0;
+      if(usado > 0 && !uidsSalidas.has(r.uid)){
+        APP.movimientosBinance.push({
+          uid: 'mig-out-' + r.uid,
+          fecha: r.fecha,
+          tipo: 'salida',
+          concepto: 'Gasto migrado desde saldo anterior',
+          usdt: usado,
+          tasa: r.tasa,
+          montoUSD: usado * r.tasa,
+          recargaUID: r.uid,
+          migrado: true,
+          esCostoReal: true
+        });
+      }
+    });
+  }
   // Deduplicar por uid al final (corrige cualquier duplicado previo guardado en Sheets)
   const seen = new Set();
   APP.movimientosBinance = APP.movimientosBinance.filter(m => {
@@ -1708,24 +1863,46 @@ function registrarSalidaBinance(usdt, tasa, concepto, cuentaUID, costoUID, fecha
   });
 }
 
-function getTasaPromBinance(){
-  // Tasa ponderada del saldo disponible actual (FIFO-aware)
-  const recargasOrdenadas = (APP.recargas||[])
-    .filter(r => r.usdt > 0)
-    .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
-  let totalUSDT = 0, totalUSD = 0;
-  for(const r of recargasOrdenadas){
-    const disponible = Math.max(0, r.usdt - (r.usado||0));
-    if(disponible > 0){
-      totalUSDT += disponible;
-      totalUSD  += disponible * (r.tasa || 1);
+function getLotesBinanceDisponibles(){
+  normalizarFechasApp();
+  migrarBinanceLegacy();
+  const lotes = (APP.movimientosBinance || [])
+    .filter(m => m.tipo === 'entrada')
+    .map(m => ({
+      recargaUID: m.recargaUID || null,
+      fecha: normalizarFechaValor(m.fecha) || hoy(),
+      tasa: parseFloat(m.tasa) || 1,
+      total: parseFloat(m.usdt) || 0,
+      disponible: parseFloat(m.usdt) || 0
+    }))
+    .sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+  const salidas = (APP.movimientosBinance || [])
+    .filter(m => m.tipo === 'salida')
+    .map(m => ({ fecha: normalizarFechaValor(m.fecha) || hoy(), usdt: parseFloat(m.usdt) || 0 }))
+    .sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+  salidas.forEach(s => {
+    let restante = s.usdt;
+    for(const lote of lotes){
+      if(restante <= 0) break;
+      if(lote.disponible <= 0) continue;
+      const usar = Math.min(restante, lote.disponible);
+      lote.disponible = parseFloat((lote.disponible - usar).toFixed(6));
+      restante = parseFloat((restante - usar).toFixed(6));
     }
-  }
+  });
+  return lotes.filter(l => l.disponible > 0);
+}
+
+function getTasaPromBinance(){
+  const lotes = getLotesBinanceDisponibles();
+  const totalUSDT = lotes.reduce((s,l) => s + l.disponible, 0);
+  const totalUSD = lotes.reduce((s,l) => s + (l.disponible * l.tasa), 0);
   if(totalUSDT > 0) return totalUSD / totalUSDT;
-  // Fallback: promedio simple de todas las entradas
   const entradas = (APP.movimientosBinance||[]).filter(m => m.tipo === 'entrada');
   if(!entradas.length) return 1;
-  return entradas.reduce((s,m) => s + m.tasa, 0) / entradas.length;
+  return entradas.reduce((s,m) => s + (parseFloat(m.tasa)||1), 0) / entradas.length;
 }
 
 // Saldo real Binance = suma entradas - suma salidas
@@ -1761,32 +1938,7 @@ function actualizarSaldoBinance(){
 // También devuelve el desglose por lote para mostrar en pantalla.
 function calcFIFO(usdt){
   if(!usdt || usdt <= 0) return { rows:[], total:0, faltante:0 };
-
-  // Construir pool de lotes disponibles (entradas ordenadas por fecha ASC)
-  const entradas = (APP.movimientosBinance||[])
-    .filter(m => m.tipo === 'entrada')
-    .sort((a,b) => a.fecha.localeCompare(b.fecha));
-
-  // Calcular cuánto USDT ya se consumió de cada lote (por salidas anteriores)
-  // Las salidas se aplican en FIFO también — usar campo r.usado de recargas como proxy
-  // Reconstruir pool con saldo disponible real por lote
-  const pool = [];
-  // Usar APP.recargas como fuente de verdad de los lotes (ya tienen .usdt y .usado)
-  const recargasOrdenadas = (APP.recargas||[])
-    .filter(r => r.usdt > 0)
-    .sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
-
-  for(const r of recargasOrdenadas){
-    const disponible = Math.max(0, r.usdt - (r.usado||0));
-    if(disponible > 0){
-      pool.push({
-        fecha: r.fecha,
-        tasa: r.tasa || 1,
-        disponible,
-        loteDesc: `Recarga ${r.fecha} @$${(r.tasa||1).toFixed(4)}`
-      });
-    }
-  }
+  const pool = getLotesBinanceDisponibles();
 
   // Consumir del pool FIFO
   let restante = usdt;
@@ -2232,20 +2384,19 @@ function editarVentaGuardar(){
   // Guardar costo de cuenta
   const costoAdqNuevo = parseFloat(document.getElementById('ev-costo-cuenta').value) || 0;
   const metodoAdqNuevo = document.getElementById('ev-metodo-adq')?.value || v.metodoAdq || 'Transferencia';
-  // FIX: Solo descontar de Binance si el costo CAMBIÓ y es mayor a 0
-  // Calcular la diferencia para no duplicar (bug 1.3)
-  const costoAnterior = parseFloat(v.costoAdq) || 0;
-  const diferenciaCosto = costoAdqNuevo - costoAnterior;
-  if(costoAdqNuevo > 0) {
-    v.costoAdq = costoAdqNuevo; v.metodoAdq = metodoAdqNuevo;
-  }
-  // FIX: Descontar de Binance si es USDT y hay diferencia positiva (aplica inventario Y manual)
-  if(diferenciaCosto > 0){
-    const esUsdt = metodoAdqNuevo.toLowerCase().includes('usdt') || metodoAdqNuevo.toLowerCase().includes('binance');
-    if(esUsdt){
-      descontarUSDTBinance(diferenciaCosto, `Costo cuenta — ${v.srvNom} (${v.cliente})`, v.cuentaUID||null, null, v.fecha||hoy());
-    } else if(origen === 'manual') {
-      APP.costos.push({ uid:uid(), fecha:v.fecha||hoy(), catUid:'cg-cuentas', desc:`Costo cuenta — ${v.srvNom} (${v.cliente})`, metodo:metodoAdqNuevo, montoUSD:diferenciaCosto, usdtUsado:0, esCostoReal:true, notas:`Desde edición ${v.id}` });
+  v.costoAdq = costoAdqNuevo;
+  v.metodoAdq = metodoAdqNuevo;
+  const snapCostos = JSON.stringify(APP.costos || []);
+  const snapMovs = JSON.stringify(APP.movimientosBinance || []);
+  const snapRecargas = JSON.stringify(APP.recargas || []);
+  quitarCostosDeVenta(v);
+  if(origen === 'manual' && costoAdqNuevo > 0){
+    const ok = registrarCostoManualVenta(v, costoAdqNuevo, metodoAdqNuevo);
+    if(!ok){
+      APP.costos = JSON.parse(snapCostos);
+      APP.movimientosBinance = JSON.parse(snapMovs);
+      APP.recargas = JSON.parse(snapRecargas);
+      return;
     }
   }
   cerrarModal('modal-editar-venta');
@@ -2253,6 +2404,7 @@ function editarVentaGuardar(){
   renderVencimientos();
   renderInventario();
   renderBadgeVencimientos();
+  renderCostos();
   actualizarSaldoBinance();
   renderBinance();
   sincronizarConSheets();
@@ -2265,8 +2417,12 @@ function eliminarVenta(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
   if(!confirm(`¿Eliminar la venta de ${v.cliente} — ${v.srvNom} ($${v.precio.toFixed(2)})?\n\nEsto la borrará del registro y de la contabilidad.`)) return;
+  quitarCostosDeVenta(v);
   APP.ventas = APP.ventas.filter(x => x.uid !== ventaUid);
   renderRegistro();
+  renderCostos();
+  renderBinance();
+  actualizarSaldoBinance();
   renderBadgeVencimientos();
   sincronizarConSheets();
 }
@@ -2431,6 +2587,10 @@ function mvGuardar(){
   const fechaVenta = document.getElementById('mv-fecha').value || hoy();
   const vence = sumarDias(fechaVenta, dur);
   const waInput = sanitizarTexto(document.getElementById('mv-wa').value, 20);
+  const ventaUidNueva = uid();
+  const ventaIdNueva = numVenta();
+  let costoAdqVenta = 0;
+  let metodoAdqVenta = '';
   let correo = '', cuentaUID = null, cupoIdx = null;
   if(_mvInvMode && _mvCuentaSelUID){
     cuentaUID = _mvCuentaSelUID;
@@ -2441,56 +2601,63 @@ function mvGuardar(){
       cuenta.cupos[cupoIdx] = {
         estado:'ocupado', cliente:nombre, wa:waInput,
         perfil:sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50),
-        pin:sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10), vence
+        pin:sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10), vence,
+        ventaUid: ventaUidNueva
       };
     }
   } else if(!_mvInvMode){
     correo = sanitizarTexto(document.getElementById('mv-cactus-correo').value, 200);
     const costoAdq = sanitizarNumero(document.getElementById('mv-cactus-costo').value);
     const metodoAdq = document.getElementById('mv-cactus-metodo-adq')?.value || 'Efectivo';
+    costoAdqVenta = costoAdq;
+    metodoAdqVenta = metodoAdq;
     if(correo){
       const nc = { uid:uid(), srvUid, srvNom: srv ? srv.nombre : srvUid, id:`${(srv?.nombre||'SRV').toUpperCase().slice(0,3)}-C${APP._ventaCounter}`,
         correo, pass:sanitizarTexto(document.getElementById('mv-cactus-pass').value, 200),
         costo: costoAdq, metodoPago: metodoAdq,
-        cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:'',pin:'',vence}]
+        cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:'',pin:'',vence,ventaUid:ventaUidNueva}]
       };
       APP.cuentas.push(nc); cuentaUID = nc.uid; cupoIdx = 0;
     }
     // Registrar costo automáticamente si fue especificado (solo en venta sin inventario = costo real)
     if(costoAdq > 0){
       const esUsdt = metodoAdq.toLowerCase().includes('usdt') || metodoAdq.toLowerCase().includes('binance');
+      const costoUID = uid();
       if(esUsdt){
+        const fifo = calcFIFO(costoAdq);
         // Descontar USDT del saldo Binance y registrar salida como Kardex
         const ok = descontarUSDTBinance(costoAdq,
-          `Adquisición cuenta — ${srv ? srv.nombre : srvUid} (${nombre})`,
-          cuentaUID, null, fechaVenta
+          `Adquisicion cuenta - ${srv ? srv.nombre : srvUid} (${nombre})`,
+          cuentaUID, costoUID, fechaVenta
         );
         if(!ok) return; // usuario canceló
         // También registrar en costos como gasto real
         APP.costos.push({
-          uid: uid(), tipo: 'adquisicion_cuenta',
+          uid: costoUID, tipo: 'adquisicion_cuenta',
           fecha: fechaVenta, catUid: 'cg-cuentas',
-          desc: `Adquisición cuenta — ${srv ? srv.nombre : srvUid} (${nombre})`,
+          desc: `Adquisicion cuenta - ${srv ? srv.nombre : srvUid} (${nombre})`,
           metodo: metodoAdq,
-          montoUSD: costoAdq * getTasaPromBinance(),
+          montoUSD: fifo.total || costoAdq,
           usdtUsado: costoAdq,
-          cuentaUID, esCostoReal: true,
-          notas: `Registrado automáticamente desde venta ${numVenta()}`
+          cuentaUID, ventaUID: ventaUidNueva, origenVentaUID: ventaUidNueva,
+          esCostoReal: true,
+          notas: `Registrado automaticamente desde venta ${ventaIdNueva}`
         });
       } else {
         APP.costos.push({
-          uid: uid(), tipo: 'adquisicion_cuenta',
+          uid: costoUID, tipo: 'adquisicion_cuenta',
           fecha: fechaVenta, catUid: 'cg-cuentas',
-          desc: `Adquisición cuenta — ${srv ? srv.nombre : srvUid} (${nombre})`,
+          desc: `Adquisicion cuenta - ${srv ? srv.nombre : srvUid} (${nombre})`,
           metodo: metodoAdq, montoUSD: costoAdq, usdtUsado: 0,
-          cuentaUID, esCostoReal: true,
-          notas: `Registrado automáticamente desde venta ${numVenta()}`
+          cuentaUID, ventaUID: ventaUidNueva, origenVentaUID: ventaUidNueva,
+          esCostoReal: true,
+          notas: `Registrado automaticamente desde venta ${ventaIdNueva}`
         });
       }
     }
   }
   const venta = {
-    uid: uid(), id: numVenta(), fecha: fechaVenta, vence,
+    uid: ventaUidNueva, id: ventaIdNueva, fecha: fechaVenta, vence,
     dias: dur,
     cliente: nombre, wa: waInput,
     srvUid, srvNom: srv ? srv.emoji + ' ' + srv.nombre : srvUid,
@@ -2502,7 +2669,8 @@ function mvGuardar(){
     metodo: sanitizarTexto(document.getElementById('mv-metodo').value, 50),
     estado: sanitizarTexto(document.getElementById('mv-estado').value, 50),
     notas: sanitizarTexto(document.getElementById('mv-notas').value, 500),
-    cuentaUID, cupoIdx, activa: true, creado: new Date().toISOString()
+    cuentaUID, cupoIdx, costoAdq: costoAdqVenta, metodoAdq: metodoAdqVenta,
+    activa: true, creado: new Date().toISOString()
   };
   APP.ventas.push(venta);
   APP._ventaCounter++;
@@ -3742,17 +3910,18 @@ function filtrarVentasDash(){
   return [...APP.ventas];
 }
 function filtrarGastosDash(){
+  const gastos = getGastosCompletos();
   const hoyStr = hoy();
   if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta){
-    return APP.costos.filter(g => g.fecha && g.fecha >= _dashDesde && g.fecha <= _dashHasta);
+    return gastos.filter(g => g.fecha && g.fecha >= _dashDesde && g.fecha <= _dashHasta);
   } else if(_dashPeriodo === 'mes'){
     const mesStr = String(_dashAnio) + '-' + String(_dashMes+1).padStart(2,'0');
-    return APP.costos.filter(g => g.fecha && g.fecha.startsWith(mesStr));
+    return gastos.filter(g => g.fecha && g.fecha.startsWith(mesStr));
   } else if(_dashPeriodo === 'semana'){
     const d = new Date(); d.setDate(d.getDate()-7);
-    return APP.costos.filter(g => g.fecha >= d.toISOString().split('T')[0]);
+    return gastos.filter(g => g.fecha >= d.toISOString().split('T')[0]);
   }
-  return APP.costos;
+  return gastos;
 }
 
 // Inversión real de bolsillo = recargas P2P + pagos directos (tarjeta/transferencia/efectivo)
@@ -4084,8 +4253,8 @@ function ccRegistrarCostoConFIFO(monto, metodo, desc, fecha, catUid, cuentaUID){
   const esUsdt = metodo.toLowerCase().includes('usdt') || metodo.toLowerCase().includes('binance');
   let montoUSD = monto, usdtUsado = 0;
   if(esUsdt && monto > 0){
-    const tasa = getTasaPromBinance();
-    montoUSD = monto * tasa;
+    const fifo = calcFIFO(monto);
+    montoUSD = fifo.total || monto;
     usdtUsado = monto;
     const ok = descontarUSDTBinance(monto, desc, cuentaUID, null, fecha);
     if(!ok) return false;
@@ -4324,11 +4493,25 @@ function abrirEditarCosto(costoUID){
 }
 function eliminarCosto(uid){
   if(!confirm('¿Eliminar este gasto?')) return;
+  const g = APP.costos.find(x => x.uid === uid);
   APP.costos = APP.costos.filter(g => g.uid !== uid);
+  if(g && metodoKeyCosto(g.metodo) === 'binance'){
+    APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => {
+      if(m.costoUID === uid) return false;
+      const mismaFecha = normalizarFechaValor(m.fecha) === normalizarFechaValor(g.fecha);
+      const mismoUsdt = Math.abs((parseFloat(m.usdt)||0) - (parseFloat(g.usdtUsado)||0)) < 0.0001;
+      const mismaDesc = (m.concepto||'').trim().toLowerCase() === (g.desc||'').trim().toLowerCase();
+      return !(m.tipo === 'salida' && mismaFecha && mismoUsdt && mismaDesc);
+    });
+    recalcularUsadoRecargasDesdeKardex();
+  }
   renderCostos();
+  actualizarSaldoBinance();
+  renderBinance();
   sincronizarConSheets(); // FIX: guardar en Sheets para que no reaparezca al sincronizar
 }
 function renderCostos(){
+  normalizarFechasApp();
   // Poblar select de categorías de gasto dinámicamente
   const catSel = document.getElementById('costo-cat');
   if(catSel){
@@ -4336,27 +4519,17 @@ function renderCostos(){
   }
 
   // ── Base: excluir formato antiguo de renovaciones ──
-  const base = APP.costos.filter(g => {
+  const base = getGastosCompletos().filter(g => {
     if(g.desc && /^Costo cuenta renovación —/.test(g.desc)) return false;
     return true;
   });
-
-  // ── Helpers de método ──
-  const metodoKey = m => {
-    const ml = (m||'').toLowerCase();
-    if(ml.includes('binance') || ml.includes('usdt')) return 'binance';
-    if(ml.includes('tarjeta')) return 'tarjeta';
-    if(ml.includes('transfer')) return 'transferencia';
-    if(ml.includes('efectivo')) return 'efectivo';
-    return 'otro';
-  };
 
   // ── KPI Fila 1: Total gastos reales (solo APP.costos — recargas NO son gasto) ──
   const totalReal = base.reduce((s,g) => s+g.montoUSD, 0);
   document.getElementById('c-total').textContent = '$' + totalReal.toFixed(2);
   // Desglose: cuánto fue pagado con USDT vs métodos directos
-  const costosBinance = base.filter(g => metodoKey(g.metodo) === 'binance');
-  const directosTotal = base.filter(g => metodoKey(g.metodo) !== 'binance').reduce((s,g) => s+g.montoUSD, 0);
+  const costosBinance = base.filter(g => metodoKeyCosto(g.metodo) === 'binance');
+  const directosTotal = base.filter(g => metodoKeyCosto(g.metodo) !== 'binance').reduce((s,g) => s+g.montoUSD, 0);
   const binanceTotal  = costosBinance.reduce((s,g) => s+g.montoUSD, 0);
   document.getElementById('c-total-sub').textContent = `USDT $${binanceTotal.toFixed(2)} + directos $${directosTotal.toFixed(2)}`;
 
@@ -4371,7 +4544,7 @@ function renderCostos(){
     { key:'efectivo',      id:'c-m-efectivo',      sub:'c-m-efectivo-sub' },
   ];
   metodosDirect.forEach(({ key, id, sub }) => {
-    const grupo = base.filter(g => metodoKey(g.metodo) === key);
+    const grupo = base.filter(g => metodoKeyCosto(g.metodo) === key);
     document.getElementById(id).textContent = '$' + grupo.reduce((s,g)=>s+g.montoUSD,0).toFixed(2);
     document.getElementById(sub).textContent = grupo.length + ' gasto' + (grupo.length !== 1 ? 's' : '');
   });
@@ -4396,7 +4569,7 @@ function renderCostos(){
   if(APP._filtroCosto === 'todos'){
     costos = [...base];
   } else if(APP._filtroCostoTipo === 'metodo'){
-    costos = base.filter(g => metodoKey(g.metodo) === APP._filtroCosto);
+    costos = base.filter(g => metodoKeyCosto(g.metodo) === APP._filtroCosto);
   } else {
     costos = base.filter(g => g.catUid === APP._filtroCosto);
 
@@ -4426,7 +4599,7 @@ function renderCostos(){
     lista.innerHTML = headerFiltro + costos.map(g => {
       // ── Fila de gasto ──
       const cg = getCatGasto(g.catUid) || CATALOGO_CAT_GASTOS[CATALOGO_CAT_GASTOS.length-1];
-      const mk = metodoKey(g.metodo);
+      const mk = metodoKeyCosto(g.metodo);
       const metIco = {binance:'💱',tarjeta:'💳',transferencia:'🏦',efectivo:'💵'}[mk] || '💰';
 
       let cuposHtml = '';
@@ -4455,8 +4628,8 @@ function renderCostos(){
           </div>
           <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
             <div class="cost-monto">-$${g.montoUSD.toFixed(2)}</div>
-            <button class="btn-sm" onclick="abrirEditarCosto('${esc(g.uid)}')">✏️</button>
-            <button class="btn-sm" onclick="eliminarCosto('${esc(g.uid)}')">🗑️</button>
+            ${g._virtualBinance ? '' : `<button class="btn-sm" onclick="abrirEditarCosto('${esc(g.uid)}')">✏️</button>`}
+            <button class="btn-sm" onclick="${g._virtualBinance ? `eliminarMovBinance('${esc(g._movUid)}')` : `eliminarCosto('${esc(g.uid)}')`}">🗑️</button>
           </div>
         </div>
         ${cuposHtml}
@@ -4550,15 +4723,21 @@ function eliminarMovBinance(movUid){
     // Eliminar todos los movimientos asociados a esa recarga
     APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.recargaUID !== mov.recargaUID);
   } else {
+    if(mov && mov.tipo === 'salida' && mov.migrado && mov.recargaUID){
+      const r = (APP.recargas||[]).find(x => x.uid === mov.recargaUID);
+      if(r) r.usado = Math.max(0, (parseFloat(r.usado)||0) - (parseFloat(mov.usdt)||0));
+    }
     APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.uid !== movUid);
   }
   actualizarSaldoBinance();
   renderBinance();
+  renderCostos();
   sincronizarConSheets();
 }
 function renderBinance(){
   const cont = document.getElementById('bin-historial');
   if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  normalizarFechasApp();
   migrarBinanceLegacy();
 
   const saldoActual = getSaldoBinance();
@@ -5248,6 +5427,7 @@ async function _verificarYActualizarDesdeSheets(){
       // Re-renderizar costos si está activo
       const costosScreen = document.getElementById('s-costos');
       if(costosScreen && costosScreen.classList.contains('active')) renderCostos();
+      normalizarFechasApp();
       guardarLocal(construirPayload());
     }
   } catch(e){
@@ -5261,33 +5441,38 @@ async function _verificarYActualizarDesdeSheets(){
 // ══════════════════════════════════════
 // API — COMUNICACIÓN CON GOOGLE SHEETS
 // ══════════════════════════════════════
-async function apiCall(body){
-  // SECURITY: Set a 15-second timeout to avoid indefinite hanging
+async function apiCall(body, timeoutMs){
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const accion = body && body.accion;
+  const limite = timeoutMs || (accion === 'cargar' ? 60000 : 45000);
+  const timeoutId = setTimeout(() => controller.abort(), limite);
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(body),
-      signal: controller.signal
+      signal: controller.signal,
+      cache: 'no-store'
     });
     clearTimeout(timeoutId);
-    return res.json();
+    if(!res.ok) throw new Error('HTTP ' + res.status + ' al conectar con Google Sheets');
+    const data = await res.json();
+    if(data && data.ok === false) throw new Error(data.error || 'Google Sheets devolvió un error');
+    return data;
   } catch(err) {
     clearTimeout(timeoutId);
+    if(err && err.name === 'AbortError'){
+      throw new Error('La conexión con Google Sheets tardó demasiado. Revisa internet e intenta otra vez.');
+    }
     throw err;
   }
 }
-
 async function sincronizarConSheets(){
-  if(!_pinVerificado) return;
-  // VELOCIDAD: Guardar local inmediatamente, luego Sheets en background sin bloquear UI
+  if(!_pinVerificado) return false;
   const payload = construirPayload();
   guardarLocal(payload);
-  _sincronizarBackground(payload);
+  return _sincronizarBackground(payload);
 }
-
 function construirPayload(){
   return {
     ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
@@ -5310,16 +5495,23 @@ async function _sincronizarBackground(payload){
   const ind = document.getElementById('sync-indicador');
   if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
   try {
-    const res = await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() });
+    await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 45000);
     if(ind){
-      ind.textContent = res && res.ok ? '✅' : '⚠️';
+      ind.textContent = '✅';
+      ind.title = 'Sincronizado con Google Sheets';
       setTimeout(()=>{ ind.style.display='none'; }, 1500);
     }
+    return true;
   } catch(err){
-    if(ind){ ind.textContent='📱'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
+    console.error('[YORITEX] Error al guardar en Google Sheets:', err);
+    if(ind){
+      ind.textContent='⚠️';
+      ind.title = err.message || 'No se pudo sincronizar';
+      setTimeout(()=>{ ind.style.display='none'; }, 4000);
+    }
+    return false;
   }
 }
-
 // Alias para compatibilidad con renGuardar
 // sincronizarConSheetsSilencioso ya está definida arriba
 
@@ -5329,8 +5521,13 @@ async function _sincronizarBackground(payload){
 // valores válidos sin importar el origen
 // ══════════════════════════════════════
 function parsearFecha(s){
+  if(s instanceof Date && !isNaN(s.getTime())) return s.toISOString().split('T')[0];
   // Formato correcto: YYYY-MM-DD
   if(typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Fecha ISO completa: 2026-05-22T00:00:00Z
+  if(typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(s)){
+    return s.split('T')[0];
+  }
   // Formato de Sheets en español: DD/MM/YYYY
   if(typeof s === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(s)){
     const [d,m,y] = s.split('/');
@@ -5350,10 +5547,6 @@ function parsearFecha(s){
   if(typeof s === 'number' && s > 40000){
     const d = new Date(Date.UTC(1900,0,1) + (s-2)*86400000);
     return d.toISOString().split('T')[0];
-  }
-  // Fecha ISO completa: 2026-05-22T00:00:00Z
-  if(typeof s === 'string' && s.length > 10 && s.includes('T')){
-    return s.split('T')[0];
   }
   return null; // No se pudo parsear
 }
@@ -5499,6 +5692,7 @@ function cargarDesdeSheets(data){
   }, 0);
   APP._ventaCounter = maxN + 1;
   inyectarDatosPDF();
+  normalizarFechasApp();
 
   guardarLocal(construirPayload());
   inicializarUI();
@@ -5574,7 +5768,10 @@ function mostrarSync(ico, msg, sub){
 function ocultarSync(){ document.getElementById('sync-overlay').style.display = 'none'; }
 
 async function sincronizarManual(){
-  await sincronizarConSheets();
+  mostrarSync('🔄', 'Sincronizando con la nube...', 'Guardando en Google Sheets');
+  const ok = await sincronizarConSheets();
+  ocultarSync();
+  alert(ok ? '✅ Sincronizado con Google Sheets.' : '⚠️ No se pudo sincronizar con Google Sheets. Tus cambios quedaron guardados solo en este navegador.');
 }
 function cerrarSesion(){
   if(!confirm('¿Cerrar sesión? La app se bloqueará con PIN.')) return;
@@ -5599,6 +5796,7 @@ function cerrarSesion(){
 // INIT — Configuración inicial de modales
 // ══════════════════════════════════════
 function inicializarUI(){
+  normalizarFechasApp();
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
   ['mv-fecha','costo-fecha','bin-fecha','rem-fecha'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = hoy();
@@ -5633,6 +5831,13 @@ function inicializarUI(){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if(new URLSearchParams(location.search).has('clean')){
+    try {
+      localStorage.removeItem('yoritex_local');
+      sessionStorage.clear();
+      history.replaceState(null, '', location.pathname);
+    } catch(e){}
+  }
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
   document.getElementById('pin-brand').textContent = APP.config.nombre || 'YORI-TEX';
   // Poblar mapa de WA correctos desde VENTAS_HISTORICAS
