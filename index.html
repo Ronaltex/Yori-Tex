@@ -132,11 +132,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .cuenta-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden}
 .cuenta-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer}
 .cuenta-nombre{font-size:13px;font-weight:600;color:var(--white)}.cuenta-correo{font-size:11px;color:var(--text3);margin-top:2px}
-.prod-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px;max-width:250px}
-.prod-mini{background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:8px;padding:5px 6px;min-width:0}
+.prod-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:9px;width:100%}
+.prod-mini{background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:8px;padding:6px 7px;min-width:0}
 .prod-mini .pl{font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.prod-mini .pv{font-size:11px;font-weight:800;margin-top:1px;white-space:nowrap}
+.prod-mini .pv{font-size:12px;font-weight:800;margin-top:1px;white-space:nowrap}
 .prod-mini.verde .pv{color:var(--green)}.prod-mini.naranja .pv{color:var(--orange)}.prod-mini.azul .pv{color:var(--blue)}.prod-mini.rojo .pv{color:var(--red)}
+@media (max-width:420px){.prod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.prod-mini .pv{font-size:11px}}
 .cupos-list{border-top:1px solid var(--border);padding:8px 14px}
 .cupo-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
 .cupo-row:last-child{border-bottom:none}
@@ -1238,7 +1239,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   </div>
   <div class="field"><label>Nombre del servicio</label><input type="text" id="srv-nombre" placeholder="Ej: Paramount+, Max, Duolingo..."/></div>
   <div class="field"><label>Emoji / ícono</label><input type="text" id="srv-emoji" placeholder="🌟" maxlength="4"/></div>
-  <div class="field"><label>Planes (uno por línea)</label><textarea id="srv-planes" placeholder="Perfil 1 mes&#10;Netflix combo | cupos=2 | cuentas=1&#10;Plan familiar | cupos=1" style="height:80px"></textarea></div>
+  <div class="field"><label>Planes (uno por línea)</label><textarea id="srv-planes" placeholder="Perfil 1 mes&#10;Netflix combo | cupos=3 | cuentas=2 | dias=30 | precio=7&#10;Plan familiar | cupos=1" style="height:80px"></textarea></div>
+  <div class="aviso">Para combos usa: <b>Nombre | cupos=3 | cuentas=2 | dias=30 | precio=7</b>. Asi la venta sabra cuantos cupos y cuentas debe pedir.</div>
   <div class="sec">Comportamiento del servicio</div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Perfil y PIN</div><div class="ts">Como Netflix, Disney: cada cliente tiene su perfil</div></div><label class="toggle"><input type="checkbox" id="srv-perfil"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Correo de Invitación</div><div class="ts">Como Spotify, Canva, Google One: se invita al cliente</div></div><label class="toggle"><input type="checkbox" id="srv-invitacion"><span class="toggle-slider"></span></label></div>
@@ -1322,6 +1324,7 @@ function esc(str){
 // ══════════════════════════════════════
 const MESES_CORTOS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_LARGOS=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const FECHA_CORTE_NEGOCIO = '2026-06-07';
 
 // BASE DE DATOS PRINCIPAL
 let APP = {
@@ -1835,8 +1838,63 @@ function desvincularVentasDeCuenta(cuenta){
       v.cuentaUID = null;
       v.cupoIdx = null;
       v.cupoIdxs = [];
+      v.cuposAsignados = [];
     }
   });
+}
+function construirCuentaVirtual(uidVirtual){
+  if(!uidVirtual || !String(uidVirtual).startsWith('virtual-')) return null;
+  const keyBuscado = String(uidVirtual).slice(8);
+  const ventas = (APP.ventas || []).filter(v => !v.cuentaUID && v.activa !== false);
+  const grupos = {};
+  ventas.forEach(v => {
+    const key = v.correo ? v.correo.toLowerCase() : 'sin-correo-' + v.uid;
+    if(!grupos[key]) grupos[key] = { correo: v.correo || '', srvUid: v.srvUid, srvNom: v.srvNom, ventas: [] };
+    grupos[key].ventas.push(v);
+  });
+  const g = grupos[keyBuscado] || Object.values(grupos).find(x => (x.correo || x.ventas[0]?.uid) === keyBuscado);
+  if(!g) return null;
+  return {
+    uid: uidVirtual,
+    srvUid: g.srvUid,
+    srvNom: g.srvNom,
+    id: g.correo ? '📧 ' + g.correo : '👤 ' + g.ventas[0].cliente,
+    correo: g.correo,
+    pass: '',
+    costo: 0,
+    esVirtual: true,
+    ventasRef: g.ventas,
+    cupos: g.ventas.map(v => ({
+      estado: v.activa === false ? 'libre' : 'ocupado',
+      cliente: v.cliente,
+      wa: v.wa || '',
+      perfil: v.perfil || '',
+      pin: v.pin || '',
+      plan: v.plan || '',
+      invCorreo: v.invCorreo || '',
+      vence: (v.vence && v.vence.match(/^\d{4}-\d{2}-\d{2}$/)) ? v.vence : null,
+      ventaUid: v.uid
+    }))
+  };
+}
+function obtenerCuentaInventarioOVirtual(uidCuenta){
+  return APP.cuentas.find(x => x.uid === uidCuenta) || construirCuentaVirtual(uidCuenta);
+}
+function archivarCuentaFantasmaSiVacia(cuenta){
+  if(cuenta && cuenta.esVirtual && cuenta.cupos && cuenta.cupos.every(cu => cu.estado !== 'ocupado')){
+    cuenta.archivada = true;
+    cuenta.fechaArchivo = hoy();
+    cuenta.motivoArchivo = 'Fantasma sin cupos ocupados';
+  }
+}
+function liberarCupoAnterior(cuentaUID, cupoIdx, ventaUID){
+  if(!cuentaUID || cupoIdx === null || cupoIdx === undefined || cupoIdx === '') return;
+  const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
+  if(!cuenta || !cuenta.cupos || !cuenta.cupos[cupoIdx]) return;
+  if(!ventaUID || !cuenta.cupos[cupoIdx].ventaUid || cuenta.cupos[cupoIdx].ventaUid === ventaUID){
+    cuenta.cupos[cupoIdx] = { estado: 'libre' };
+    archivarCuentaFantasmaSiVacia(cuenta);
+  }
 }
 
 // ══════════════════════════════════════
@@ -2455,7 +2513,11 @@ function editarVentaGuardar(){
     if(cuentaNueva && v.cupoIdx !== null && v.cupoIdx !== undefined){
       cuentaNueva.cupos[v.cupoIdx] = {
         estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
-        perfil: v.perfil || '', pin: v.pin || '', vence: v.vence, ventaUid: v.uid
+        perfil: v.perfil || '', pin: v.pin || '', vence: v.vence,
+        pendienteCobro: v.estado !== 'pagado',
+        periodoDesde: v.fecha || hoy(),
+        periodoHasta: v.vence || '',
+        ventaUid: v.uid
       };
       if(nuevoCorreo) cuentaNueva.correo = cuentaNueva.correo || nuevoCorreo;
     }
@@ -2751,6 +2813,25 @@ function mvRenderPerfilesMulti(){
     </div>`;
   }).join('');
 }
+function mvAccesosSeleccionadosParaMensaje(){
+  if(!_mvInvMode) return [];
+  const picks = mvSeleccionCupos();
+  if(!picks.length && _mvCuentaSelUID){
+    const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
+    return cuenta ? [{ cuenta, cupoIdx: null, perfil: document.getElementById('mv-perfil')?.value || '', pin: document.getElementById('mv-pin')?.value || '' }] : [];
+  }
+  return picks.map(p => {
+    const cuenta = APP.cuentas.find(c => c.uid === p.cuentaUID);
+    const perfilEl = document.querySelector(`.mv-perfil-multi[data-cuenta="${p.cuentaUID}"][data-cupo="${p.cupoIdx}"]`);
+    const pinEl = document.querySelector(`.mv-pin-multi[data-cuenta="${p.cuentaUID}"][data-cupo="${p.cupoIdx}"]`);
+    return {
+      cuenta,
+      cupoIdx: p.cupoIdx,
+      perfil: perfilEl?.value || document.getElementById('mv-perfil')?.value || '',
+      pin: pinEl?.value || document.getElementById('mv-pin')?.value || ''
+    };
+  }).filter(x => x.cuenta);
+}
 function mvSelCupo(){
   const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
   if(!cuenta) return;
@@ -2787,6 +2868,7 @@ function mvGenWA(){
   const srvUid = document.getElementById('mv-srv').value;
   const srv = getSrv(srvUid);
   const srvNom = srv ? srv.emoji + ' ' + srv.nombre : document.getElementById('mv-srv').options[document.getElementById('mv-srv').selectedIndex]?.text || 'Servicio';
+  const accesos = mvAccesosSeleccionadosParaMensaje();
   const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
   const correo = _mvInvMode && cuenta ? cuenta.correo : (document.getElementById('mv-cactus-correo').value || '');
   const perfil = document.getElementById('mv-perfil')?.value || '';
@@ -2795,9 +2877,22 @@ function mvGenWA(){
   const precio = document.getElementById('mv-precio').value || '\u2014';
   const firma = APP.config.firma || '';
   let msg = '\u00a1Hola ' + nombre + '! \ud83d\udc4b\nTu acceso est\u00e1 listo \ud83c\udf89\n\n\u2728 *' + srvNom + '*\n';
-  if(correo) msg += '\ud83d\udce7 ' + correo + '\n';
-  if(perfil) msg += '\ud83d\udc64 Perfil: ' + perfil + '\n';
-  if(pin) msg += '\ud83d\udd10 PIN: ' + pin + '\n';
+  if(accesos.length > 1){
+    msg += '\ud83d\udd10 *Accesos del combo:*\n';
+    accesos.forEach((a, i) => {
+      msg += '\n' + (i+1) + '. \ud83d\udce7 ' + (a.cuenta.correo || 'Correo no definido') + '\n';
+      msg += '   \ud83d\udc64 Perfil: ' + (a.perfil || ('Cupo ' + ((a.cupoIdx ?? i) + 1))) + '\n';
+      if(a.pin) msg += '   \ud83d\udd10 PIN: ' + a.pin + '\n';
+    });
+  } else {
+    const acceso = accesos[0];
+    const correoMsg = acceso?.cuenta?.correo || correo;
+    const perfilMsg = acceso?.perfil || perfil;
+    const pinMsg = acceso?.pin || pin;
+    if(correoMsg) msg += '\ud83d\udce7 ' + correoMsg + '\n';
+    if(perfilMsg) msg += '\ud83d\udc64 Perfil: ' + perfilMsg + '\n';
+    if(pinMsg) msg += '\ud83d\udd10 PIN: ' + pinMsg + '\n';
+  }
   msg += '\ud83d\udcc5 Vence: ' + vence + '\n\ud83d\udcb5 Monto: $' + precio + '\n\n\u26a0\ufe0f _No compartas ni modifiques los datos._\n\n' + firma;
   const wa = document.getElementById('mv-wa').value;
   enviarWA(wa, msg);
@@ -2812,6 +2907,8 @@ function mvGuardar(){
   const fechaVenta = document.getElementById('mv-fecha').value || hoy();
   const vence = sumarDias(fechaVenta, dur);
   const waInput = sanitizarTexto(document.getElementById('mv-wa').value, 20);
+  const precioVenta = sanitizarNumero(document.getElementById('mv-precio').value);
+  const estadoVenta = sanitizarTexto(document.getElementById('mv-estado').value, 50);
   const ventaUidNueva = uid();
   const ventaIdNueva = numVenta();
   let costoAdqVenta = 0;
@@ -2832,17 +2929,32 @@ function mvGuardar(){
     correo = cuenta ? cuenta.correo : '';
     const perfilGlobal = sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50);
     const pinGlobal = sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10);
+    const precioPorCupoAsignado = cuposAsignados.length ? (precioVenta / cuposAsignados.length) : precioVenta;
     cuposAsignados.forEach(asig => {
       const cuentaAsig = APP.cuentas.find(c => c.uid === asig.cuentaUID);
       if(cuentaAsig && cuentaAsig.cupos && cuentaAsig.cupos[asig.cupoIdx]){
         const perfilEl = document.querySelector(`.mv-perfil-multi[data-cuenta="${asig.cuentaUID}"][data-cupo="${asig.cupoIdx}"]`);
         const pinEl = document.querySelector(`.mv-pin-multi[data-cuenta="${asig.cuentaUID}"][data-cupo="${asig.cupoIdx}"]`);
+        const perfilAsig = sanitizarTexto(perfilEl?.value || perfilGlobal, 50);
+        const pinAsig = sanitizarTexto(pinEl?.value || pinGlobal, 10);
+        Object.assign(asig, {
+          perfil: perfilAsig,
+          pin: pinAsig,
+          precio: precioPorCupoAsignado,
+          estado: estadoVenta,
+          fecha: fechaVenta,
+          vence
+        });
         cuentaAsig.cupos[asig.cupoIdx] = {
           estado:'ocupado', cliente:nombre, wa:waInput,
-          perfil:sanitizarTexto(perfilEl?.value || perfilGlobal, 50),
-          pin:sanitizarTexto(pinEl?.value || pinGlobal, 10), vence,
+          perfil: perfilAsig,
+          pin: pinAsig, vence,
           plan: planNombre(document.getElementById('mv-plan').value),
-          ventaUid: ventaUidNueva
+          pendienteCobro: estadoVenta !== 'pagado',
+          periodoDesde: fechaVenta,
+          periodoHasta: vence,
+          ventaUid: ventaUidNueva,
+          montoVenta: precioPorCupoAsignado
         };
       }
     });
@@ -2856,7 +2968,7 @@ function mvGuardar(){
       const nc = { uid:uid(), srvUid, srvNom: srv ? srv.nombre : srvUid, id:`${(srv?.nombre||'SRV').toUpperCase().slice(0,3)}-C${APP._ventaCounter}`,
         correo, pass:sanitizarTexto(document.getElementById('mv-cactus-pass').value, 200),
         costo: costoAdq, metodoPago: metodoAdq,
-        cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:'',pin:'',vence,ventaUid:ventaUidNueva}]
+        cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:'',pin:'',vence,pendienteCobro:estadoVenta !== 'pagado',periodoDesde:fechaVenta,periodoHasta:vence,ventaUid:ventaUidNueva,montoVenta:precioVenta}]
       };
       APP.cuentas.push(nc); cuentaUID = nc.uid; cupoIdx = 0;
     }
@@ -2906,9 +3018,9 @@ function mvGuardar(){
     correo, perfil: sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50),
     pin: sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10),
     invCorreo: sanitizarTexto(document.getElementById('mv-inv-correo')?.value||'', 200),
-    precio: sanitizarNumero(document.getElementById('mv-precio').value),
+    precio: precioVenta,
     metodo: sanitizarTexto(document.getElementById('mv-metodo').value, 50),
-    estado: sanitizarTexto(document.getElementById('mv-estado').value, 50),
+    estado: estadoVenta,
     notas: sanitizarTexto(document.getElementById('mv-notas').value, 500),
     cuentaUID, cupoIdx, cupoIdxs, cuposAsignados, costoAdq: costoAdqVenta, metodoAdq: metodoAdqVenta,
     activa: true, creado: new Date().toISOString()
@@ -3017,23 +3129,39 @@ function renderInventario(){
     const ocu = c.cupos.filter(cu => cu.estado==='ocupado').length;
     const srv = getSrv(c.srvUid);
     const ventasUids = new Set((c.cupos || []).map(cu => cu.ventaUid).filter(Boolean));
-    const ventasCuenta = (APP.ventas || []).filter(v => v.activa !== false && (v.cuentaUID === c.uid || ventasUids.has(v.uid)));
-    const ventaIdsCuenta = new Set(ventasCuenta.map(v => v.uid));
-    const cuposOcupadosSinVenta = (c.cupos || []).filter(cu => cu.estado === 'ocupado' && (!cu.ventaUid || !ventaIdsCuenta.has(cu.ventaUid))).length;
-    const estimadoSinVenta = cuposOcupadosSinVenta * (parseFloat(c.pventa) || 0);
-    const cobradoCuenta = ventasCuenta.filter(v => v.estado === 'pagado').reduce((s,v) => s + (parseFloat(v.precio)||0), 0);
-    const porCobrarCuenta = ventasCuenta.filter(v => v.estado !== 'pagado').reduce((s,v) => s + (parseFloat(v.precio)||0), 0) + estimadoSinVenta;
-    const produciraCuenta = cobradoCuenta + porCobrarCuenta;
+    const desdePeriodo = normalizarFechaValor(c.desde) || '';
+    const hastaPeriodo = normalizarFechaValor(c.hasta) || '';
+    const enPeriodoCuenta = v => {
+      const f = normalizarFechaValor(v.fecha);
+      if(!f) return false;
+      if(f < FECHA_CORTE_NEGOCIO) return false;
+      if(desdePeriodo && f < desdePeriodo) return false;
+      if(hastaPeriodo && f > hastaPeriodo) return false;
+      return true;
+    };
+    const ventasCuenta = (APP.ventas || []).filter(v => v.activa !== false && (v.cuentaUID === c.uid || ventasUids.has(v.uid)) && enPeriodoCuenta(v));
+    const valorVentaParaCuenta = v => {
+      const asignados = Array.isArray(v.cuposAsignados) ? v.cuposAsignados : [];
+      if(asignados.length){
+        const propios = asignados.filter(a => a.cuentaUID === c.uid);
+        if(!propios.length) return 0;
+        const sumaAsignada = propios.reduce((s,a) => s + (parseFloat(a.precio)||0), 0);
+        if(sumaAsignada > 0 || (parseFloat(v.precio)||0) === 0) return sumaAsignada;
+        return (parseFloat(v.precio)||0) * (propios.length / asignados.length);
+      }
+      return (v.cuentaUID === c.uid || ventasUids.has(v.uid)) ? (parseFloat(v.precio)||0) : 0;
+    };
+    const cobradoCuenta = ventasCuenta.filter(v => v.estado === 'pagado').reduce((s,v) => s + valorVentaParaCuenta(v), 0);
+    const porCobrarCuenta = ventasCuenta.filter(v => v.estado !== 'pagado').reduce((s,v) => s + valorVentaParaCuenta(v), 0);
     const costoCuenta = parseFloat(c.costo) || 0;
     const liquidezReal = cobradoCuenta - costoCuenta;
-    const liquidezProyectada = produciraCuenta - costoCuenta;
+    const liquidezTotal = (cobradoCuenta + porCobrarCuenta) - costoCuenta;
     const money = n => n < 0 ? '-$' + Math.abs(n).toFixed(2) : '$' + n.toFixed(2);
     const prodHtml = ocu > 0 ? `<div class="prod-grid">
       <div class="prod-mini verde"><div class="pl">Cobrado</div><div class="pv">${money(cobradoCuenta)}</div></div>
       <div class="prod-mini naranja"><div class="pl">Por cobrar</div><div class="pv">${money(porCobrarCuenta)}</div></div>
-      <div class="prod-mini azul"><div class="pl">Producira</div><div class="pv">${money(produciraCuenta)}</div></div>
       <div class="prod-mini ${liquidezReal >= 0 ? 'verde' : 'rojo'}"><div class="pl">Liq. real</div><div class="pv">${money(liquidezReal)}</div></div>
-      <div class="prod-mini ${liquidezProyectada >= 0 ? 'verde' : 'rojo'}" style="grid-column:1/-1"><div class="pl">Liq. total</div><div class="pv">${money(liquidezProyectada)}</div></div>
+      <div class="prod-mini ${liquidezTotal >= 0 ? 'verde' : 'rojo'}"><div class="pl">Liq. total</div><div class="pv">${money(liquidezTotal)}</div></div>
     </div>` : '';
     // Calcular costo por cupo vendido (distribución inteligente)
     const costoPorCupoVendido = ocu > 0 && c.costo > 0 ? (c.costo / ocu).toFixed(2) : null;
@@ -3054,12 +3182,12 @@ function renderInventario(){
         <div class="cupo-row">
           <div class="cupo-dot dot-libre"></div>
           <div class="cupo-info"><div class="cupo-cliente" style="color:var(--green)">Cupo ${i+1} — Libre</div></div>
-          ${!c.esVirtual ? `<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button>` : ''}
+          <button class="btn-sm" onclick="${c.esVirtual && cu.ventaUid ? `abrirEditarVenta('${esc(cu.ventaUid)}')` : `abrirEditarCupo('${esc(c.uid)}',${i})`}">✏️</button>
         </div>`;
       const wa = cu.wa ? cu.wa.replace(/\D/g,'') : '';
       const editBtn = c.esVirtual && cu.ventaUid
         ? `<button class="btn-sm" onclick="abrirEditarVenta('${esc(cu.ventaUid)}')">✏️</button>`
-        : (!c.esVirtual ? `<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button>` : '');
+        : `<button class="btn-sm" onclick="abrirEditarCupo('${esc(c.uid)}',${i})">✏️</button>`;
       // Fecha vencimiento — usar la del cupo, o c.hasta de la cuenta como fallback
       const venceRaw = cu.vence || (!c.esVirtual ? c.hasta : null);
       const venceStr = venceRaw && venceRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? fmtFecha(venceRaw) : null;
@@ -3083,11 +3211,24 @@ function renderInventario(){
         </div>`;
     }).join('');
     return `<div class="cuenta-card">
-      <div class="cuenta-hdr" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-        <div style="flex:1;min-width:0">
-          <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
-          <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
-          ${prodHtml}
+      <div class="cuenta-hdr" style="display:block" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%">
+          <div style="flex:1;min-width:0">
+            <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
+            <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
+            <span class="chip verde">${lib} libre${lib!==1?'s':''}</span>
+            <span class="chip rojo">${ocu} ocup.</span>
+            ${c.esVirtual ? `<span class="chip amarillo" style="font-size:9px">Auto</span>` : ''}
+            <button class="btn-sm" onclick="event.stopPropagation();${c.esVirtual ? `editarCuentaVirtual('${esc(c.uid)}')` : `abrirEditarCuenta('${esc(c.uid)}')`}">✏️</button>
+            <button class="btn-sm" onclick="event.stopPropagation();abrirCuentaCaida('${esc(c.uid)}')" title="Cuenta caída" style="color:var(--red)">⚡</button>
+            <button class="btn-sm" onclick="event.stopPropagation();${c.esVirtual ? `eliminarCuentaVirtual('${esc(c.uid)}')` : `eliminarCuenta('${esc(c.uid)}')`}">🗑️</button>
+            <span style="color:var(--text3)">▾</span>
+          </div>
+        </div>
+        ${prodHtml}
+        <div style="margin-top:3px">
           ${costoPorCupoVendido ? `<div style="font-size:10px;color:var(--orange);margin-top:2px">💡 $${costoPorCupoVendido}/cupo vendido</div>` : ''}
           ${!c.esVirtual ? (()=>{
             if(!c.hasta){
@@ -3105,16 +3246,6 @@ function renderInventario(){
             const diasTxt = dH === null ? '' : dH < 0 ? ` · venció hace ${Math.abs(dH)}d` : dH === 0 ? ' · vence HOY' : ` · ${dH}d restantes`;
             return `<div style="font-size:11px;color:${color};margin-top:3px;font-weight:600">${icono} Cuenta vence: ${fH}${diasTxt}</div>`;
           })() : ''}
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0">
-          <span class="chip verde">${lib} libre${lib!==1?'s':''}</span>
-          <span class="chip rojo">${ocu} ocup.</span>
-          ${!c.esVirtual
-            ? `<button class="btn-sm" onclick="event.stopPropagation();abrirEditarCuenta('${esc(c.uid)}')">✏️</button>
-               <button class="btn-sm" onclick="event.stopPropagation();abrirCuentaCaida('${esc(c.uid)}')" title="Cuenta caída" style="color:var(--red)">⚡</button>
-               <button class="btn-sm" onclick="event.stopPropagation();eliminarCuenta('${esc(c.uid)}')">🗑️</button>`
-            : `<span class="chip amarillo" style="font-size:9px">Auto</span>`}
-          <span style="color:var(--text3)">▾</span>
         </div>
       </div>
       <div class="cupos-list" style="display:none">${cuposHtml}</div>
@@ -3233,6 +3364,13 @@ function ncRenovarCuenta(){
   c.desde = renDesde;
   c.hasta = renHasta;
   c.metodoPago = renMetodo;
+  (c.cupos || []).forEach(cu => {
+    if(cu.estado === 'ocupado'){
+      cu.pendienteCobro = true;
+      cu.periodoDesde = renDesde;
+      cu.periodoHasta = renHasta;
+    }
+  });
   // Registrar el costo automáticamente en gastos
   if(renCosto > 0){
     const desc = `Renovación ${c.id} (${c.srvNom||''})`;
@@ -3279,6 +3417,39 @@ function eliminarCuenta(uid){
   renderDashboard();
   sincronizarConSheets();
 }
+function editarCuentaVirtual(uidVirtual){
+  const c = construirCuentaVirtual(uidVirtual);
+  if(!c || !c.ventasRef || !c.ventasRef.length){
+    alert('No encontré una venta activa para editar en esta cuenta Auto.');
+    return;
+  }
+  if(c.ventasRef.length === 1){
+    abrirEditarVenta(c.ventasRef[0].uid);
+    return;
+  }
+  alert('Esta cuenta Auto tiene varios clientes. Abre la flecha y edita el cupo/cliente específico.');
+}
+function eliminarCuentaVirtual(uidVirtual){
+  const c = construirCuentaVirtual(uidVirtual);
+  if(!c || !c.ventasRef || !c.ventasRef.length) return;
+  const msg = c.ventasRef.length > 1
+    ? `Esta cuenta Auto tiene ${c.ventasRef.length} venta(s) activa(s).\n\nSe quitaran del inventario y quedaran como inactivas. ¿Continuar?`
+    : `¿Quitar esta cuenta Auto del inventario?\n\nLa venta de ${c.ventasRef[0].cliente || 'cliente'} quedara inactiva.`;
+  if(!confirm(msg)) return;
+  c.ventasRef.forEach(v => {
+    v.activa = false;
+    v.motivoSalida = 'Cuenta Auto eliminada del inventario';
+    v.cuentaUID = null;
+    v.cupoIdx = null;
+    v.cupoIdxs = [];
+    v.cuposAsignados = [];
+  });
+  renderInventario();
+  renderRegistro();
+  renderVencimientos();
+  renderDashboard();
+  sincronizarConSheets();
+}
 
 function abrirEditarCupo(cuentaUID, cupoIdx){
   const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
@@ -3314,7 +3485,10 @@ function ecGuardar(){
     pin: document.getElementById('ec-pin').value,
     invCorreo: document.getElementById('ec-inv-correo').value,
     plan: document.getElementById('ec-plan').value,
-    vence: document.getElementById('ec-vence').value
+    vence: document.getElementById('ec-vence').value,
+    pendienteCobro: false,
+    periodoDesde: cuenta.desde || hoy(),
+    periodoHasta: document.getElementById('ec-vence').value || cuenta.hasta || ''
   };
   cerrarModal('modal-editar-cupo');
   renderInventario();
@@ -3908,6 +4082,8 @@ function renGuardar(){
   const ventaUid = document.getElementById('ren-venta-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
+  const cuentaAnteriorUID = v.cuentaUID || null;
+  const cupoAnteriorIdx = v.cupoIdx;
   const nuevoWA = sanitizarTexto(document.getElementById('ren-wa').value, 20);
   const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
 
@@ -3953,6 +4129,9 @@ function renGuardar(){
   if(origen === 'inventario' && cuentaInvUID){
     nuevaVenta.cuentaUID = cuentaInvUID;
     if(cupoInvIdx !== '') nuevaVenta.cupoIdx = parseInt(cupoInvIdx);
+    if(cuentaAnteriorUID && (cuentaAnteriorUID !== cuentaInvUID || String(cupoAnteriorIdx) !== String(nuevaVenta.cupoIdx))){
+      liberarCupoAnterior(cuentaAnteriorUID, cupoAnteriorIdx, v.uid);
+    }
     const cuenta = APP.cuentas.find(c => c.uid === cuentaInvUID);
     if(cuenta){
       if(nuevoCorreo) nuevaVenta.correo = cuenta.correo || nuevoCorreo;
@@ -3962,13 +4141,17 @@ function renGuardar(){
         cuenta.cupos[nuevaVenta.cupoIdx] = {
           estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
           perfil: nuevaVenta.perfil || v.perfil || '', pin: v.pin || '',
-          vence: nuevaVenta.vence, ventaUid: nuevaVenta.uid
+          vence: nuevaVenta.vence,
+          pendienteCobro: nuevaVenta.estado !== 'pagado',
+          periodoDesde: nuevaVenta.fecha || hoy(),
+          periodoHasta: nuevaVenta.vence || '',
+          ventaUid: nuevaVenta.uid
         };
       }
     }
     v.cuentaUID = cuentaInvUID;
     if(cupoInvIdx !== '') v.cupoIdx = parseInt(cupoInvIdx);
-  } else if(cuentaInvUID === '' && v.cuentaUID){
+  } else if(origen === 'inventario' && cuentaInvUID === '' && v.cuentaUID){
     // Si había cuenta pero no se seleccionó ninguna en renovar, mantener la misma
     nuevaVenta.cuentaUID = v.cuentaUID;
     nuevaVenta.cupoIdx = v.cupoIdx;
@@ -3978,9 +4161,18 @@ function renGuardar(){
         cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
         if(nuevoWA) cuenta.cupos[v.cupoIdx].wa = nuevoWA;
         if(nuevaVenta.perfil) cuenta.cupos[v.cupoIdx].perfil = nuevaVenta.perfil;
+        cuenta.cupos[v.cupoIdx].pendienteCobro = nuevaVenta.estado !== 'pagado';
+        cuenta.cupos[v.cupoIdx].periodoDesde = nuevaVenta.fecha || hoy();
+        cuenta.cupos[v.cupoIdx].periodoHasta = nuevaVenta.vence || '';
         cuenta.cupos[v.cupoIdx].ventaUid = nuevaVenta.uid;
       }
     }
+  } else if(origen === 'manual' && cuentaAnteriorUID){
+    liberarCupoAnterior(cuentaAnteriorUID, cupoAnteriorIdx, v.uid);
+    nuevaVenta.cuentaUID = null;
+    nuevaVenta.cupoIdx = null;
+    v.cuentaUID = null;
+    v.cupoIdx = null;
   }
 
   // Registrar costo si aplica
@@ -4433,7 +4625,7 @@ function renderDashboard(){
 // CUENTA CAÍDA
 // ══════════════════════════════════════
 function abrirCuentaCaida(cuentaUID){
-  const c = cuentaUID ? APP.cuentas.find(x => x.uid === cuentaUID) : null;
+  const c = cuentaUID ? obtenerCuentaInventarioOVirtual(cuentaUID) : null;
   document.getElementById('cc-cuenta-uid').value = cuentaUID || '';
   if(c){
     const srv = getSrv(c.srvUid);
@@ -4544,7 +4736,7 @@ function ccRegistrarCostoConFIFO(monto, metodo, desc, fecha, catUid, cuentaUID){
 
 function ccGuardar(){
   const cuentaUID = document.getElementById('cc-cuenta-uid').value;
-  const c = APP.cuentas.find(x => x.uid === cuentaUID);
+  const c = obtenerCuentaInventarioOVirtual(cuentaUID);
   if(!c) return;
   const accion = document.querySelector('input[name="cc-accion"]:checked').value;
   const ventaCupoIdx = document.getElementById('cc-venta-sel').value;
@@ -4566,7 +4758,9 @@ function ccGuardar(){
         APP.reembolsos.push({ uid: uid(), fecha, cliente: cu.cliente || 'Cliente', servicio: srvNom + ' (' + c.id + ')', motivo: '⚡ ' + notas, monto, metodo });
         cu.estado = 'libre';
         // Buscar venta relacionada y marcar inactiva
-        const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === parseInt(ventaCupoIdx) && v.activa !== false);
+        const ventaRel = cu.ventaUid
+          ? APP.ventas.find(v => v.uid === cu.ventaUid && v.activa !== false)
+          : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === parseInt(ventaCupoIdx) && v.activa !== false);
         if(ventaRel){ ventaRel.activa = false; ventaRel.motivoSalida = 'Cuenta caída — reembolso dado'; }
       }
     } else {
@@ -4575,7 +4769,9 @@ function ccGuardar(){
         if(cu.estado === 'ocupado'){
           APP.reembolsos.push({ uid: uid(), fecha, cliente: cu.cliente || 'Cliente', servicio: srvNom + ' (' + c.id + ')', motivo: '⚡ ' + notas, monto, metodo });
           cu.estado = 'libre';
-          const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === i && v.activa !== false);
+          const ventaRel = cu.ventaUid
+            ? APP.ventas.find(v => v.uid === cu.ventaUid && v.activa !== false)
+            : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === i && v.activa !== false);
           if(ventaRel){ ventaRel.activa = false; ventaRel.motivoSalida = 'Cuenta caída — reembolso dado'; }
         }
       });
@@ -4605,10 +4801,12 @@ function ccGuardar(){
       if(cupoAfectado){
         cuentaRepo.cupos[cupoIdxNum] = { ...cuentaRepo.cupos[cupoIdxNum], estado: 'ocupado', cliente: cupoAfectado.cliente, wa: cupoAfectado.wa || '', perfil: cupoAfectado.perfil || '', pin: cupoAfectado.pin || '', vence: cupoAfectado.vence };
         // Actualizar venta relacionada
-        const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
+        const ventaRel = cupoAfectado.ventaUid
+          ? APP.ventas.find(v => v.uid === cupoAfectado.ventaUid && v.activa !== false)
+          : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
         if(ventaRel){ ventaRel.cuentaUID = cuentaRepoUID; ventaRel.cupoIdx = cupoIdxNum; ventaRel.correo = cuentaRepo.correo; }
         // Liberar cupo original
-        c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
+        if(!c.esVirtual) c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
       }
       // Registrar costo de reposición
       const costoRepo = parseFloat(document.getElementById('cc-repo-costo').value) || 0;
@@ -4642,9 +4840,11 @@ function ccGuardar(){
       APP.cuentas.push(nuevaCuenta);
       // Actualizar venta relacionada
       if(cupoAfectado){
-        const ventaRel = APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
+        const ventaRel = cupoAfectado.ventaUid
+          ? APP.ventas.find(v => v.uid === cupoAfectado.ventaUid && v.activa !== false)
+          : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
         if(ventaRel){ ventaRel.cuentaUID = nuevaCuenta.uid; ventaRel.cupoIdx = 0; ventaRel.correo = correoNuevo; }
-        c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
+        if(!c.esVirtual) c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
       }
       // Registrar costo
       if(costoNuevo > 0){
@@ -4653,7 +4853,7 @@ function ccGuardar(){
     }
   }
 
-  if(c.cupos && c.cupos.every(cu => cu.estado !== 'ocupado')){
+  if(!c.esVirtual && c.cupos && c.cupos.every(cu => cu.estado !== 'ocupado')){
     c.archivada = true;
     c.fechaArchivo = hoyStr;
     c.motivoArchivo = 'Cuenta caida';
@@ -5188,19 +5388,31 @@ function subirLogo(input){
     input.value = '';
     return;
   }
-  const r = new FileReader();
-  r.onload = e => {
-    const result = e.target.result;
-    // SECURITY: Double-check the data URL is really an image
-    if(!/^data:image\/(png|jpeg|gif|webp);base64,/.test(result)){
-      alert('❌ Archivo no válido.');
+  const img = new Image();
+  img.onload = () => {
+    const max = 160;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(img,0,0,w,h);
+    let result = canvas.toDataURL('image/webp', 0.78);
+    if(result.length > 45000) result = canvas.toDataURL('image/jpeg', 0.72);
+    if(result.length > 45000){
+      alert('El logo sigue siendo muy pesado. Prueba una imagen mas simple o cuadrada.');
+      URL.revokeObjectURL(img.src);
       return;
     }
     APP.config.logo = result;
     document.getElementById('cfg-logo-preview').innerHTML = `<img src="${esc(result)}" style="width:64px;height:64px;border-radius:10px;object-fit:cover" alt="logo">`;
     document.getElementById('logo-hex').innerHTML = `<img src="${esc(result)}" alt="logo">`;
+    URL.revokeObjectURL(img.src);
   };
-  r.readAsDataURL(file);
+  img.onerror = () => alert('No se pudo leer el logo.');
+  img.src = URL.createObjectURL(file);
 }
 function guardarConfig(){
   APP.config = { ...APP.config,
@@ -5872,7 +6084,10 @@ function normalizarCuenta(c){
     archivada: c.archivada === true || c.archivada === 'TRUE' || c.archivada === 'true',
     cupos: Array.isArray(c.cupos) ? c.cupos.map(cu => ({
       ...cu,
-      vence: parsearFecha(cu.vence) || cu.vence || ''
+      vence: parsearFecha(cu.vence) || cu.vence || '',
+      pendienteCobro: cu.pendienteCobro === true || cu.pendienteCobro === 'TRUE' || cu.pendienteCobro === 'true',
+      periodoDesde: parsearFecha(cu.periodoDesde) || cu.periodoDesde || '',
+      periodoHasta: parsearFecha(cu.periodoHasta) || cu.periodoHasta || ''
     })) : []
   };
 }
@@ -5889,7 +6104,16 @@ function normalizarVenta(v){
   else if(typeof v.cuposAsignados === 'string' && v.cuposAsignados.trim()){
     try { const parsed = JSON.parse(v.cuposAsignados); if(Array.isArray(parsed)) cuposAsignados = parsed; } catch(e){}
   }
-  cuposAsignados = cuposAsignados.map(x => ({ cuentaUID: x.cuentaUID, cupoIdx: parseInt(x.cupoIdx) })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
+  cuposAsignados = cuposAsignados.map(x => ({
+    cuentaUID: x.cuentaUID,
+    cupoIdx: parseInt(x.cupoIdx),
+    perfil: x.perfil || '',
+    pin: x.pin || '',
+    precio: isNaN(parseFloat(x.precio)) ? 0 : parseFloat(x.precio),
+    estado: x.estado || v.estado || 'pagado',
+    fecha: parsearFecha(x.fecha) || x.fecha || '',
+    vence: parsearFecha(x.vence) || x.vence || ''
+  })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
   // Corregir número WA si está truncado
   const waCorregido = normalizarWA(v.wa, v.uid);
   return {
