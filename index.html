@@ -132,6 +132,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .cuenta-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden}
 .cuenta-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer}
 .cuenta-nombre{font-size:13px;font-weight:600;color:var(--white)}.cuenta-correo{font-size:11px;color:var(--text3);margin-top:2px}
+.prod-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px;max-width:250px}
+.prod-mini{background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:8px;padding:5px 6px;min-width:0}
+.prod-mini .pl{font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prod-mini .pv{font-size:11px;font-weight:800;margin-top:1px;white-space:nowrap}
+.prod-mini.verde .pv{color:var(--green)}.prod-mini.naranja .pv{color:var(--orange)}.prod-mini.azul .pv{color:var(--blue)}.prod-mini.rojo .pv{color:var(--red)}
 .cupos-list{border-top:1px solid var(--border);padding:8px 14px}
 .cupo-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
 .cupo-row:last-child{border-bottom:none}
@@ -283,7 +288,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 <div id="s-registro" class="screen active">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <div><div class="page-title">Registro diario</div><div class="page-sub" id="reg-sub">Hoy: 0 ventas · $0.00</div></div>
-    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirModal('modal-nueva-venta')">＋ Venta</button>
+    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirNuevaVenta()">＋ Venta</button>
   </div>
   <div class="kpi-grid" style="margin-bottom:12px">
     <div class="kpi verde"><div class="kl" id="kpi-cobrado-lbl">Cobrado hoy</div><div class="kv" id="kpi-cobrado-hoy">$0.00</div></div>
@@ -651,6 +656,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   </div>
   <div class="field"><label>Servicio</label><select id="mv-srv" onchange="mvActSrv()"><option>— Elige categoría —</option></select></div>
   <div class="field"><label>Plan</label><select id="mv-plan" onchange="mvActPlan()"><option>— Elige servicio —</option></select></div>
+  <div class="row2" id="mv-plan-cupos-row" style="display:none">
+    <div class="field"><label>Cupos que ocupa</label><input type="number" id="mv-cupos-plan" min="1" value="1" onchange="mvActualizarCuposNecesarios()"/></div>
+    <div class="field"><label>Cuentas que usa</label><input type="number" id="mv-cuentas-plan" min="1" value="1" onchange="mvActualizarCuposNecesarios()"/></div>
+  </div>
   <div id="mv-inv-bloque" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;margin-bottom:10px;cursor:pointer" onclick="mvToggleInv()">
       <span style="font-size:13px;color:var(--text2)">¿Está en inventario?</span>
@@ -659,6 +668,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
     <div id="mv-cuentas-wrap">
       <div id="mv-lista-cuentas"></div>
       <div class="field" id="mv-cupo-wrap" style="display:none"><label>Cupo disponible</label><select id="mv-cupo" onchange="mvSelCupo()"><option>— Selecciona —</option></select></div>
+      <div id="mv-cupos-multi"></div>
       <div id="mv-correo-auto" style="display:none"><div class="info-box verde"><div class="ib-lbl">📧 Correo automático</div><div class="ib-val" id="mv-correo-auto-val">—</div></div></div>
     </div>
     <div id="mv-cactus-wrap" style="display:none">
@@ -685,6 +695,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
       <div class="field" id="mv-perfil-f"><label>Nombre perfil</label><input type="text" id="mv-perfil" placeholder="Ej: María"/></div>
       <div class="field" id="mv-pin-f"><label>PIN</label><input type="text" id="mv-pin" placeholder="1234" maxlength="4"/></div>
     </div>
+    <div id="mv-perfiles-multi"></div>
   </div>
   <!-- Bloque Invitación (para Spotify, Google One, Canva y similares) -->
   <div id="mv-invitacion-bloque" style="display:none">
@@ -1227,7 +1238,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   </div>
   <div class="field"><label>Nombre del servicio</label><input type="text" id="srv-nombre" placeholder="Ej: Paramount+, Max, Duolingo..."/></div>
   <div class="field"><label>Emoji / ícono</label><input type="text" id="srv-emoji" placeholder="🌟" maxlength="4"/></div>
-  <div class="field"><label>Planes (uno por línea)</label><textarea id="srv-planes" placeholder="Perfil 1 mes&#10;Perfil 3 meses&#10;Plan familiar" style="height:80px"></textarea></div>
+  <div class="field"><label>Planes (uno por línea)</label><textarea id="srv-planes" placeholder="Perfil 1 mes&#10;Netflix combo | cupos=2 | cuentas=1&#10;Plan familiar | cupos=1" style="height:80px"></textarea></div>
   <div class="sec">Comportamiento del servicio</div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Perfil y PIN</div><div class="ts">Como Netflix, Disney: cada cliente tiene su perfil</div></div><label class="toggle"><input type="checkbox" id="srv-perfil"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Correo de Invitación</div><div class="ts">Como Spotify, Canva, Google One: se invita al cliente</div></div><label class="toggle"><input type="checkbox" id="srv-invitacion"><span class="toggle-slider"></span></label></div>
@@ -1530,7 +1541,7 @@ let _dashPeriodo = 'mes';
 let _dashDesde = ''; // para modo rango
 let _dashHasta = '';
 let _chartIngresos = null, _chartCostos = null;
-let _mvCuentaSelUID = null, _mvInvMode = true;
+let _mvCuentaSelUID = null, _mvCuentaSelUIDs = [], _mvInvMode = true;
 let _editCupoUID = null, _editCupoIdx = null;
 
 // ══════════════════════════════════════
@@ -1606,6 +1617,40 @@ function numVenta(){ return '#VTA-' + String(APP._ventaCounter).padStart(4,'0');
 function getSrv(uid){ return CATALOGO_SERVICIOS.find(s => s.uid === uid); }
 function getCat(uid){ return CATALOGO_CATEGORIAS.find(c => c.uid === uid); }
 function getCatGasto(uid){ return CATALOGO_CAT_GASTOS.find(c => c.uid === uid); }
+function planNombre(plan){
+  if(!plan) return '';
+  if(typeof plan === 'object') return plan.nombre || plan.name || 'Plan';
+  return String(plan).split('|')[0].trim();
+}
+function planConfigDesdeTexto(plan){
+  const cfg = { nombre: planNombre(plan), cupos: 1, cuentas: 1, duracion: null, precio: null };
+  if(!plan) return cfg;
+  if(typeof plan === 'object'){
+    cfg.cupos = Math.max(1, parseInt(plan.cupos || plan.cuposOcupa || 1) || 1);
+    cfg.cuentas = Math.max(1, parseInt(plan.cuentas || 1) || 1);
+    cfg.duracion = parseInt(plan.duracion || plan.dias || 0) || null;
+    cfg.precio = parseFloat(plan.precio);
+    if(isNaN(cfg.precio)) cfg.precio = null;
+    return cfg;
+  }
+  String(plan).split('|').slice(1).forEach(part => {
+    const [kRaw, vRaw] = part.split('=');
+    const k = (kRaw || '').trim().toLowerCase();
+    const v = (vRaw || '').trim();
+    if(k === 'cupos') cfg.cupos = Math.max(1, parseInt(v) || 1);
+    if(k === 'cuentas') cfg.cuentas = Math.max(1, parseInt(v) || 1);
+    if(k === 'dias' || k === 'duracion') cfg.duracion = parseInt(v) || null;
+    if(k === 'precio') cfg.precio = parseFloat(v);
+  });
+  if(/combo/i.test(cfg.nombre) && cfg.cupos < 2) cfg.cupos = 2;
+  if(isNaN(cfg.precio)) cfg.precio = null;
+  return cfg;
+}
+function getPlanConfig(srvUid, nombrePlan){
+  const srv = getSrv(srvUid);
+  const plan = (srv?.planes || []).find(p => planNombre(p) === nombrePlan) || nombrePlan;
+  return planConfigDesdeTexto(plan);
+}
 function normalizarFechasApp(){
   const listas = [
     APP.ventas || [],
@@ -1746,6 +1791,52 @@ function registrarCostoManualVenta(v, costoAdq, metodoAdq){
     notas: `Costo vinculado a venta ${v.id || v.uid}`
   });
   return true;
+}
+function indicesCuposVenta(v){
+  if(!v) return [];
+  if(Array.isArray(v.cupoIdxs) && v.cupoIdxs.length) return v.cupoIdxs.map(x => parseInt(x)).filter(x => !isNaN(x));
+  if(typeof v.cupoIdxs === 'string' && v.cupoIdxs.trim()){
+    return v.cupoIdxs.split(',').map(x => parseInt(x)).filter(x => !isNaN(x));
+  }
+  if(v.cupoIdx !== null && v.cupoIdx !== undefined && v.cupoIdx !== '') return [parseInt(v.cupoIdx)];
+  return [];
+}
+function asignacionesCuposVenta(v){
+  if(!v) return [];
+  if(Array.isArray(v.cuposAsignados)) return v.cuposAsignados.map(x => ({ cuentaUID: x.cuentaUID, cupoIdx: parseInt(x.cupoIdx) })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
+  if(typeof v.cuposAsignados === 'string' && v.cuposAsignados.trim()){
+    try {
+      const arr = JSON.parse(v.cuposAsignados);
+      if(Array.isArray(arr)) return arr.map(x => ({ cuentaUID: x.cuentaUID, cupoIdx: parseInt(x.cupoIdx) })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
+    } catch(e){}
+  }
+  return indicesCuposVenta(v).map(i => ({ cuentaUID: v.cuentaUID, cupoIdx: i })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
+}
+function liberarCuposDeVenta(v){
+  if(!v) return;
+  const asignaciones = asignacionesCuposVenta(v);
+  const porCuenta = {};
+  asignaciones.forEach(a => {
+    if(!porCuenta[a.cuentaUID]) porCuenta[a.cuentaUID] = new Set();
+    porCuenta[a.cuentaUID].add(a.cupoIdx);
+  });
+  APP.cuentas.forEach(cuenta => {
+    if(!Array.isArray(cuenta.cupos)) return;
+    const indices = porCuenta[cuenta.uid] || new Set();
+    cuenta.cupos.forEach((cu, i) => {
+      if(cu.ventaUid === v.uid || indices.has(i)) cuenta.cupos[i] = { estado: 'libre' };
+    });
+  });
+}
+function desvincularVentasDeCuenta(cuenta){
+  if(!cuenta) return;
+  APP.ventas.forEach(v => {
+    if(v.cuentaUID === cuenta.uid){
+      v.cuentaUID = null;
+      v.cupoIdx = null;
+      v.cupoIdxs = [];
+    }
+  });
 }
 
 // ══════════════════════════════════════
@@ -2155,7 +2246,7 @@ function evActSrv(){
   if(!srvUid) return;
   const srv = getSrv(srvUid);
   if(!srv) return;
-  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = p; planSel.appendChild(o); });
+  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = planNombre(p); planSel.appendChild(o); });
   // Poblar cuentas del inventario para este servicio
   const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
   if(origen === 'inventario'){
@@ -2418,6 +2509,7 @@ function eliminarVenta(ventaUid){
   if(!v) return;
   if(!confirm(`¿Eliminar la venta de ${v.cliente} — ${v.srvNom} ($${v.precio.toFixed(2)})?\n\nEsto la borrará del registro y de la contabilidad.`)) return;
   quitarCostosDeVenta(v);
+  liberarCuposDeVenta(v);
   APP.ventas = APP.ventas.filter(x => x.uid !== ventaUid);
   renderRegistro();
   renderCostos();
@@ -2425,6 +2517,42 @@ function eliminarVenta(ventaUid){
   actualizarSaldoBinance();
   renderBadgeVencimientos();
   sincronizarConSheets();
+}
+
+function abrirNuevaVenta(){
+  _mvCuentaSelUID = null;
+  _mvCuentaSelUIDs = [];
+  _mvInvMode = true;
+  ['mv-nombre','mv-wa','mv-precio','mv-perfil','mv-pin','mv-inv-correo','mv-notas','mv-cactus-correo','mv-cactus-pass','mv-cactus-costo'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  document.getElementById('mv-id').textContent = numVenta();
+  document.getElementById('mv-fecha').value = hoy();
+  document.getElementById('mv-dur').value = '30';
+  document.getElementById('mv-metodo').value = 'Efectivo';
+  document.getElementById('mv-estado').value = 'pagado';
+  document.getElementById('mv-cupos-plan').value = 1;
+  document.getElementById('mv-cuentas-plan').value = 1;
+  document.getElementById('mv-plan-cupos-row').style.display = 'none';
+  document.getElementById('mv-srv').innerHTML = '<option value="">— Elige categoría —</option>';
+  document.getElementById('mv-plan').innerHTML = '<option>— Elige servicio —</option>';
+  document.getElementById('mv-cupo').innerHTML = '<option value="">— Selecciona cupo —</option>';
+  document.getElementById('mv-cupos-multi').innerHTML = '';
+  document.getElementById('mv-perfiles-multi').innerHTML = '';
+  document.getElementById('mv-lista-cuentas').innerHTML = '';
+  document.getElementById('mv-inv-bloque').style.display = 'none';
+  document.getElementById('mv-cupo-wrap').style.display = 'none';
+  document.getElementById('mv-correo-auto').style.display = 'none';
+  document.getElementById('mv-perfil-bloque').style.display = 'none';
+  document.getElementById('mv-invitacion-bloque').style.display = 'none';
+  document.getElementById('mv-cuentas-wrap').style.display = 'block';
+  document.getElementById('mv-cactus-wrap').style.display = 'none';
+  document.getElementById('mv-toggle-lbl').textContent = 'Sí — elegir cuenta';
+  document.getElementById('mv-toggle-lbl').style.color = 'var(--green)';
+  mvPoblarCategorias();
+  mvCalcVence();
+  abrirModal('modal-nueva-venta');
 }
 
 // MODAL NUEVA VENTA — populate selects
@@ -2459,13 +2587,21 @@ function mvActSrv(){
   if(!srvUid || srvUid.startsWith('—')) return;
   const srv = getSrv(srvUid);
   if(!srv) return;
-  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = p; planSel.appendChild(o); });
+  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = planNombre(p); planSel.appendChild(o); });
 }
 function mvActPlan(){
   const srvUid = document.getElementById('mv-srv').value;
   if(!srvUid || srvUid.startsWith('—')) return;
   const srv = getSrv(srvUid);
   if(!srv) return;
+  const planTxt = document.getElementById('mv-plan').value;
+  const planCfg = getPlanConfig(srvUid, planTxt);
+  document.getElementById('mv-plan-cupos-row').style.display = 'grid';
+  document.getElementById('mv-cupos-plan').value = planCfg.cupos || 1;
+  document.getElementById('mv-cuentas-plan').value = planCfg.cuentas || 1;
+  if(planCfg.duracion) document.getElementById('mv-dur').value = String(planCfg.duracion);
+  if(planCfg.precio !== null) document.getElementById('mv-precio').value = planCfg.precio;
+  mvCalcVence();
   document.getElementById('mv-inv-bloque').style.display = 'block';
   // Perfil/PIN block
   if(srv.tienePerfil || srv.tienePin){
@@ -2487,7 +2623,10 @@ function mvActPlan(){
   const lista = document.getElementById('mv-lista-cuentas');
   lista.innerHTML = '';
   _mvCuentaSelUID = null;
+  _mvCuentaSelUIDs = [];
   document.getElementById('mv-cupo-wrap').style.display = 'none';
+  document.getElementById('mv-cupos-multi').innerHTML = '';
+  document.getElementById('mv-perfiles-multi').innerHTML = '';
   document.getElementById('mv-correo-auto').style.display = 'none';
   if(!disponibles.length){
     lista.innerHTML = '<div class="aviso">⚠️ Sin cuentas disponibles. Usa modo cactus.</div>';
@@ -2508,8 +2647,49 @@ function mvActPlan(){
   document.getElementById('mv-cuentas-wrap').style.display = 'block';
   document.getElementById('mv-cactus-wrap').style.display = 'none';
 }
+function mvCuposNecesarios(){
+  return Math.max(1, parseInt(document.getElementById('mv-cupos-plan')?.value || '1') || 1);
+}
+function mvCuentasNecesarias(){
+  return Math.max(1, parseInt(document.getElementById('mv-cuentas-plan')?.value || '1') || 1);
+}
+function mvActualizarCuposNecesarios(){
+  _mvCuentaSelUIDs = [];
+  _mvCuentaSelUID = null;
+  document.querySelectorAll('[id^="mv-cc-"]').forEach(el => {
+    el.style.background = 'var(--surface2)'; el.style.borderColor = 'var(--border)';
+  });
+  document.getElementById('mv-cupo-wrap').style.display = 'none';
+  document.getElementById('mv-cupos-multi').innerHTML = '';
+  document.getElementById('mv-perfiles-multi').innerHTML = '';
+  document.getElementById('mv-correo-auto').style.display = 'none';
+}
 function mvSelCuenta(u){
+  const cuentasNecesarias = mvCuentasNecesarias();
+  if(cuentasNecesarias > 1){
+    if(_mvCuentaSelUIDs.includes(u)) _mvCuentaSelUIDs = _mvCuentaSelUIDs.filter(x => x !== u);
+    else {
+      if(_mvCuentaSelUIDs.length >= cuentasNecesarias){
+        alert('Este plan usa ' + cuentasNecesarias + ' cuenta' + (cuentasNecesarias!==1?'s':'') + '. Quita una para elegir otra.');
+        return;
+      }
+      _mvCuentaSelUIDs.push(u);
+    }
+    _mvCuentaSelUID = _mvCuentaSelUIDs[0] || null;
+    document.querySelectorAll('[id^="mv-cc-"]').forEach(el => {
+      el.style.background = 'var(--surface2)'; el.style.borderColor = 'var(--border)';
+    });
+    _mvCuentaSelUIDs.forEach(id => {
+      const el = document.getElementById('mv-cc-' + id);
+      if(el){ el.style.background = 'var(--green-bg)'; el.style.borderColor = 'var(--green-border)'; }
+    });
+    document.getElementById('mv-cupo-wrap').style.display = 'none';
+    document.getElementById('mv-correo-auto').style.display = 'none';
+    mvRenderCuposMulti();
+    return;
+  }
   _mvCuentaSelUID = u;
+  _mvCuentaSelUIDs = [u];
   document.querySelectorAll('[id^="mv-cc-"]').forEach(el => {
     el.style.background = 'var(--surface2)'; el.style.borderColor = 'var(--border)';
   });
@@ -2518,18 +2698,63 @@ function mvSelCuenta(u){
   const cuenta = APP.cuentas.find(c => c.uid === u);
   if(!cuenta) return;
   const cupoSel = document.getElementById('mv-cupo');
+  const necesarios = mvCuposNecesarios();
   cupoSel.innerHTML = '<option value="">— Selecciona cupo —</option>';
+  cupoSel.multiple = necesarios > 1;
+  cupoSel.size = necesarios > 1 ? Math.min(6, necesarios + 1) : 1;
   cuenta.cupos.forEach((cu, i) => {
     if(cu.estado === 'libre'){
       const o = document.createElement('option'); o.value = i; o.textContent = 'Cupo ' + (i+1); cupoSel.appendChild(o);
     }
   });
+  if(necesarios > 1){
+    [...cupoSel.options].forEach((o, idx) => { if(idx > 0 && idx <= necesarios) o.selected = true; });
+  }
+  document.getElementById('mv-cupos-multi').innerHTML = '';
+  mvRenderPerfilesMulti();
   document.getElementById('mv-cupo-wrap').style.display = 'block';
   document.getElementById('mv-correo-auto').style.display = 'none';
+}
+function mvRenderCuposMulti(){
+  const wrap = document.getElementById('mv-cupos-multi');
+  const necesarios = mvCuposNecesarios();
+  if(mvCuentasNecesarias() <= 1 || !_mvCuentaSelUIDs.length){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = _mvCuentaSelUIDs.map(uidCuenta => {
+    const cuenta = APP.cuentas.find(c => c.uid === uidCuenta);
+    if(!cuenta) return '';
+    const opciones = (cuenta.cupos || []).map((cu, i) => cu.estado === 'libre' ? `<option value="${i}">Cupo ${i+1}</option>` : '').join('');
+    return `<div class="field" style="margin-top:8px">
+      <label>${esc(cuenta.id)} · ${esc(cuenta.correo || '')}</label>
+      <select class="mv-cupo-multi" data-cuenta="${esc(uidCuenta)}" multiple size="${Math.min(6, necesarios)}" onchange="mvRenderPerfilesMulti()">${opciones}</select>
+    </div>`;
+  }).join('');
+  mvRenderPerfilesMulti();
+}
+function mvSeleccionCupos(){
+  if(mvCuentasNecesarias() > 1){
+    return [...document.querySelectorAll('.mv-cupo-multi')].flatMap(sel =>
+      [...sel.selectedOptions].map(o => ({ cuentaUID: sel.dataset.cuenta, cupoIdx: parseInt(o.value) })).filter(x => !isNaN(x.cupoIdx))
+    );
+  }
+  const cupoSel = document.getElementById('mv-cupo');
+  return [...cupoSel.selectedOptions].map(o => ({ cuentaUID: _mvCuentaSelUID, cupoIdx: parseInt(o.value) })).filter(x => !isNaN(x.cupoIdx));
+}
+function mvRenderPerfilesMulti(){
+  const wrap = document.getElementById('mv-perfiles-multi');
+  const picks = mvSeleccionCupos();
+  if(picks.length <= 1){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="aviso" style="margin-top:8px">Configura perfil y PIN por cada cupo del combo.</div>` + picks.map((p, idx) => {
+    const cuenta = APP.cuentas.find(c => c.uid === p.cuentaUID);
+    return `<div class="row2" style="margin-top:7px">
+      <div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · Cupo ${p.cupoIdx + 1} perfil</label><input type="text" class="mv-perfil-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="Perfil ${idx+1}"/></div>
+      <div class="field"><label>PIN</label><input type="text" class="mv-pin-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="1234" maxlength="4"/></div>
+    </div>`;
+  }).join('');
 }
 function mvSelCupo(){
   const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
   if(!cuenta) return;
+  mvRenderPerfilesMulti();
   document.getElementById('mv-correo-auto').style.display = 'block';
   document.getElementById('mv-correo-auto-val').textContent = cuenta.correo;
 }
@@ -2591,20 +2816,36 @@ function mvGuardar(){
   const ventaIdNueva = numVenta();
   let costoAdqVenta = 0;
   let metodoAdqVenta = '';
-  let correo = '', cuentaUID = null, cupoIdx = null;
-  if(_mvInvMode && _mvCuentaSelUID){
-    cuentaUID = _mvCuentaSelUID;
-    cupoIdx = parseInt(document.getElementById('mv-cupo').value);
-    const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
-    correo = cuenta ? cuenta.correo : '';
-    if(cuenta && !isNaN(cupoIdx)){
-      cuenta.cupos[cupoIdx] = {
-        estado:'ocupado', cliente:nombre, wa:waInput,
-        perfil:sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50),
-        pin:sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10), vence,
-        ventaUid: ventaUidNueva
-      };
+  let correo = '', cuentaUID = null, cupoIdx = null, cupoIdxs = [], cuposAsignados = [];
+  if(_mvInvMode && (_mvCuentaSelUID || _mvCuentaSelUIDs.length)){
+    const seleccion = mvSeleccionCupos();
+    const necesarios = mvCuposNecesarios();
+    if(seleccion.length < necesarios){
+      alert('Selecciona ' + necesarios + ' cupo' + (necesarios!==1?'s':'') + ' para este plan');
+      return;
     }
+    cuposAsignados = seleccion.slice(0, necesarios);
+    cuentaUID = cuposAsignados[0]?.cuentaUID || _mvCuentaSelUID;
+    cupoIdx = cuposAsignados[0]?.cupoIdx ?? null;
+    cupoIdxs = cuposAsignados.filter(x => x.cuentaUID === cuentaUID).map(x => x.cupoIdx);
+    const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
+    correo = cuenta ? cuenta.correo : '';
+    const perfilGlobal = sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50);
+    const pinGlobal = sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10);
+    cuposAsignados.forEach(asig => {
+      const cuentaAsig = APP.cuentas.find(c => c.uid === asig.cuentaUID);
+      if(cuentaAsig && cuentaAsig.cupos && cuentaAsig.cupos[asig.cupoIdx]){
+        const perfilEl = document.querySelector(`.mv-perfil-multi[data-cuenta="${asig.cuentaUID}"][data-cupo="${asig.cupoIdx}"]`);
+        const pinEl = document.querySelector(`.mv-pin-multi[data-cuenta="${asig.cuentaUID}"][data-cupo="${asig.cupoIdx}"]`);
+        cuentaAsig.cupos[asig.cupoIdx] = {
+          estado:'ocupado', cliente:nombre, wa:waInput,
+          perfil:sanitizarTexto(perfilEl?.value || perfilGlobal, 50),
+          pin:sanitizarTexto(pinEl?.value || pinGlobal, 10), vence,
+          plan: planNombre(document.getElementById('mv-plan').value),
+          ventaUid: ventaUidNueva
+        };
+      }
+    });
   } else if(!_mvInvMode){
     correo = sanitizarTexto(document.getElementById('mv-cactus-correo').value, 200);
     const costoAdq = sanitizarNumero(document.getElementById('mv-cactus-costo').value);
@@ -2669,7 +2910,7 @@ function mvGuardar(){
     metodo: sanitizarTexto(document.getElementById('mv-metodo').value, 50),
     estado: sanitizarTexto(document.getElementById('mv-estado').value, 50),
     notas: sanitizarTexto(document.getElementById('mv-notas').value, 500),
-    cuentaUID, cupoIdx, costoAdq: costoAdqVenta, metodoAdq: metodoAdqVenta,
+    cuentaUID, cupoIdx, cupoIdxs, cuposAsignados, costoAdq: costoAdqVenta, metodoAdq: metodoAdqVenta,
     activa: true, creado: new Date().toISOString()
   };
   APP.ventas.push(venta);
@@ -2695,11 +2936,11 @@ function invFiltrar(f, btn){
 
 function renderInventario(){
   // ── Cuentas formales ──────────────────────────────────────
-  const cuentasFormales = [...APP.cuentas];
+  const cuentasFormales = (APP.cuentas || []).filter(c => !c.archivada && !c.eliminada);
 
   // ── Ventas sin cuenta asignada → cuentas virtuales ────────
   // Incluir TODAS: activas, vencidas, sin correo también
-  const ventasSinCuenta = APP.ventas.filter(v => !v.cuentaUID);
+  const ventasSinCuenta = APP.ventas.filter(v => !v.cuentaUID && v.activa !== false);
   // Agrupar por correo si tienen, sino cada una es su propia "cuenta"
   const porCorreo = {};
   ventasSinCuenta.forEach(v => {
@@ -2775,6 +3016,25 @@ function renderInventario(){
     const lib = c.cupos.filter(cu => cu.estado==='libre').length;
     const ocu = c.cupos.filter(cu => cu.estado==='ocupado').length;
     const srv = getSrv(c.srvUid);
+    const ventasUids = new Set((c.cupos || []).map(cu => cu.ventaUid).filter(Boolean));
+    const ventasCuenta = (APP.ventas || []).filter(v => v.activa !== false && (v.cuentaUID === c.uid || ventasUids.has(v.uid)));
+    const ventaIdsCuenta = new Set(ventasCuenta.map(v => v.uid));
+    const cuposOcupadosSinVenta = (c.cupos || []).filter(cu => cu.estado === 'ocupado' && (!cu.ventaUid || !ventaIdsCuenta.has(cu.ventaUid))).length;
+    const estimadoSinVenta = cuposOcupadosSinVenta * (parseFloat(c.pventa) || 0);
+    const cobradoCuenta = ventasCuenta.filter(v => v.estado === 'pagado').reduce((s,v) => s + (parseFloat(v.precio)||0), 0);
+    const porCobrarCuenta = ventasCuenta.filter(v => v.estado !== 'pagado').reduce((s,v) => s + (parseFloat(v.precio)||0), 0) + estimadoSinVenta;
+    const produciraCuenta = cobradoCuenta + porCobrarCuenta;
+    const costoCuenta = parseFloat(c.costo) || 0;
+    const liquidezReal = cobradoCuenta - costoCuenta;
+    const liquidezProyectada = produciraCuenta - costoCuenta;
+    const money = n => n < 0 ? '-$' + Math.abs(n).toFixed(2) : '$' + n.toFixed(2);
+    const prodHtml = ocu > 0 ? `<div class="prod-grid">
+      <div class="prod-mini verde"><div class="pl">Cobrado</div><div class="pv">${money(cobradoCuenta)}</div></div>
+      <div class="prod-mini naranja"><div class="pl">Por cobrar</div><div class="pv">${money(porCobrarCuenta)}</div></div>
+      <div class="prod-mini azul"><div class="pl">Producira</div><div class="pv">${money(produciraCuenta)}</div></div>
+      <div class="prod-mini ${liquidezReal >= 0 ? 'verde' : 'rojo'}"><div class="pl">Liq. real</div><div class="pv">${money(liquidezReal)}</div></div>
+      <div class="prod-mini ${liquidezProyectada >= 0 ? 'verde' : 'rojo'}" style="grid-column:1/-1"><div class="pl">Liq. total</div><div class="pv">${money(liquidezProyectada)}</div></div>
+    </div>` : '';
     // Calcular costo por cupo vendido (distribución inteligente)
     const costoPorCupoVendido = ocu > 0 && c.costo > 0 ? (c.costo / ocu).toFixed(2) : null;
     // Badge de vigencia de cuenta madre
@@ -2827,6 +3087,7 @@ function renderInventario(){
         <div style="flex:1;min-width:0">
           <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
           <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
+          ${prodHtml}
           ${costoPorCupoVendido ? `<div style="font-size:10px;color:var(--orange);margin-top:2px">💡 $${costoPorCupoVendido}/cupo vendido</div>` : ''}
           ${!c.esVirtual ? (()=>{
             if(!c.hasta){
@@ -3003,9 +3264,20 @@ function ncRenovarCuenta(){
 }
 
 function eliminarCuenta(uid){
-  if(!confirm('¿Eliminar esta cuenta? Se perderán los datos de cupos.')) return;
+  const c = APP.cuentas.find(x => x.uid === uid);
+  if(!c) return;
+  const ocupados = (c.cupos || []).filter(cu => cu.estado === 'ocupado').length;
+  const msg = ocupados > 0
+    ? `Esta cuenta tiene ${ocupados} cupo(s) ocupado(s).\n\nSe quitara del inventario y las ventas quedaran sin cuenta asignada. ¿Continuar?`
+    : '¿Eliminar esta cuenta del inventario?';
+  if(!confirm(msg)) return;
+  desvincularVentasDeCuenta(c);
   APP.cuentas = APP.cuentas.filter(c => c.uid !== uid);
   renderInventario();
+  renderRegistro();
+  renderVencimientos();
+  renderDashboard();
+  sincronizarConSheets();
 }
 
 function abrirEditarCupo(cuentaUID, cupoIdx){
@@ -3474,7 +3746,7 @@ function renActSrv(){
   if(!srvUid) return;
   const srv = getSrv(srvUid);
   if(!srv) return;
-  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = p; planSel.appendChild(o); });
+  (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = planNombre(p); planSel.appendChild(o); });
   const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
   if(origen === 'inventario'){
     APP.cuentas.filter(c => c.srvUid === srvUid).forEach(c => {
@@ -4250,6 +4522,7 @@ function ccSelCuentaRepo(){
 }
 
 function ccRegistrarCostoConFIFO(monto, metodo, desc, fecha, catUid, cuentaUID){
+  if(monto <= 0) return true;
   const esUsdt = metodo.toLowerCase().includes('usdt') || metodo.toLowerCase().includes('binance');
   let montoUSD = monto, usdtUsado = 0;
   if(esUsdt && monto > 0){
@@ -4280,7 +4553,7 @@ function ccGuardar(){
   if(accion === 'reembolso'){
     // Registrar reembolso por cada cliente afectado (o solo el seleccionado)
     const monto = parseFloat(document.getElementById('cc-rem-monto').value) || 0;
-    if(monto <= 0){ alert('Ingresa el monto del reembolso'); return; }
+    if(monto < 0){ alert('El reembolso no puede ser negativo'); return; }
     const metodo = document.getElementById('cc-rem-metodo').value;
     const fecha = document.getElementById('cc-rem-fecha').value || hoyStr;
     const notas = document.getElementById('cc-rem-notas').value || 'Cuenta caída';
@@ -4308,7 +4581,7 @@ function ccGuardar(){
       });
     }
     // Registrar el reembolso también como gasto
-    ccRegistrarCostoConFIFO(monto, metodo, `Reembolso por cuenta caída — ${srvNom} (${c.id})`, fecha, 'cg-otro', cuentaUID);
+    if(monto > 0) ccRegistrarCostoConFIFO(monto, metodo, `Reembolso por cuenta caída — ${srvNom} (${c.id})`, fecha, 'cg-otro', cuentaUID);
 
   } else {
     // REPOSICIÓN
@@ -4378,6 +4651,12 @@ function ccGuardar(){
         ccRegistrarCostoConFIFO(costoNuevo, metodoNuevo, `Nueva cuenta reposición — ${srvNom} (${nuevaCuenta.id})`, hoyStr, 'cg-cuentas', nuevaCuenta.uid);
       }
     }
+  }
+
+  if(c.cupos && c.cupos.every(cu => cu.estado !== 'ocupado')){
+    c.archivada = true;
+    c.fechaArchivo = hoyStr;
+    c.motivoArchivo = 'Cuenta caida';
   }
 
   cerrarModal('modal-cuenta-caida');
@@ -4953,7 +5232,7 @@ function renderCatalogos(){
     return `<div class="catalog-item">
       <div class="catalog-left">
         <div class="catalog-name">${esc(s.emoji)} ${esc(s.nombre)}</div>
-        <div class="catalog-sub">${cat?esc(cat.emoji)+' '+esc(cat.nombre):'?'} · ${s.planes.length} plan${s.planes.length!==1?'es':''} · ${esc(comportamiento)}</div>
+        <div class="catalog-sub">${cat?esc(cat.emoji)+' '+esc(cat.nombre):'?'} · ${(s.planes||[]).length} plan${(s.planes||[]).length!==1?'es':''} · ${esc(comportamiento)}</div>
       </div>
       <div class="catalog-actions">
         <button class="btn-sm" onclick="abrirEditarServicio('${esc(s.uid)}')">✏️</button>
@@ -5026,7 +5305,7 @@ function abrirEditarServicio(suid){
     document.getElementById('srv-cat').value = s.catUid;
     document.getElementById('srv-nombre').value = s.nombre;
     document.getElementById('srv-emoji').value = s.emoji;
-    document.getElementById('srv-planes').value = s.planes.join('\n');
+    document.getElementById('srv-planes').value = (s.planes || []).map(p => typeof p === 'object' ? `${planNombre(p)} | cupos=${p.cupos || 1} | cuentas=${p.cuentas || 1}` : p).join('\n');
     document.getElementById('srv-perfil').checked = s.tienePerfil;
     document.getElementById('srv-invitacion').checked = s.tieneInvitacion;
     document.getElementById('srv-pass').checked = s.tienePass;
@@ -5474,8 +5753,13 @@ async function sincronizarConSheets(){
   return _sincronizarBackground(payload);
 }
 function construirPayload(){
+  const ventasPayload = (APP.ventas || []).map(v => ({
+    ...v,
+    cupoIdxs: Array.isArray(v.cupoIdxs) ? v.cupoIdxs.join(',') : (v.cupoIdxs || ''),
+    cuposAsignados: Array.isArray(v.cuposAsignados) ? JSON.stringify(v.cuposAsignados) : (v.cuposAsignados || '')
+  }));
   return {
-    ventas: APP.ventas, cuentas: APP.cuentas, costos: APP.costos,
+    ventas: ventasPayload, cuentas: APP.cuentas, costos: APP.costos,
     recargas: APP.recargas, reembolsos: APP.reembolsos,
     movimientosBinance: APP.movimientosBinance || [],
     ventasEliminadas: APP.ventasEliminadas || [],  // lista negra de UIDs eliminados
@@ -5585,6 +5869,7 @@ function normalizarCuenta(c){
     desde: parsearFecha(c.desde) || c.desde || '',
     hasta: parsearFecha(c.hasta) || c.hasta || '',
     costo: parseFloat(c.costo) || 0,
+    archivada: c.archivada === true || c.archivada === 'TRUE' || c.archivada === 'true',
     cupos: Array.isArray(c.cupos) ? c.cupos.map(cu => ({
       ...cu,
       vence: parsearFecha(cu.vence) || cu.vence || ''
@@ -5594,12 +5879,25 @@ function normalizarCuenta(c){
 function normalizarVenta(v){
   const fecha = parsearFecha(v.fecha) || hoy();
   const vence = parsearFecha(v.vence) || fecha;
+  const cupoIdxs = Array.isArray(v.cupoIdxs)
+    ? v.cupoIdxs.map(x => parseInt(x)).filter(x => !isNaN(x))
+    : (typeof v.cupoIdxs === 'string' && v.cupoIdxs.trim()
+      ? v.cupoIdxs.split(',').map(x => parseInt(x)).filter(x => !isNaN(x))
+      : []);
+  let cuposAsignados = [];
+  if(Array.isArray(v.cuposAsignados)) cuposAsignados = v.cuposAsignados;
+  else if(typeof v.cuposAsignados === 'string' && v.cuposAsignados.trim()){
+    try { const parsed = JSON.parse(v.cuposAsignados); if(Array.isArray(parsed)) cuposAsignados = parsed; } catch(e){}
+  }
+  cuposAsignados = cuposAsignados.map(x => ({ cuentaUID: x.cuentaUID, cupoIdx: parseInt(x.cupoIdx) })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
   // Corregir número WA si está truncado
   const waCorregido = normalizarWA(v.wa, v.uid);
   return {
     ...v,
     fecha,
     vence,
+    cupoIdxs,
+    cuposAsignados,
     dias:   (parseInt(v.dias) > 0) ? parseInt(v.dias) : 30,
     precio: isNaN(parseFloat(v.precio)) ? 0 : parseFloat(v.precio),
     activa: (v.activa === 'false' || v.activa === false) ? false : true,
