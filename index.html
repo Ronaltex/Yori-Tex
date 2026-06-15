@@ -114,6 +114,20 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .filters::-webkit-scrollbar{display:none}
 .filter-btn{padding:5px 13px;border-radius:99px;font-size:12px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;color:var(--text2);white-space:nowrap;flex-shrink:0;font-weight:500}
 .filter-btn.active{background:var(--orange);border-color:var(--orange);color:var(--bg);font-weight:700}
+.inv-status-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:-2px 0 12px}
+.inv-status-btn{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:10px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer}
+.inv-status-btn.active{background:var(--orange);border-color:var(--orange);color:var(--bg)}
+.inv-service-filters{display:flex;gap:6px;margin:-6px 0 12px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.inv-service-filters::-webkit-scrollbar{display:none}
+.inv-service-filters:empty{display:none}
+.inv-service-btn{padding:6px 12px;border-radius:10px;font-size:11px;border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--text2);white-space:nowrap;font-weight:700;cursor:pointer}
+.inv-service-btn.active{background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue)}
+.inv-section{margin:16px 0 8px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,.045),rgba(255,255,255,.015));display:flex;align-items:center;justify-content:space-between;gap:8px}
+.inv-section-title{font-size:12px;font-weight:800;color:var(--white);display:flex;align-items:center;gap:7px;min-width:0}
+.inv-section-title span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inv-section-counts{display:flex;gap:5px;flex-shrink:0}
+.inv-service-title{font-size:11px;font-weight:800;color:var(--orange);margin:12px 0 7px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.inv-plan-title{font-size:10px;font-weight:700;color:var(--text2);margin:8px 0 6px;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
 .id-badge{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .id-badge .il{font-size:11px;color:var(--text3)}.id-badge .iv{font-size:14px;font-weight:700;color:var(--orange)}
 .vence-box{background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;margin-top:6px}
@@ -235,6 +249,493 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .pin-btn:active{background:var(--orange);color:var(--bg)}
 @keyframes pinShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .pin-shake{animation:pinShake .4s ease}
+
+/* VISUAL REFRESH v1 - YORI-TEX Control Panel */
+:root{
+  --bg:#091421;
+  --surface:#101d2d;
+  --surface2:#17283e;
+  --surface3:#1d314b;
+  --border:rgba(137,165,204,.18);
+  --orange:#f5a623;
+  --orange2:#ffbe4a;
+  --text:#edf4ff;
+  --text2:#9fb4d1;
+  --text3:#627a99;
+}
+body{
+  background:
+    linear-gradient(180deg,#07111e 0%,#0b1928 44%,#091421 100%);
+  padding-bottom:86px;
+}
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(180deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:32px 32px;
+  opacity:.16;
+  z-index:0;
+}
+body::after{
+  content:'';
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  opacity:0;
+  background-position:center 42%;
+  background-repeat:no-repeat;
+  background-size:min(72vw,320px) auto;
+  transition:opacity .25s ease,background-size .25s ease;
+}
+body.bg-watermark::after{
+  opacity:calc(var(--bg-opacity,16) / 100);
+  background-image:var(--bg-watermark);
+}
+body.bg-image::before{
+  background:
+    linear-gradient(180deg,rgba(9,20,33,.76),rgba(9,20,33,.93)),
+    var(--bg-photo);
+  background-size:cover;
+  background-position:center;
+  opacity:1;
+}
+body.bg-solid{
+  background:linear-gradient(180deg,var(--bg-custom,#091421),#091421);
+}
+.app-header{
+  min-height:64px;
+  padding:12px 16px;
+  background:rgba(9,20,33,.86);
+  border-bottom:1px solid rgba(245,166,35,.18);
+  backdrop-filter:blur(14px);
+  box-shadow:0 10px 28px rgba(0,0,0,.22);
+}
+.logo-hex{
+  width:44px;
+  height:44px;
+  border-radius:10px;
+  box-shadow:0 0 0 1px rgba(245,166,35,.18),0 10px 24px rgba(0,0,0,.28);
+}
+.logo-hex img{border-radius:10px}
+.logo-text{
+  font-size:17px;
+  font-weight:850;
+  letter-spacing:.6px;
+}
+.header-right{font-size:11px;color:var(--text2)}
+.screen{padding:20px 12px 14px;position:relative;z-index:1}
+.page-title{
+  font-size:22px;
+  line-height:1.05;
+  letter-spacing:0;
+  margin-bottom:6px;
+}
+.page-sub{font-size:13px;color:var(--text2);margin-bottom:16px}
+.bottom-nav{
+  bottom:10px;
+  width:calc(100% - 18px);
+  border:1px solid rgba(137,165,204,.18);
+  border-radius:16px;
+  background:rgba(12,25,40,.9);
+  backdrop-filter:blur(16px);
+  box-shadow:0 16px 34px rgba(0,0,0,.36);
+  overflow:hidden;
+}
+.nav-item{
+  padding:9px 2px 10px;
+  transition:background .18s ease,color .18s ease,transform .18s ease;
+}
+.nav-item.active{
+  background:rgba(245,166,35,.11);
+  color:var(--orange);
+}
+.nav-item.active::before{
+  content:'';
+  position:absolute;
+  top:0;
+  width:26px;
+  height:3px;
+  border-radius:0 0 99px 99px;
+  background:var(--orange);
+}
+.nav-item:active{transform:translateY(1px)}
+.nav-item .ni{font-size:20px}
+.nav-item .nl{font-size:9.5px}
+.kpi,.card,.cuenta-card,.ven-card,.cfg-section,.chart-wrap,.plantilla-card,.reemb-card,.saldo-box{
+  border-radius:10px;
+  border-color:rgba(137,165,204,.18);
+  box-shadow:0 12px 26px rgba(0,0,0,.18);
+}
+.kpi{
+  padding:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+}
+.kpi .kl{text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+.kpi .kv{font-size:25px;line-height:1.05}
+.btn{
+  border-radius:10px;
+  min-height:42px;
+  transition:transform .16s ease,filter .16s ease,background .16s ease,border-color .16s ease;
+}
+.btn:active{transform:translateY(1px);opacity:1}
+.btn-primary{
+  background:linear-gradient(180deg,var(--orange2),var(--orange));
+  box-shadow:0 10px 22px rgba(245,166,35,.22);
+}
+.btn-navy,.field input,.field select,.field textarea,.search-wrap input{
+  background:rgba(23,40,62,.9);
+  border-color:rgba(137,165,204,.18);
+}
+.field input:focus,.field select:focus,.field textarea:focus,.search-wrap input:focus{
+  border-color:rgba(245,166,35,.7);
+  box-shadow:0 0 0 3px rgba(245,166,35,.12);
+}
+.filter-btn,.inv-status-btn,.inv-service-btn,.chip,.badge{
+  border-radius:10px;
+}
+.filter-btn{
+  padding:7px 13px;
+  background:rgba(23,40,62,.86);
+}
+.filter-btn.active,.inv-status-btn.active{
+  background:linear-gradient(180deg,var(--orange2),var(--orange));
+  border-color:rgba(245,166,35,.9);
+}
+.inv-service-btn.active{
+  background:rgba(59,158,222,.18);
+  box-shadow:inset 0 0 0 1px rgba(59,158,222,.18);
+}
+.inv-section{
+  border-radius:10px;
+  border-color:rgba(245,166,35,.2);
+  background:linear-gradient(180deg,rgba(245,166,35,.1),rgba(255,255,255,.025));
+}
+.inv-service-title{
+  padding:0 2px;
+  letter-spacing:0;
+}
+.cuenta-card{
+  background:rgba(16,29,45,.92);
+}
+.cuenta-hdr{
+  padding:13px 13px;
+}
+.cuenta-nombre{font-size:14px;font-weight:750}
+.cuenta-correo{font-size:11.5px}
+.prod-mini{
+  border-radius:8px;
+  background:rgba(255,255,255,.045);
+}
+.ven-card{
+  border-radius:10px;
+  background:rgba(16,29,45,.92);
+}
+.cost-row,.hist-row,.rank-row,.cfg-row,.cupo-row{
+  border-color:rgba(137,165,204,.14);
+}
+.modal-overlay.open .modal-sheet{
+  animation:modalRise .2s ease both;
+}
+.modal-sheet{
+  border-radius:18px 18px 0 0;
+  background:rgba(16,29,45,.98);
+  box-shadow:0 -24px 50px rgba(0,0,0,.44);
+}
+.modal-title{font-size:16px}
+.empty{
+  background:rgba(255,255,255,.025);
+  border:1px dashed rgba(137,165,204,.18);
+  border-radius:12px;
+  padding:28px 10px;
+}
+@keyframes modalRise{from{opacity:.75;transform:translateY(18px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+
+/* VISUAL REFRESH v2 - screens and flow polish */
+#pin-screen{
+  background:
+    linear-gradient(180deg,rgba(7,17,30,.92),rgba(9,20,33,.98)),
+    radial-gradient(circle at 50% 18%,rgba(245,166,35,.2),transparent 34%)!important;
+}
+#pin-screen > div:first-child{
+  width:72px;
+  height:72px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:18px;
+  background:rgba(245,166,35,.12);
+  border:1px solid rgba(245,166,35,.28);
+  box-shadow:0 18px 40px rgba(0,0,0,.3);
+}
+.pin-btn{
+  border-radius:18px;
+  background:rgba(16,29,45,.94);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(0,0,0,.2);
+}
+#s-registro > div:first-child,
+#s-inventario > div:first-child,
+#s-vencimientos > div:first-child,
+#s-dashboard > div:first-child,
+#s-costos > div:first-child,
+#s-config > .page-title{
+  position:relative;
+}
+#s-registro > div:first-child,
+#s-inventario > div:first-child,
+#s-vencimientos > div:first-child,
+#s-dashboard > div:first-child,
+#s-costos > div:first-child{
+  padding:14px;
+  margin-bottom:14px!important;
+  border:1px solid rgba(245,166,35,.18);
+  border-radius:14px;
+  background:linear-gradient(135deg,rgba(245,166,35,.1),rgba(16,29,45,.52) 48%,rgba(255,255,255,.025));
+  box-shadow:0 14px 30px rgba(0,0,0,.2);
+  overflow:hidden;
+}
+#s-registro > div:first-child::after,
+#s-inventario > div:first-child::after,
+#s-vencimientos > div:first-child::after,
+#s-dashboard > div:first-child::after,
+#s-costos > div:first-child::after{
+  content:'';
+  position:absolute;
+  right:-24px;
+  top:-32px;
+  width:112px;
+  height:112px;
+  border-radius:50%;
+  border:1px solid rgba(245,166,35,.16);
+  background:rgba(245,166,35,.04);
+  pointer-events:none;
+}
+#s-config > .page-title{
+  padding:14px 14px 0;
+}
+#s-config > .page-title + .page-sub{
+  padding:0 14px 14px;
+  border:1px solid rgba(245,166,35,.18);
+  border-top:none;
+  border-radius:0 0 14px 14px;
+  background:linear-gradient(135deg,rgba(245,166,35,.08),rgba(16,29,45,.44));
+}
+.sec{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#b8c8df;
+  margin-top:18px;
+}
+.sec::before{
+  content:'';
+  width:4px;
+  height:14px;
+  border-radius:99px;
+  background:var(--orange);
+  box-shadow:0 0 12px rgba(245,166,35,.34);
+}
+.kpi{
+  position:relative;
+  overflow:hidden;
+}
+.kpi::after{
+  content:'';
+  position:absolute;
+  inset:auto -20px -34px auto;
+  width:86px;
+  height:86px;
+  border-radius:50%;
+  background:rgba(255,255,255,.04);
+  pointer-events:none;
+}
+.kpi .kl,.kpi .kv,.kpi .ksub{position:relative;z-index:1}
+.search-wrap input{
+  min-height:40px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.filters,.inv-service-filters{
+  mask-image:linear-gradient(90deg,#000 86%,transparent);
+}
+.cuenta-card,.ven-card,.card,.cfg-section,.chart-wrap,.plantilla-card,.reemb-card{
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.cuenta-card:active,.ven-card:active,.cfg-row:active,.hist-row:active,.cost-row:active{
+  transform:scale(.992);
+}
+.cuenta-hdr{
+  background:linear-gradient(180deg,rgba(255,255,255,.025),transparent);
+}
+.cupos-list{
+  background:rgba(5,12,22,.18);
+}
+.hist-row,.cost-row,.rank-row,.catalog-item,.cfg-row{
+  min-height:58px;
+}
+.hist-nombre,.cost-desc,.rank-nombre,.cfg-label,.catalog-name{
+  font-weight:650;
+}
+.hist-sub,.cost-sub,.rank-sub,.cfg-sub,.catalog-sub{
+  color:#7890ad;
+}
+.tabs{
+  padding:3px;
+  gap:3px;
+  background:rgba(23,40,62,.72);
+  border-radius:12px;
+}
+.tab{
+  border-radius:9px;
+  transition:background .16s ease,color .16s ease,transform .16s ease;
+}
+.tab:active{transform:translateY(1px)}
+.tab.active{
+  background:linear-gradient(180deg,var(--orange2),var(--orange));
+  box-shadow:0 8px 18px rgba(245,166,35,.16);
+}
+.logo-upload-area{
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+  border-radius:14px;
+}
+.logo-placeholder{
+  border-radius:14px;
+  box-shadow:0 12px 24px rgba(0,0,0,.22);
+}
+.modal-overlay{
+  backdrop-filter:blur(5px);
+}
+.modal-handle{
+  width:44px;
+  height:5px;
+  background:rgba(159,180,209,.35);
+}
+.modal-title{
+  padding-bottom:10px;
+  border-bottom:1px solid rgba(137,165,204,.12);
+}
+
+/* VISUAL REFRESH v3 - inventory account cards */
+.cuenta-card{
+  position:relative;
+  border-radius:15px!important;
+  overflow:hidden;
+  background:linear-gradient(180deg,rgba(17,35,56,.94),rgba(11,23,38,.94))!important;
+}
+.cuenta-card::before{
+  content:'';
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:4px;
+  background:rgba(137,165,204,.28);
+}
+.cuenta-card.disp::before{background:linear-gradient(180deg,var(--green),rgba(32,211,136,.35))}
+.cuenta-card.llena::before{background:linear-gradient(180deg,var(--red),rgba(255,91,82,.34))}
+.cuenta-card.vacia::before{background:linear-gradient(180deg,var(--blue),rgba(66,178,255,.3))}
+.cuenta-card.auto::before{background:linear-gradient(180deg,var(--yellow),rgba(255,199,59,.28))}
+.cuenta-hdr{
+  padding:14px 13px 12px!important;
+}
+.cuenta-nombre{
+  font-size:15px;
+  letter-spacing:0;
+}
+.cuenta-correo{
+  margin-top:3px;
+  line-height:1.35;
+  word-break:break-word;
+  color:#7890ad;
+}
+.account-state{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  margin-top:8px;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  background:rgba(137,165,204,.1);
+  color:#9fb4d1;
+  border:1px solid rgba(137,165,204,.16);
+}
+.account-state.disp{color:var(--green);background:rgba(32,211,136,.1);border-color:rgba(32,211,136,.22)}
+.account-state.llena{color:var(--red);background:rgba(255,91,82,.1);border-color:rgba(255,91,82,.22)}
+.account-state.vacia{color:var(--blue);background:rgba(66,178,255,.1);border-color:rgba(66,178,255,.2)}
+.account-state.auto{color:var(--yellow);background:rgba(255,199,59,.09);border-color:rgba(255,199,59,.2)}
+.prod-grid{
+  margin-top:12px!important;
+  padding-top:11px;
+  border-top:1px solid rgba(137,165,204,.12);
+}
+.prod-mini{
+  min-height:46px;
+  padding:8px 9px!important;
+  border-radius:9px!important;
+}
+.prod-mini .pl{
+  font-size:8px!important;
+  letter-spacing:.05em;
+}
+.prod-mini .pv{
+  margin-top:3px;
+  font-size:13px!important;
+}
+.cupos-list{
+  padding:8px 11px 11px!important;
+  background:linear-gradient(180deg,rgba(5,12,22,.2),rgba(7,16,28,.36))!important;
+}
+.cupo-row{
+  border:1px solid rgba(137,165,204,.12)!important;
+  background:rgba(18,34,54,.58);
+  border-radius:10px;
+  margin:7px 0;
+  padding:9px 10px!important;
+}
+.cupo-row:last-child{
+  border-bottom:1px solid rgba(137,165,204,.12)!important;
+}
+.cupo-cliente{
+  font-size:13px;
+  font-weight:750;
+}
+.cupo-sub{
+  margin-top:2px;
+  color:#7890ad;
+}
+.cuenta-card .btn-sm{
+  min-width:28px;
+  height:28px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  background:rgba(137,165,204,.08);
+}
+.field label{
+  color:#a9bad2;
+}
+.field input,.field select,.field textarea{
+  min-height:42px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.msg-preview{
+  background:rgba(5,12,22,.28);
+}
+@media (min-width:431px){
+  body{box-shadow:0 0 0 1px rgba(137,165,204,.12),0 0 60px rgba(0,0,0,.35)}
+}
 </style>
 </head>
 <body>
@@ -332,6 +833,13 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   </div>
   <div class="filters" id="inv-filtros">
     <button class="filter-btn active" onclick="invFiltrar('todos',this)">Todos</button>
+  </div>
+  <div class="inv-service-filters" id="inv-servicios-filtros"></div>
+  <div class="inv-status-filters" id="inv-status-filtros">
+    <button class="inv-status-btn active" onclick="invEstadoFiltrar('todos',this)">Todo</button>
+    <button class="inv-status-btn" onclick="invEstadoFiltrar('libres',this)">Libres</button>
+    <button class="inv-status-btn" onclick="invEstadoFiltrar('ocupadas',this)">Ocup.</button>
+    <button class="inv-status-btn" onclick="invEstadoFiltrar('llenas',this)">Llenas</button>
   </div>
   <div id="inv-lista"></div>
 </div>
@@ -485,6 +993,31 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
         <div class="field"><label>Nombre del negocio</label><input type="text" id="cfg-nombre" placeholder="YORI-TEX" oninput="actualizarMarca()"></div>
         <div class="field"><label>Slogan</label><input type="text" id="cfg-slogan" placeholder="Streaming premium para todos 🚀"></div>
         <div class="field"><label>Tu WhatsApp (para firma)</label><input type="tel" id="cfg-wa" placeholder="+593 99 999 9999"></div>
+      </div>
+    </div>
+    <div class="cfg-section">
+      <div class="cfg-section-title">Fondo visual</div>
+      <div style="padding:14px">
+        <div class="field">
+          <label>Tipo de fondo</label>
+          <select id="cfg-fondo-modo" onchange="aplicarFondoMarca()">
+            <option value="normal">Normal premium</option>
+            <option value="watermark">Marca de agua con logo/isotipo</option>
+            <option value="solid">Color personalizado</option>
+            <option value="image">Imagen subida</option>
+          </select>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Color base</label><input type="color" id="cfg-fondo-color" value="#091421" oninput="aplicarFondoMarca()"></div>
+          <div class="field"><label>Intensidad</label><input type="range" id="cfg-fondo-opacidad" min="6" max="34" value="16" oninput="aplicarFondoMarca()"></div>
+        </div>
+        <div class="logo-upload-area" onclick="document.getElementById('fondo-input').click()" style="padding:14px;margin-bottom:8px">
+          <div class="logo-placeholder" id="cfg-fondo-preview" style="width:54px;height:54px;font-size:18px">BG</div>
+          <div style="font-size:12px;color:var(--text2)">Subir isotipo o imagen de fondo</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">Se oscurece automaticamente para que se lea bien</div>
+          <input type="file" id="fondo-input" accept="image/*" style="display:none" onchange="subirFondoApp(this)">
+        </div>
+        <button class="btn btn-navy" style="min-height:36px;font-size:12px" onclick="quitarFondoApp()">Quitar imagen de fondo</button>
       </div>
     </div>
     <div class="cfg-section">
@@ -1347,6 +1880,10 @@ let APP = {
     wa: '',
     firma: '— Cualquier consulta escríbeme 😊\nYORI-TEX | Streaming Premium 🔥',
     logo: null,
+    fondoModo: 'normal',
+    fondoColor: '#091421',
+    fondoImagen: null,
+    fondoOpacidad: 16,
     notifVenc: true
   }
 };
@@ -3038,10 +3575,25 @@ function mvGuardar(){
 // INVENTARIO
 // ══════════════════════════════════════
 let _invBusq = '';
+let _invEstado = 'todos';
+let _invServicio = 'todos';
 function invBuscar(v){ _invBusq = v; renderInventario(); }
 function invFiltrar(f, btn){
   APP._filtroInv = f;
+  _invServicio = 'todos';
   document.querySelectorAll('#inv-filtros .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderInventario();
+}
+function invServicioFiltrar(f, btn){
+  _invServicio = f;
+  document.querySelectorAll('#inv-servicios-filtros .inv-service-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderInventario();
+}
+function invEstadoFiltrar(f, btn){
+  _invEstado = f;
+  document.querySelectorAll('#inv-status-filtros .inv-status-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderInventario();
 }
@@ -3092,17 +3644,51 @@ function renderInventario(){
   let todasCuentas = [...cuentasFormales, ...cuentasVirtuales];
 
   // ── Filtros de servicio ────────────────────────────────────
-  const srvUIDs = [...new Set(todasCuentas.map(c => c.srvUid))];
+  const catUIDs = [...new Set(todasCuentas.map(c => {
+    const srv = getSrv(c.srvUid);
+    return srv ? srv.catUid : 'cat-otros';
+  }))];
   const filtrosEl = document.getElementById('inv-filtros');
   filtrosEl.innerHTML = `<button class="filter-btn ${APP._filtroInv==='todos'?'active':''}" onclick="invFiltrar('todos',this)">Todos</button>`;
-  srvUIDs.forEach(suid => {
-    const srv = getSrv(suid);
-    const nom = srv ? esc(srv.emoji) + ' ' + esc(srv.nombre) : esc(suid);
-    filtrosEl.innerHTML += `<button class="filter-btn ${APP._filtroInv===suid?'active':''}" onclick="invFiltrar('${esc(suid)}',this)">${nom}</button>`;
+  catUIDs.forEach(cuid => {
+    const cat = getCat(cuid) || { uid:cuid, nombre:'Otros', emoji:'📦' };
+    const nom = esc(cat.emoji) + ' ' + esc(cat.nombre);
+    filtrosEl.innerHTML += `<button class="filter-btn ${APP._filtroInv===cuid?'active':''}" onclick="invFiltrar('${esc(cuid)}',this)">${nom}</button>`;
   });
 
+  const serviciosEl = document.getElementById('inv-servicios-filtros');
+  serviciosEl.innerHTML = '';
+  if(APP._filtroInv !== 'todos'){
+    const serviciosCat = [...new Set(todasCuentas.filter(c => {
+      const srv = getSrv(c.srvUid);
+      return (srv ? srv.catUid : 'cat-otros') === APP._filtroInv;
+    }).map(c => c.srvUid))];
+    if(serviciosCat.length > 1){
+      serviciosEl.innerHTML = `<button class="inv-service-btn ${_invServicio==='todos'?'active':''}" onclick="invServicioFiltrar('todos',this)">Todos</button>`;
+      serviciosCat.forEach(suid => {
+        const srv = getSrv(suid);
+        const nom = srv ? esc(srv.emoji) + ' ' + esc(srv.nombre) : esc(suid);
+        serviciosEl.innerHTML += `<button class="inv-service-btn ${_invServicio===suid?'active':''}" onclick="invServicioFiltrar('${esc(suid)}',this)">${nom}</button>`;
+      });
+    }
+  }
+
   let cuentas = [...todasCuentas];
-  if(APP._filtroInv !== 'todos') cuentas = cuentas.filter(c => c.srvUid === APP._filtroInv);
+  if(APP._filtroInv !== 'todos') cuentas = cuentas.filter(c => {
+    const srv = getSrv(c.srvUid);
+    return (srv ? srv.catUid : 'cat-otros') === APP._filtroInv;
+  });
+  if(_invServicio !== 'todos') cuentas = cuentas.filter(c => c.srvUid === _invServicio);
+  if(_invEstado !== 'todos'){
+    cuentas = cuentas.filter(c => {
+      const lib = c.cupos.filter(cu => cu.estado === 'libre').length;
+      const ocu = c.cupos.filter(cu => cu.estado === 'ocupado').length;
+      if(_invEstado === 'libres') return lib > 0;
+      if(_invEstado === 'ocupadas') return ocu > 0;
+      if(_invEstado === 'llenas') return ocu > 0 && lib === 0;
+      return true;
+    });
+  }
   if(_invBusq){
     const q = _invBusq.toLowerCase();
     cuentas = cuentas.filter(c =>
@@ -3210,12 +3796,15 @@ function renderInventario(){
           </div>
         </div>`;
     }).join('');
-    return `<div class="cuenta-card">
+    const cuentaEstado = c.esVirtual ? 'auto' : (lib > 0 ? 'disp' : (ocu > 0 ? 'llena' : 'vacia'));
+    const cuentaEstadoTxt = c.esVirtual ? 'Auto' : (lib > 0 ? 'Disponible' : (ocu > 0 ? 'Llena' : 'Sin uso'));
+    return `<div class="cuenta-card ${cuentaEstado}">
       <div class="cuenta-hdr" style="display:block" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%">
           <div style="flex:1;min-width:0">
             <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
             <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
+            <div class="account-state ${cuentaEstado}">${cuentaEstadoTxt}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
             <span class="chip verde">${lib} libre${lib!==1?'s':''}</span>
@@ -3257,6 +3846,55 @@ function renderInventario(){
     lista.innerHTML = '<div class="empty"><div class="e-ico">📦</div><div>Sin cuentas. Toca <b>＋ Cuenta</b>.</div></div>';
     return;
   }
+
+  const catGrupos = {};
+  cuentas.forEach(c => {
+    const srv = getSrv(c.srvUid);
+    const cat = srv ? getCat(srv.catUid) : null;
+    const catUid = cat ? cat.uid : 'cat-otros';
+    if(!catGrupos[catUid]) catGrupos[catUid] = { catNom: cat ? cat.nombre : 'Otros', catEmoji: cat ? cat.emoji : '📦', servicios: {} };
+    if(!catGrupos[catUid].servicios[c.srvUid]){
+      catGrupos[catUid].servicios[c.srvUid] = { srvNom: srv ? srv.nombre : (c.srvNom || c.srvUid), emoji: srv ? srv.emoji : '📦', planes: {} };
+    }
+    const planNom = c.plan || c.subplan || 'General';
+    const srvGrupo = catGrupos[catUid].servicios[c.srvUid];
+    if(!srvGrupo.planes[planNom]) srvGrupo.planes[planNom] = [];
+    srvGrupo.planes[planNom].push(c);
+  });
+
+  let htmlNuevoInv = '';
+  Object.values(catGrupos).forEach(cg => {
+    const catCuentas = Object.values(cg.servicios).flatMap(sg => Object.values(sg.planes).flat());
+    const catLib = catCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado === 'libre').length, 0);
+    const catOcu = catCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado === 'ocupado').length, 0);
+    htmlNuevoInv += `<div class="inv-section">
+      <div class="inv-section-title"><span>${esc(cg.catEmoji)}</span><span>${esc(cg.catNom)}</span></div>
+      <div class="inv-section-counts"><span class="chip verde">${catLib}</span><span class="chip rojo">${catOcu}</span></div>
+    </div>`;
+    Object.values(cg.servicios).forEach(sg => {
+      const srvCuentas = Object.values(sg.planes).flat();
+      const srvLib = srvCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado === 'libre').length, 0);
+      const srvOcu = srvCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado === 'ocupado').length, 0);
+      htmlNuevoInv += `<div class="inv-service-title">
+        <span>${esc(sg.emoji)} ${esc(sg.srvNom)}</span>
+        <span><span style="color:var(--green)">${srvLib} libres</span> · <span style="color:var(--red)">${srvOcu} ocup.</span></span>
+      </div>`;
+      Object.entries(sg.planes).forEach(([planNom, planCuentas]) => {
+        const libTot = planCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado === 'libre').length, 0);
+        const ocuTot = planCuentas.reduce((s,c) => s + c.cupos.filter(cu => cu.estado === 'ocupado').length, 0);
+        if(planNom !== 'General'){
+          htmlNuevoInv += `<div class="inv-plan-title">
+            <span style="flex:1">${esc(planNom)}</span>
+            <span style="color:var(--green);font-weight:600">${libTot} libre${libTot!==1?'s':''}</span>
+            <span style="color:var(--red);font-weight:600">${ocuTot} ocup.</span>
+          </div>`;
+        }
+        htmlNuevoInv += planCuentas.map(renderCuenta).join('');
+      });
+    });
+  });
+  lista.innerHTML = htmlNuevoInv;
+  return;
 
   // ── Agrupar por servicio → plan ──────────────────────────────
   // Si hay filtro activo (un solo srv) no hace falta agrupar por srv, solo por plan
@@ -5357,6 +5995,17 @@ function renderConfig(){
       document.getElementById('cfg-logo-preview').innerHTML = `<img src="${esc(APP.config.logo)}" style="width:64px;height:64px;border-radius:10px;object-fit:cover" alt="logo">`;
     }
   }
+  if(document.getElementById('cfg-fondo-modo')){
+    document.getElementById('cfg-fondo-modo').value = APP.config.fondoModo || 'normal';
+    document.getElementById('cfg-fondo-color').value = APP.config.fondoColor || '#091421';
+    document.getElementById('cfg-fondo-opacidad').value = APP.config.fondoOpacidad || 16;
+    if(APP.config.fondoImagen && /^data:image\/(png|jpeg|gif|webp);base64,/.test(APP.config.fondoImagen)){
+      document.getElementById('cfg-fondo-preview').innerHTML = `<img src="${esc(APP.config.fondoImagen)}" style="width:54px;height:54px;border-radius:10px;object-fit:cover" alt="fondo">`;
+    } else {
+      document.getElementById('cfg-fondo-preview').textContent = 'BG';
+    }
+  }
+  aplicarFondoMarca();
 }
 
 function actualizarMarca(){
@@ -5372,6 +6021,78 @@ function actualizarFirmaPreview(){
   const el = document.getElementById('firma-preview');
   // SECURITY: Escape HTML before inserting, then convert newlines to <br>
   if(el) el.innerHTML = esc(f).replace(/\n/g,'<br>');
+}
+function aplicarFondoMarca(){
+  const modoEl = document.getElementById('cfg-fondo-modo');
+  const colorEl = document.getElementById('cfg-fondo-color');
+  const opEl = document.getElementById('cfg-fondo-opacidad');
+  const modo = modoEl ? modoEl.value : (APP.config.fondoModo || 'normal');
+  const color = colorEl ? colorEl.value : (APP.config.fondoColor || '#091421');
+  const opacidad = parseInt(opEl ? opEl.value : (APP.config.fondoOpacidad || 16)) || 16;
+  APP.config.fondoModo = modo;
+  APP.config.fondoColor = color;
+  APP.config.fondoOpacidad = opacidad;
+  document.body.classList.remove('bg-watermark','bg-image','bg-solid');
+  document.body.style.setProperty('--bg-custom', color);
+  document.body.style.setProperty('--bg-opacity', opacidad);
+  const img = APP.config.fondoImagen || APP.config.logo || '';
+  if(modo === 'solid'){
+    document.body.classList.add('bg-solid');
+  } else if(modo === 'watermark' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(img)){
+    document.body.style.setProperty('--bg-watermark', `url("${img}")`);
+    document.body.classList.add('bg-watermark');
+  } else if(modo === 'image' && /^data:image\/(png|jpeg|gif|webp);base64,/.test(APP.config.fondoImagen || '')){
+    document.body.style.setProperty('--bg-photo', `url("${APP.config.fondoImagen}")`);
+    document.body.classList.add('bg-image');
+  }
+}
+function subirFondoApp(input){
+  if(!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if(!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type)){
+    alert('Solo se permiten imagenes PNG, JPG, GIF o WEBP.');
+    input.value = '';
+    return;
+  }
+  if(file.size > 3 * 1024 * 1024){
+    alert('La imagen es demasiado grande. Maximo 3 MB.');
+    input.value = '';
+    return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    const max = 900;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img,0,0,w,h);
+    let result = canvas.toDataURL('image/webp', 0.68);
+    if(result.length > 180000) result = canvas.toDataURL('image/jpeg', 0.62);
+    if(result.length > 180000){
+      alert('La imagen sigue siendo muy pesada. Prueba una imagen mas simple.');
+      URL.revokeObjectURL(img.src);
+      return;
+    }
+    APP.config.fondoImagen = result;
+    APP.config.fondoModo = document.getElementById('cfg-fondo-modo')?.value || 'image';
+    if(document.getElementById('cfg-fondo-preview')){
+      document.getElementById('cfg-fondo-preview').innerHTML = `<img src="${esc(result)}" style="width:54px;height:54px;border-radius:10px;object-fit:cover" alt="fondo">`;
+    }
+    aplicarFondoMarca();
+    URL.revokeObjectURL(img.src);
+  };
+  img.onerror = () => alert('No se pudo leer la imagen.');
+  img.src = URL.createObjectURL(file);
+}
+function quitarFondoApp(){
+  APP.config.fondoImagen = null;
+  APP.config.fondoModo = 'normal';
+  if(document.getElementById('cfg-fondo-modo')) document.getElementById('cfg-fondo-modo').value = 'normal';
+  if(document.getElementById('cfg-fondo-preview')) document.getElementById('cfg-fondo-preview').textContent = 'BG';
+  aplicarFondoMarca();
 }
 function subirLogo(input){
   if(!input.files || !input.files[0]) return;
@@ -5409,6 +6130,7 @@ function subirLogo(input){
     APP.config.logo = result;
     document.getElementById('cfg-logo-preview').innerHTML = `<img src="${esc(result)}" style="width:64px;height:64px;border-radius:10px;object-fit:cover" alt="logo">`;
     document.getElementById('logo-hex').innerHTML = `<img src="${esc(result)}" alt="logo">`;
+    aplicarFondoMarca();
     URL.revokeObjectURL(img.src);
   };
   img.onerror = () => alert('No se pudo leer el logo.');
@@ -5420,8 +6142,13 @@ function guardarConfig(){
     slogan: document.getElementById('cfg-slogan').value,
     wa: document.getElementById('cfg-wa').value,
     firma: document.getElementById('cfg-firma').value,
+    fondoModo: document.getElementById('cfg-fondo-modo')?.value || APP.config.fondoModo || 'normal',
+    fondoColor: document.getElementById('cfg-fondo-color')?.value || APP.config.fondoColor || '#091421',
+    fondoOpacidad: parseInt(document.getElementById('cfg-fondo-opacidad')?.value || APP.config.fondoOpacidad || 16),
+    fondoImagen: APP.config.fondoImagen || null,
     notifVenc: document.getElementById('notif-venc').checked
   };
+  aplicarFondoMarca();
   const btn = event.target;
   btn.textContent = '✅ ¡Guardado!'; btn.style.background = 'var(--green)';
   setTimeout(() => { btn.textContent = '💾 Guardar configuración'; btn.style.background = ''; }, 2000);
@@ -5908,6 +6635,7 @@ async function _verificarYActualizarDesdeSheets(){
       if(Array.isArray(data.plantillasWA) && data.plantillasWA.length)
         PLANTILLAS_WA.splice(0, PLANTILLAS_WA.length, ...data.plantillasWA);
       if(data.config) Object.assign(APP.config, data.config);
+      aplicarFondoMarca();
       // Actualizar solo las vistas que están visibles, sin resetear filtros
       renderRegistro();
       renderBadgeVencimientos();
@@ -6206,6 +6934,7 @@ function cargarDesdeSheets(data){
   if(Array.isArray(data.plantillasWA) && data.plantillasWA.length)
     PLANTILLAS_WA.splice(0, PLANTILLAS_WA.length, ...data.plantillasWA);
   if(data.config) Object.assign(APP.config, data.config);
+  aplicarFondoMarca();
 
   // Recalcular contador de ventas
   const maxN = APP.ventas.reduce((m,v)=>{
@@ -6345,6 +7074,7 @@ function inicializarUI(){
       document.getElementById('logo-hex').innerHTML = `<img src="${esc(APP.config.logo)}" alt="logo">`;
     }
   }
+  aplicarFondoMarca();
   // Si el dashboard ya está visible al cargar datos (ej. recarga en background), re-renderizarlo
   const dashScreen = document.getElementById('s-dashboard');
   if(dashScreen && dashScreen.classList.contains('active')){
