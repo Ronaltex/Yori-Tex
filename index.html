@@ -110,6 +110,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .search-wrap{position:relative;margin-bottom:12px}
 .search-wrap input{padding-left:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px}
 .search-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text3);pointer-events:none}
+.search-wrap input{padding-right:40px}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:26px;height:26px;border:none;border-radius:8px;background:rgba(137,165,204,.12);color:var(--text2);font-size:15px;font-weight:800;display:none;align-items:center;justify-content:center;cursor:pointer}
+.search-clear.show{display:flex}
 .filters{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
 .filters::-webkit-scrollbar{display:none}
 .filter-btn{padding:5px 13px;border-radius:99px;font-size:12px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;color:var(--text2);white-space:nowrap;flex-shrink:0;font-weight:500}
@@ -809,7 +812,8 @@ body.bg-solid{
   </div>
   <div class="search-wrap">
     <span class="search-ico">🔍</span>
-    <input type="text" placeholder="Buscar cliente, servicio..." oninput="regBuscar(this.value)">
+    <input id="reg-search" type="text" placeholder="Buscar cliente, servicio, correo, perfil, teléfono..." oninput="regBuscar(this.value)">
+    <button class="search-clear" id="reg-search-clear" onclick="limpiarBusqueda('reg')">×</button>
   </div>
   <div class="card" id="reg-lista-container">
     <div class="empty"><div class="e-ico">📋</div><div>Sin ventas registradas.<br>Toca <b>＋ Venta</b> para agregar.</div></div>
@@ -829,7 +833,8 @@ body.bg-solid{
   </div>
   <div class="search-wrap">
     <span class="search-ico">🔍</span>
-    <input type="text" placeholder="Buscar cuenta, cliente, correo..." oninput="invBuscar(this.value)">
+    <input id="inv-search" type="text" placeholder="Buscar cuenta, cliente, correo, perfil, teléfono..." oninput="invBuscar(this.value)">
+    <button class="search-clear" id="inv-search-clear" onclick="limpiarBusqueda('inv')">×</button>
   </div>
   <div class="filters" id="inv-filtros">
     <button class="filter-btn active" onclick="invFiltrar('todos',this)">Todos</button>
@@ -927,7 +932,7 @@ body.bg-solid{
 <div id="s-costos" class="screen">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <div class="page-title">Costos</div>
-    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirModal('modal-nuevo-costo')">＋ Gasto</button>
+    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirNuevoCosto()">＋ Gasto</button>
   </div>
   <div class="page-sub">Gastos y Binance FIFO</div>
   <div class="saldo-box">
@@ -2713,7 +2718,71 @@ function regFiltrar(f, btn){
   }
   renderRegistro();
 }
-function regBuscar(v){ _regBusq = v; renderRegistro(); }
+function normalizarBusqueda(v){
+  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+function coincideBusqueda(texto, consulta){
+  const q = normalizarBusqueda(consulta);
+  if(!q) return true;
+  const base = normalizarBusqueda(texto);
+  const qNum = String(consulta || '').replace(/\D/g,'');
+  const baseNum = String(texto || '').replace(/\D/g,'');
+  return base.includes(q) || (!!qNum && baseNum.includes(qNum));
+}
+function textoBusquedaVenta(v){
+  const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
+  const asignados = Array.isArray(v.cuposAsignados) ? v.cuposAsignados : [];
+  const extrasAsignados = asignados.map(a => [a.correo, a.perfil, a.pin, a.cuentaId, a.cuentaUID].join(' ')).join(' ');
+  return [
+    v.id, v.cliente, v.wa, v.correo, v.invCorreo, v.perfil, v.pin, v.plan, v.srvNom, v.catNom, v.notas, v.estado,
+    cuenta?.id, cuenta?.correo, cuenta?.pass, extrasAsignados
+  ].join(' ');
+}
+function textoBusquedaCuenta(c){
+  const srv = getSrv(c.srvUid);
+  const cat = srv ? getCat(srv.catUid) : null;
+  const cuposTxt = (c.cupos || []).map(cu => [
+    cu.cliente, cu.wa, cu.perfil, cu.pin, cu.plan, cu.invCorreo, cu.vence, cu.estado
+  ].join(' ')).join(' ');
+  return [
+    c.id, c.correo, c.pass, c.srvNom, srv?.nombre, cat?.nombre, c.notas, cuposTxt
+  ].join(' ');
+}
+function actualizarSearchClear(input){
+  const btn = input?.parentElement?.querySelector('.search-clear');
+  if(btn) btn.classList.toggle('show', !!input.value);
+}
+function inicializarBuscadores(){
+  document.querySelectorAll('.search-wrap input').forEach((input, idx) => {
+    if(!input.id) input.id = 'search-auto-' + idx;
+    let btn = input.parentElement.querySelector('.search-clear');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'search-clear';
+      btn.textContent = '×';
+      input.insertAdjacentElement('afterend', btn);
+    }
+    btn.onclick = () => {
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles:true }));
+      actualizarSearchClear(input);
+      input.focus();
+    };
+    input.oninput && actualizarSearchClear(input);
+    input.addEventListener('input', () => actualizarSearchClear(input));
+    actualizarSearchClear(input);
+  });
+}
+function limpiarBusqueda(tipo){
+  const input = document.getElementById(tipo + '-search');
+  if(!input) return;
+  input.value = '';
+  input.dispatchEvent(new Event('input', { bubbles:true }));
+  actualizarSearchClear(input);
+  input.focus();
+}
+function regBuscar(v){ _regBusq = v; actualizarSearchClear(document.getElementById('reg-search')); renderRegistro(); }
 
 function renderRegistro(){
   const hoyStr = hoy();
@@ -2734,8 +2803,7 @@ function renderRegistro(){
     ventas = ventas.filter(v => v.estado === 'por_cobrar' || v.estado === 'pendiente' || v.estado === 'parcial');
   }
   if(_regBusq){
-    const q = _regBusq.toLowerCase();
-    ventas = ventas.filter(v => v.cliente.toLowerCase().includes(q) || v.srvNom.toLowerCase().includes(q) || (v.wa||'').includes(q));
+    ventas = ventas.filter(v => coincideBusqueda(textoBusquedaVenta(v), _regBusq));
   }
   ventas = ventas.sort((a,b) => (b.creado||'').localeCompare(a.creado||''));
 
@@ -3577,7 +3645,7 @@ function mvGuardar(){
 let _invBusq = '';
 let _invEstado = 'todos';
 let _invServicio = 'todos';
-function invBuscar(v){ _invBusq = v; renderInventario(); }
+function invBuscar(v){ _invBusq = v; actualizarSearchClear(document.getElementById('inv-search')); renderInventario(); }
 function invFiltrar(f, btn){
   APP._filtroInv = f;
   _invServicio = 'todos';
@@ -3690,12 +3758,7 @@ function renderInventario(){
     });
   }
   if(_invBusq){
-    const q = _invBusq.toLowerCase();
-    cuentas = cuentas.filter(c =>
-      c.id.toLowerCase().includes(q) ||
-      c.correo.toLowerCase().includes(q) ||
-      c.cupos.some(cu => cu.cliente?.toLowerCase().includes(q))
-    );
+    cuentas = cuentas.filter(c => coincideBusqueda(textoBusquedaCuenta(c), _invBusq));
   }
 
   // ── KPIs ──────────────────────────────────────────────────
@@ -4272,7 +4335,7 @@ function ncGuardar(){
 // VENCIMIENTOS
 // ══════════════════════════════════════
 let _venBusq = '';
-function venBuscar(v){ _venBusq = v; renderVencimientos(); }
+function venBuscar(v){ _venBusq = v; actualizarSearchClear(document.getElementById('ven-search') || document.querySelector('#s-vencimientos .search-wrap input')); renderVencimientos(); }
 function venFiltrar(f, btn){
   APP._filtroVen = f;
   document.querySelectorAll('#ven-filtros .filter-btn').forEach(b => b.classList.remove('active'));
@@ -4477,8 +4540,7 @@ function renderVencimientos(){
   if(APP._filtroVen !== 'todos' && APP._filtroVen !== 'inactivo')
     ventas = ventas.filter(v => estadoVen(v.vence) === APP._filtroVen);
   if(_venBusq){
-    const q = _venBusq.toLowerCase();
-    ventas = ventas.filter(v => v.cliente.toLowerCase().includes(q) || v.srvNom.toLowerCase().includes(q));
+    ventas = ventas.filter(v => coincideBusqueda(textoBusquedaVenta(v), _venBusq));
   }
   venMsgWA = {};
   const ord = {vencido:0,hoy:1,pronto:2,ok:3};
@@ -5551,6 +5613,31 @@ function costoCalcFIFO(){
 
   document.getElementById('costo-fifo-total').textContent = '$' + fifo.total.toFixed(4);
 }
+function limpiarCostoForm(){
+  document.getElementById('costo-modal-titulo').innerHTML = '💸 Nuevo gasto <button class="modal-close" onclick="cerrarModal(&quot;modal-nuevo-costo&quot;)">×</button>';
+  document.getElementById('costo-edit-uid').value = '';
+  const cat = document.getElementById('costo-cat');
+  if(cat && cat.options.length) cat.selectedIndex = 0;
+  document.getElementById('costo-desc').value = '';
+  document.getElementById('costo-fecha').value = hoy();
+  document.getElementById('costo-metodo').value = 'transferencia';
+  document.getElementById('costo-usdt').value = '';
+  document.getElementById('costo-usd').value = '';
+  document.getElementById('costo-notas').value = '';
+  const rows = document.getElementById('costo-fifo-rows');
+  if(rows) rows.innerHTML = '';
+  const preview = document.getElementById('costo-fifo-preview');
+  if(preview) preview.style.display = 'none';
+  const total = document.getElementById('costo-fifo-total');
+  if(total) total.textContent = '$0.00';
+  const btn = document.querySelector('#modal-nuevo-costo .btn-primary');
+  if(btn) btn.textContent = '💾 Registrar gasto';
+  costoToggleBinance();
+}
+function abrirNuevoCosto(){
+  limpiarCostoForm();
+  abrirModal('modal-nuevo-costo');
+}
 function costoGuardar(){
   const met = document.getElementById('costo-metodo').value;
   const desc = document.getElementById('costo-desc').value.trim();
@@ -5829,6 +5916,9 @@ function eliminarRecarga(ruid){
   APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => m.recargaUID !== ruid);
   actualizarSaldoBinance();
   renderBinance();
+  renderCostos();
+  renderDashboard();
+  sincronizarConSheets();
 }
 
 function eliminarMovBinance(movUid){
@@ -6061,7 +6151,7 @@ function subirFondoApp(input){
   }
   const img = new Image();
   img.onload = () => {
-    const max = 900;
+    const max = 420;
     const scale = Math.min(1, max / Math.max(img.width, img.height));
     const w = Math.max(1, Math.round(img.width * scale));
     const h = Math.max(1, Math.round(img.height * scale));
@@ -6069,10 +6159,10 @@ function subirFondoApp(input){
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img,0,0,w,h);
-    let result = canvas.toDataURL('image/webp', 0.68);
-    if(result.length > 180000) result = canvas.toDataURL('image/jpeg', 0.62);
-    if(result.length > 180000){
-      alert('La imagen sigue siendo muy pesada. Prueba una imagen mas simple.');
+    let result = canvas.toDataURL('image/webp', 0.52);
+    if(result.length > 42000) result = canvas.toDataURL('image/jpeg', 0.48);
+    if(result.length > 42000){
+      alert('La imagen sigue siendo muy pesada para guardarse en Google Sheets. Prueba una imagen mas simple o con menos detalle.');
       URL.revokeObjectURL(img.src);
       return;
     }
@@ -6082,6 +6172,8 @@ function subirFondoApp(input){
       document.getElementById('cfg-fondo-preview').innerHTML = `<img src="${esc(result)}" style="width:54px;height:54px;border-radius:10px;object-fit:cover" alt="fondo">`;
     }
     aplicarFondoMarca();
+    guardarLocal(construirPayload());
+    if(_pinVerificado) sincronizarConSheets();
     URL.revokeObjectURL(img.src);
   };
   img.onerror = () => alert('No se pudo leer la imagen.');
@@ -6093,6 +6185,8 @@ function quitarFondoApp(){
   if(document.getElementById('cfg-fondo-modo')) document.getElementById('cfg-fondo-modo').value = 'normal';
   if(document.getElementById('cfg-fondo-preview')) document.getElementById('cfg-fondo-preview').textContent = 'BG';
   aplicarFondoMarca();
+  guardarLocal(construirPayload());
+  if(_pinVerificado) sincronizarConSheets();
 }
 function subirLogo(input){
   if(!input.files || !input.files[0]) return;
@@ -6121,8 +6215,8 @@ function subirLogo(input){
     ctx.clearRect(0,0,w,h);
     ctx.drawImage(img,0,0,w,h);
     let result = canvas.toDataURL('image/webp', 0.78);
-    if(result.length > 45000) result = canvas.toDataURL('image/jpeg', 0.72);
-    if(result.length > 45000){
+    if(result.length > 42000) result = canvas.toDataURL('image/jpeg', 0.68);
+    if(result.length > 42000){
       alert('El logo sigue siendo muy pesado. Prueba una imagen mas simple o cuadrada.');
       URL.revokeObjectURL(img.src);
       return;
@@ -6131,6 +6225,8 @@ function subirLogo(input){
     document.getElementById('cfg-logo-preview').innerHTML = `<img src="${esc(result)}" style="width:64px;height:64px;border-radius:10px;object-fit:cover" alt="logo">`;
     document.getElementById('logo-hex').innerHTML = `<img src="${esc(result)}" alt="logo">`;
     aplicarFondoMarca();
+    guardarLocal(construirPayload());
+    if(_pinVerificado) sincronizarConSheets();
     URL.revokeObjectURL(img.src);
   };
   img.onerror = () => alert('No se pudo leer el logo.');
@@ -6233,6 +6329,7 @@ function srvGuardar(){
   cerrarModal('modal-nuevo-servicio');
   renderCatalogos();
   mvPoblarCategorias();
+  sincronizarConSheets();
 }
 function abrirEditarServicio(suid){
   const s = CATALOGO_SERVICIOS.find(x=>x.uid===suid);
@@ -6255,6 +6352,7 @@ function eliminarServicio(suid){
   if(!confirm('¿Eliminar este servicio?')) return;
   CATALOGO_SERVICIOS = CATALOGO_SERVICIOS.filter(s=>s.uid!==suid);
   renderCatalogos();
+  sincronizarConSheets();
 }
 
 // Nueva Categoría
@@ -6268,6 +6366,9 @@ function catGuardar(){
   document.getElementById('cat-edit-uid').value = '';
   cerrarModal('modal-nueva-categoria');
   renderCatalogos();
+  mvPoblarCategorias();
+  ncPoblarCategorias();
+  sincronizarConSheets();
 }
 function abrirEditarCategoria(catUid){
   const c = CATALOGO_CATEGORIAS.find(x=>x.uid===catUid);
@@ -6283,6 +6384,7 @@ function eliminarCategoria(catUid){
   if(!confirm('¿Eliminar esta categoría?')) return;
   CATALOGO_CATEGORIAS = CATALOGO_CATEGORIAS.filter(c=>c.uid!==catUid);
   renderCatalogos();
+  sincronizarConSheets();
 }
 
 // Nueva Categoría de Gasto
@@ -6296,6 +6398,8 @@ function catgGuardar(){
   document.getElementById('catg-edit-uid').value = '';
   cerrarModal('modal-nueva-cat-gasto');
   renderCatalogos();
+  renderCostos();
+  sincronizarConSheets();
 }
 function abrirEditarCatGasto(cgUid){
   const cg = CATALOGO_CAT_GASTOS.find(x=>x.uid===cgUid);
@@ -6311,6 +6415,8 @@ function eliminarCatGasto(cgUid){
   if(!confirm('¿Eliminar esta categoría de gasto?')) return;
   CATALOGO_CAT_GASTOS = CATALOGO_CAT_GASTOS.filter(c=>c.uid!==cgUid);
   renderCatalogos();
+  renderCostos();
+  sincronizarConSheets();
 }
 
 // ══════════════════════════════════════
@@ -6395,6 +6501,7 @@ function eliminarPlantilla(puid){
   if(!confirm('¿Eliminar esta plantilla?')) return;
   PLANTILLAS_WA = PLANTILLAS_WA.filter(p=>p.uid!==puid);
   renderPlantillas();
+  sincronizarConSheets();
 }
 
 // ══════════════════════════════════════
@@ -6452,7 +6559,7 @@ function restaurarBackupJSON(input){
       if(!confirm('⚠️ Esto reemplazará TODOS tus datos actuales. ¿Continuar?')) return;
       // SECURITY: Only copy known safe keys, not arbitrary properties
       if(datos.APP && typeof datos.APP === 'object'){
-        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','movimientosBinance','config'];
+        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','movimientosBinance','ventasEliminadas','config'];
         safeAPPKeys.forEach(k => { if(datos.APP[k] !== undefined) APP[k] = datos.APP[k]; });
         APP._ventaCounter = datos.APP._ventaCounter || 1;
       }
@@ -6464,8 +6571,10 @@ function restaurarBackupJSON(input){
       if(APP.config.logo && !/^data:image\/(png|jpeg|gif|webp);base64,/.test(APP.config.logo)){
         APP.config.logo = null; // Discard invalid logo
       }
-      renderRegistro(); renderBadgeVencimientos(); renderConfig(); actualizarSaldoBinance();
+      renderRegistro(); renderInventario(); renderBadgeVencimientos(); renderVencimientos(); renderCostos(); renderConfig(); actualizarSaldoBinance();
       mvPoblarCategorias();
+      guardarLocal(construirPayload());
+      sincronizarConSheets();
       alert('✅ Copia de seguridad restaurada correctamente.');
     } catch(err) {
       alert('❌ Error al leer el archivo: ' + err.message);
@@ -6692,6 +6801,12 @@ async function sincronizarConSheets(){
   guardarLocal(payload);
   return _sincronizarBackground(payload);
 }
+function configParaSync(){
+  const cfg = { ...(APP.config || {}) };
+  if(cfg.logo && String(cfg.logo).length > 48000) cfg.logo = null;
+  if(cfg.fondoImagen && String(cfg.fondoImagen).length > 48000) cfg.fondoImagen = null;
+  return cfg;
+}
 function construirPayload(){
   const ventasPayload = (APP.ventas || []).map(v => ({
     ...v,
@@ -6704,7 +6819,7 @@ function construirPayload(){
     movimientosBinance: APP.movimientosBinance || [],
     ventasEliminadas: APP.ventasEliminadas || [],  // lista negra de UIDs eliminados
     catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
-    catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: APP.config
+    catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: configParaSync()
   };
 }
 
@@ -7058,6 +7173,7 @@ function inicializarUI(){
     migrarBinanceLegacy();
   }
   initDashSelectors();
+  inicializarBuscadores();
   mvPoblarCategorias();
   ncPoblarCategorias();
   poblarSrvCatSelect();
