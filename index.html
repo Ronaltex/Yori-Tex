@@ -46,6 +46,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .logo-hex img{width:100%;height:100%;object-fit:cover;border-radius:8px}
 .logo-text{font-size:15px;font-weight:700;color:var(--white);letter-spacing:1px}
 .logo-text span{color:var(--orange)}
+.sync-status{font-size:10px;color:var(--text3);text-align:right;line-height:1.15;min-width:82px;cursor:pointer}
+.sync-status.ok{color:var(--green)}
+.sync-status.warn{color:var(--orange)}
+.sync-status.err{color:var(--red)}
 .header-right{font-size:11px;color:var(--text3)}
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:50}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 2px 10px;cursor:pointer;color:var(--text3);border:none;background:none;position:relative}
@@ -785,6 +789,7 @@ body.bg-solid{
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <div id="sync-indicador" style="display:none;font-size:16px;transition:all 0.3s"></div>
+    <div id="sync-status" class="sync-status" onclick="sincronizarManual()" title="Toca para sincronizar ahora">Sin iniciar</div>
     <div class="header-right" id="header-fecha"></div>
   </div>
 </div>
@@ -824,7 +829,10 @@ body.bg-solid{
 <div id="s-inventario" class="screen">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
     <div class="page-title">Inventario</div>
-    <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirNuevaCuenta()">＋ Cuenta</button>
+    <div style="display:flex;gap:7px">
+      <button class="btn btn-navy" style="width:auto;padding:9px 12px;font-size:12px" onclick="abrirNuevaCuentaMasiva()">Masivo</button>
+      <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirNuevaCuenta()">＋ Cuenta</button>
+    </div>
   </div>
   <div class="page-sub" id="inv-sub">Sin cuentas aún</div>
   <div class="kpi-grid">
@@ -1276,6 +1284,11 @@ body.bg-solid{
   <div class="modal-handle"></div>
   <div class="modal-title" id="nc-titulo">📦 Nueva cuenta <button class="modal-close" onclick="cerrarModal('modal-nueva-cuenta')">×</button></div>
   <input type="hidden" id="nc-edit-uid"/>
+  <input type="hidden" id="nc-modo" value="individual"/>
+  <div class="tabs" id="nc-modo-tabs" style="margin-bottom:12px">
+    <button class="tab active" id="nc-tab-individual" onclick="ncSetModo('individual')">Individual</button>
+    <button class="tab" id="nc-tab-masivo" onclick="ncSetModo('masivo')">Masivo</button>
+  </div>
   <div class="field"><label>Categoría</label>
     <select id="nc-cat" onchange="ncActCat()"><option value="">— Selecciona —</option></select>
   </div>
@@ -1289,6 +1302,25 @@ body.bg-solid{
     <div class="pass-wrap"><input type="password" id="nc-pass" placeholder="••••••••"/><button class="eye-btn" onclick="togglePass('nc-pass',this)">👁</button></div>
   </div>
   <div class="field"><label>Número de cupos / perfiles máx.</label><input type="number" id="nc-cupos" placeholder="5" min="1" max="30"/></div>
+  <div id="nc-bulk-block" style="display:none">
+    <div class="divider"></div>
+    <div class="sec">Carga masiva</div>
+    <div class="row2">
+      <div class="field"><label>Cantidad esperada</label><input type="number" id="nc-bulk-cantidad" placeholder="10" min="2" max="100"/></div>
+      <div class="field"><label>Contraseña</label>
+        <select id="nc-bulk-pass-mode" onchange="ncBulkTogglePass()">
+          <option value="same">Misma para todas</option>
+          <option value="custom">Una diferente por cuenta</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" id="nc-bulk-pass-same-wrap"><label>Contraseña común</label><input type="text" id="nc-bulk-pass-same" placeholder="Contraseña para todas"/></div>
+    <div class="field">
+      <label>Correos / cuentas</label>
+      <textarea id="nc-bulk-lista" placeholder="Una cuenta por línea. Si la contraseña es diferente usa: correo | contraseña"></textarea>
+    </div>
+    <div id="nc-bulk-preview" class="aviso" style="display:none"></div>
+  </div>
   <div class="divider"></div>
   <div class="sec">Vigencia de la cuenta madre</div>
   <div class="row2">
@@ -1836,6 +1868,12 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbyI1ecwaMem5dQUAPBNywxx
 let _pinIngresado = '';
 let _pinVerificado = false;
 let _pinGuardado = ''; // Se carga desde Sheets al verificar
+let _syncDirty = false;
+let _syncChecking = false;
+let _syncTimer = null;
+let _ultimaSync = null;
+let _firmaNube = '';
+let _ultimoAvisoCambio = 0;
 
 // SECURITY: PIN brute-force lockout — max 5 intentos, luego bloqueo de 60 s
 let _pinIntentos = 0;
@@ -2305,6 +2343,22 @@ function quitarCostosDeVenta(v){
     });
   });
   recalcularUsadoRecargasDesdeKardex();
+}
+function costosAsociadosCuenta(cuentaUID){
+  return (APP.costos || []).filter(g => g.cuentaUID === cuentaUID);
+}
+function eliminarCostosAsociadosCuenta(cuentaUID){
+  const costos = costosAsociadosCuenta(cuentaUID);
+  const ids = new Set(costos.map(g => g.uid).filter(Boolean));
+  APP.costos = (APP.costos || []).filter(g => g.cuentaUID !== cuentaUID);
+  APP.movimientosBinance = (APP.movimientosBinance || []).filter(m => {
+    if(m.cuentaUID !== cuentaUID) return true;
+    if(m.costoUID && ids.has(m.costoUID)) return false;
+    const concepto = textoPlano(m.concepto || '');
+    return !(concepto.includes('adquisicion cuenta') || concepto.includes('renovacion cuenta') || concepto.includes('reposicion cuenta'));
+  });
+  recalcularUsadoRecargasDesdeKardex();
+  return costos.length;
 }
 function registrarCostoManualVenta(v, costoAdq, metodoAdq){
   const costoUID = uid();
@@ -4004,6 +4058,9 @@ function abrirEditarCuenta(cuentaUID){
   if(!c) return;
   document.getElementById('nc-titulo').innerHTML = '✏️ Editar cuenta <button class="modal-close" onclick="cerrarModal(\'modal-nueva-cuenta\')">×</button>';
   document.getElementById('nc-edit-uid').value = cuentaUID;
+  ncSetModo('individual');
+  const modoTabs = document.getElementById('nc-modo-tabs');
+  if(modoTabs) modoTabs.style.display = 'none';
   ncPoblarCategorias();
   setTimeout(() => {
     const catSel = document.getElementById('nc-cat');
@@ -4110,12 +4167,21 @@ function eliminarCuenta(uid){
     ? `Esta cuenta tiene ${ocupados} cupo(s) ocupado(s).\n\nSe quitara del inventario y las ventas quedaran sin cuenta asignada. ¿Continuar?`
     : '¿Eliminar esta cuenta del inventario?';
   if(!confirm(msg)) return;
+  const costosCuenta = costosAsociadosCuenta(uid);
+  if(costosCuenta.length){
+    const totalCostos = costosCuenta.reduce((s,g) => s + (parseFloat(g.montoUSD)||0), 0);
+    const borrarCostos = confirm(`Esta cuenta tiene ${costosCuenta.length} costo(s) asociado(s) por $${totalCostos.toFixed(2)}.\n\nSi los eliminas, tambien se quitaran de Costos y del kardex Binance cuando corresponda.\n\nAceptar = borrar cuenta Y costos\nCancelar = borrar solo la cuenta`);
+    if(borrarCostos) eliminarCostosAsociadosCuenta(uid);
+  }
   desvincularVentasDeCuenta(c);
   APP.cuentas = APP.cuentas.filter(c => c.uid !== uid);
   renderInventario();
   renderRegistro();
   renderVencimientos();
   renderDashboard();
+  renderCostos();
+  actualizarSaldoBinance();
+  renderBinance();
   sincronizarConSheets();
 }
 function editarCuentaVirtual(uidVirtual){
@@ -4208,17 +4274,63 @@ function ecLiberar(){
 
 // Nueva cuenta
 // Nueva cuenta
+function ncSetModo(modo){
+  document.getElementById('nc-modo').value = modo;
+  document.getElementById('nc-bulk-block').style.display = modo === 'masivo' ? 'block' : 'none';
+  document.getElementById('nc-tab-individual')?.classList.toggle('active', modo === 'individual');
+  document.getElementById('nc-tab-masivo')?.classList.toggle('active', modo === 'masivo');
+  ['nc-correo','nc-pass'].forEach(id => {
+    const el = document.getElementById(id);
+    const wrap = el ? el.closest('.field') : null;
+    if(wrap) wrap.style.display = modo === 'masivo' ? 'none' : '';
+  });
+  const idWrap = document.getElementById('nc-id')?.closest('.field');
+  if(idWrap) idWrap.querySelector('label').textContent = modo === 'masivo' ? 'Prefijo ID (ej: NET)' : 'ID de cuenta (ej: NET-01)';
+  ncBulkPreview();
+}
+function ncBulkTogglePass(){
+  const custom = document.getElementById('nc-bulk-pass-mode').value === 'custom';
+  document.getElementById('nc-bulk-pass-same-wrap').style.display = custom ? 'none' : 'block';
+  ncBulkPreview();
+}
+function ncBulkItems(){
+  const custom = document.getElementById('nc-bulk-pass-mode')?.value === 'custom';
+  const passSame = document.getElementById('nc-bulk-pass-same')?.value || '';
+  const raw = document.getElementById('nc-bulk-lista')?.value || '';
+  return raw.split(/\n+/).map(line => line.trim()).filter(Boolean).map(line => {
+    const parts = line.split(/[|;\t,]/).map(x => x.trim());
+    return { correo: parts[0] || '', pass: custom ? (parts[1] || '') : passSame };
+  }).filter(x => x.correo);
+}
+function ncBulkPreview(){
+  const box = document.getElementById('nc-bulk-preview');
+  if(!box) return;
+  const items = ncBulkItems();
+  const costoTotal = parseFloat(document.getElementById('nc-costo')?.value) || 0;
+  if(!items.length){ box.style.display = 'none'; return; }
+  const unit = items.length ? costoTotal / items.length : 0;
+  box.style.display = 'block';
+  box.innerHTML = `Se crearÃ¡n <b>${items.length}</b> cuenta(s). Costo total: <b>$${costoTotal.toFixed(2)}</b>. Costo por cuenta: <b>$${unit.toFixed(2)}</b>.`;
+}
 function abrirNuevaCuenta(){
   document.getElementById('nc-edit-uid').value = '';
   document.getElementById('nc-titulo').innerHTML = '📦 Nueva cuenta <button class="modal-close" onclick="cerrarModal(\'modal-nueva-cuenta\')">×</button>';
   document.getElementById('nc-renovar-bloque').style.display = 'none';
   document.getElementById('nc-costo-por-cupo').style.display = 'none';
-  ['nc-cat','nc-srv','nc-id','nc-correo','nc-pass','nc-cupos','nc-costo','nc-pventa','nc-notas','nc-desde','nc-hasta','nc-vendidos'].forEach(id => {
+  ['nc-cat','nc-srv','nc-id','nc-correo','nc-pass','nc-cupos','nc-costo','nc-pventa','nc-notas','nc-desde','nc-hasta','nc-vendidos','nc-bulk-cantidad','nc-bulk-pass-same','nc-bulk-lista'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
+  if(document.getElementById('nc-bulk-pass-mode')) document.getElementById('nc-bulk-pass-mode').value = 'same';
+  ncSetModo('individual');
+  const modoTabs = document.getElementById('nc-modo-tabs');
+  if(modoTabs) modoTabs.style.display = '';
   ncPoblarCategorias();
   abrirModal('modal-nueva-cuenta');
+}
+function abrirNuevaCuentaMasiva(){
+  abrirNuevaCuenta();
+  ncSetModo('masivo');
 }
 function ncPoblarCategorias(){
   const sel = document.getElementById('nc-cat');
@@ -4236,7 +4348,80 @@ function ncActCat(){
   });
 }
 function ncActSrv(){}
+function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, fecha){
+  if(costoCuenta <= 0) return;
+  const esUsdt = metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
+  let montoUSDReal = costoCuenta;
+  let usdtUsado = 0;
+  if(esUsdt){
+    const fifo = calcFIFO(costoCuenta);
+    usdtUsado = costoCuenta;
+    montoUSDReal = fifo.total || costoCuenta;
+    descontarUSDTBinance(costoCuenta, `Adquisicion cuenta madre - ${idVal} (${srv ? srv.nombre : srvUid})`, cuentaUID, null, fecha || hoy());
+  }
+  APP.costos.push({
+    uid: uid(),
+    tipo: 'adquisicion_cuenta',
+    cuentaUID,
+    fecha: fecha || hoy(),
+    catUid: 'cg-cuentas',
+    desc: `Adquisicion cuenta madre - ${srv ? srv.nombre : srvUid} - ${idVal}`,
+    metodo: metodoPago || 'Transferencia',
+    montoUSD: montoUSDReal,
+    usdtUsado,
+    esCostoReal: true,
+    notas: `Registrado automaticamente al crear cuenta ${idVal}`
+  });
+}
+function ncGuardarMasivo(){
+  const srvUid = document.getElementById('nc-srv').value;
+  if(!srvUid){ alert('Selecciona el servicio'); return; }
+  const items = ncBulkItems();
+  if(items.length < 2){ alert('Agrega al menos 2 cuentas en la lista masiva'); return; }
+  const esperado = parseInt(document.getElementById('nc-bulk-cantidad').value) || items.length;
+  if(esperado !== items.length && !confirm(`Cantidad esperada: ${esperado}\nLineas detectadas: ${items.length}\n\nContinuar de todas formas?`)) return;
+  const custom = document.getElementById('nc-bulk-pass-mode').value === 'custom';
+  if(custom && items.some(x => !x.pass)){ alert('Hay cuentas sin contrasena. Usa formato: correo | contrasena'); return; }
+  if(!custom && !document.getElementById('nc-bulk-pass-same').value){ alert('Ingresa la contrasena comun'); return; }
+  const numCupos = parseInt(document.getElementById('nc-cupos').value) || 1;
+  const srv = getSrv(srvUid);
+  const prefijo = (document.getElementById('nc-id').value.trim() || (srv?.nombre || 'SRV').toUpperCase().slice(0,3)).replace(/\s+/g,'-').toUpperCase();
+  const costoTotal = parseFloat(document.getElementById('nc-costo').value)||0;
+  const costoCuenta = items.length ? parseFloat((costoTotal / items.length).toFixed(6)) : 0;
+  const metodoPago = document.getElementById('nc-metodo-pago').value;
+  const ncDesde = document.getElementById('nc-desde').value;
+  const ncHasta = document.getElementById('nc-hasta').value;
+  const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
+  const notas = document.getElementById('nc-notas').value;
+  const baseNum = APP.cuentas.length + 1;
+  items.forEach((item, idx) => {
+    const cuentaUID = uid();
+    const idVal = `${prefijo}-${String(baseNum + idx).padStart(2,'0')}`;
+    APP.cuentas.push({
+      uid: cuentaUID, srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo: item.correo,
+      pass: item.pass,
+      costo: costoCuenta, metodoPago, desde: ncDesde, hasta: ncHasta,
+      pventa,
+      notas,
+      cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
+    });
+    registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, ncDesde || hoy());
+  });
+  cerrarModal('modal-nueva-cuenta');
+  renderInventario();
+  renderCostos();
+  actualizarSaldoBinance();
+  renderBinance();
+  const _dashEl = document.getElementById('s-dashboard');
+  if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
+  sincronizarConSheets();
+  alert(`Se crearon ${items.length} cuenta(s). Costo por cuenta: $${costoCuenta.toFixed(2)}`);
+}
 function ncGuardar(){
+  if(document.getElementById('nc-modo')?.value === 'masivo' && !document.getElementById('nc-edit-uid').value){
+    ncGuardarMasivo();
+    return;
+  }
   const srvUid = document.getElementById('nc-srv').value;
   if(!srvUid){ alert('Selecciona el servicio'); return; }
   const correo = document.getElementById('nc-correo').value.trim();
@@ -6628,6 +6813,9 @@ async function pinVerificar(){
         _pinVerificado = true;
         _pinGuardado = _pinIngresado;
         cargarDesdeSheets(d.data || {});
+        _firmaNube = firmaDatos(d.data || {});
+        setSyncStatus('Local', 'warn');
+        iniciarAutoSync();
         document.getElementById('pin-screen').style.display = 'none';
         // FIX SYNC: Actualizar desde Sheets con indicador visible (no silencioso)
         mostrarSync('🔄', 'Sincronizando con la nube...', 'Un momento...');
@@ -6662,6 +6850,10 @@ async function pinVerificar(){
     _pinVerificado = true;
     _pinGuardado = _pinIngresado;
     cargarDesdeSheets(res.data);
+    _firmaNube = firmaDatos(res.data);
+    _ultimaSync = Date.now();
+    setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
+    iniciarAutoSync();
     document.getElementById('pin-screen').style.display = 'none';
   } catch(err) {
     ocultarSync();
@@ -6674,6 +6866,8 @@ async function pinVerificar(){
           _pinVerificado = true;
           _pinGuardado = _pinIngresado;
           cargarDesdeSheets(d.data || {});
+          _firmaNube = firmaDatos(d.data || {});
+          setSyncStatus('Local sin red', 'err');
           document.getElementById('pin-screen').style.display = 'none';
           setTimeout(()=>alert('⚠️ Sin conexión. Mostrando último guardado local.'), 300);
           return;
@@ -6757,6 +6951,9 @@ async function _verificarYActualizarDesdeSheets(){
       if(costosScreen && costosScreen.classList.contains('active')) renderCostos();
       normalizarFechasApp();
       guardarLocal(construirPayload());
+      _firmaNube = firmaDatos(data);
+      _ultimaSync = Date.now();
+      setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
     }
   } catch(e){
     // FIX SYNC: Avisar visiblemente que no se pudo sincronizar (antes era silencioso)
@@ -6798,6 +6995,8 @@ async function apiCall(body, timeoutMs){
 async function sincronizarConSheets(){
   if(!_pinVerificado) return false;
   const payload = construirPayload();
+  _syncDirty = true;
+  setSyncStatus('Guardando...', 'warn');
   guardarLocal(payload);
   return _sincronizarBackground(payload);
 }
@@ -6830,11 +7029,66 @@ function guardarLocal(payload){
 }
 
 // Sincronización en background — no bloquea nada, solo muestra emoji pequeño
+function firmaDatos(data){
+  try { return JSON.stringify(data || {}); } catch(e){ return ''; }
+}
+function setSyncStatus(texto, tipo=''){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  el.textContent = texto;
+  el.className = 'sync-status ' + tipo;
+}
+function textoHace(ts){
+  if(!ts) return '';
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if(s < 60) return `hace ${s}s`;
+  return `hace ${Math.round(s / 60)}m`;
+}
+function iniciarAutoSync(){
+  if(_syncTimer) clearInterval(_syncTimer);
+  _syncTimer = setInterval(verificarCambiosNube, 60000);
+  setTimeout(verificarCambiosNube, 12000);
+}
+async function verificarCambiosNube(){
+  if(!_pinVerificado || _syncChecking || _syncDirty) return;
+  _syncChecking = true;
+  try {
+    setSyncStatus('Revisando...', 'warn');
+    const res = await apiCall({ accion:'cargar', pin:_pinGuardado }, 60000);
+    if(res && res.ok && res.data){
+      const firma = firmaDatos(res.data);
+      if(_firmaNube && firma && firma !== _firmaNube){
+        cargarDesdeSheets(res.data);
+        _firmaNube = firma;
+        _ultimaSync = Date.now();
+        setSyncStatus('Cambios nuevos', 'warn');
+        const ahora = Date.now();
+        if(ahora - _ultimoAvisoCambio > 30000){
+          _ultimoAvisoCambio = ahora;
+          const ind = document.getElementById('sync-indicador');
+          if(ind){ ind.style.display='flex'; ind.textContent='🔄'; setTimeout(()=>{ ind.style.display='none'; }, 3000); }
+        }
+      } else {
+        _firmaNube = firma || _firmaNube;
+        _ultimaSync = Date.now();
+        setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
+      }
+    }
+  } catch(e){
+    setSyncStatus('Sin conexión', 'err');
+  } finally {
+    _syncChecking = false;
+  }
+}
 async function _sincronizarBackground(payload){
   const ind = document.getElementById('sync-indicador');
   if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
   try {
     await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 45000);
+    _syncDirty = false;
+    _ultimaSync = Date.now();
+    _firmaNube = firmaDatos(payload || construirPayload());
+    setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
     if(ind){
       ind.textContent = '✅';
       ind.title = 'Sincronizado con Google Sheets';
@@ -6843,6 +7097,7 @@ async function _sincronizarBackground(payload){
     return true;
   } catch(err){
     console.error('[YORITEX] Error al guardar en Google Sheets:', err);
+    setSyncStatus('Error al guardar', 'err');
     if(ind){
       ind.textContent='⚠️';
       ind.title = err.message || 'No se pudo sincronizar';
@@ -7174,6 +7429,10 @@ function inicializarUI(){
   }
   initDashSelectors();
   inicializarBuscadores();
+  ['nc-costo','nc-bulk-lista','nc-bulk-cantidad','nc-bulk-pass-same'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', ncBulkPreview);
+  });
   mvPoblarCategorias();
   ncPoblarCategorias();
   poblarSrvCatSelect();
