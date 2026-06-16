@@ -7093,6 +7093,7 @@ async function _verificarYActualizarDesdeSheets(){
       if(Array.isArray(data.plantillasWA) && data.plantillasWA.length)
         PLANTILLAS_WA.splice(0, PLANTILLAS_WA.length, ...data.plantillasWA);
       if(data.config) Object.assign(APP.config, data.config);
+      sanearMojibakeDatos();
       aplicarFondoMarca();
       // Actualizar solo las vistas que estÃ¡n visibles, sin resetear filtros
       renderRegistro();
@@ -7466,6 +7467,7 @@ function cargarDesdeSheets(data){
   if(Array.isArray(data.plantillasWA) && data.plantillasWA.length)
     PLANTILLAS_WA.splice(0, PLANTILLAS_WA.length, ...data.plantillasWA);
   if(data.config) Object.assign(APP.config, data.config);
+  sanearMojibakeDatos();
   aplicarFondoMarca();
 
   // Recalcular contador de ventas
@@ -7581,6 +7583,7 @@ function cerrarSesion(){
 // INIT â€” ConfiguraciÃ³n inicial de modales
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function inicializarUI(){
+  sanearMojibakeDatos();
   normalizarFechasApp();
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
   ['mv-fecha','costo-fecha','bin-fecha','rem-fecha'].forEach(id => {
@@ -7621,15 +7624,96 @@ function inicializarUI(){
   }
 }
 
+function repararMojibakeManual(txt){
+  if(typeof txt !== 'string') return txt;
+  const pares = [
+    ['ðŸ”„','🔄'], ['ðŸ”','🔍'], ['ðŸŽ¬','🎬'], ['ðŸŽµ','🎵'], ['ðŸª','🎵'], ['ðŸŽ¨','🎨'], ['ðŸŽ‰','🎉'], ['ðŸ“¡','📡'], ['ðŸ“¦','📦'], ['ðŸ“‹','📋'], ['ðŸ“§','📧'], ['ðŸ“…','📅'], ['ðŸ“º','📺'], ['ðŸ“£','📣'], ['ðŸ“Œ','📌'],
+    ['ðŸ¤–','🤖'], ['ðŸ’¾','💾'], ['ðŸ’¸','💸'], ['ðŸ’³','💳'], ['ðŸ’µ','💵'], ['ðŸ‘‹','👋'], ['ðŸ‘¤','👤'], ['ðŸ˜Š','😊'], ['ðŸ°','🏰'], ['ðŸ–Œï¸','🖌️'],
+    ['âœ‚ï¸','✂️'], ['âœï¸','✏️'], ['âš¡','⚡'], ['âš™ï¸','⚙️'], ['âš™','⚙️'], ['ðŸ—‘ï¸','🗑️'], ['âœ…','✅'], ['âŒ','❌'], ['âš ï¸','⚠️'], ['â˜ï¸','☁️'], ['ðŸ”','🔐'], ['ðŸ”§','🔧'], ['ðŸ””','🔔'],
+    ['Ã¡','á'], ['Ã©','é'], ['Ã­','í'], ['Ã³','ó'], ['Ãº','ú'], ['Ã±','ñ'], ['Ã','Á'], ['Ã‰','É'], ['Ã','Í'], ['Ã“','Ó'], ['Ãš','Ú'], ['Ã‘','Ñ'],
+    ['Â¿','¿'], ['Â¡','¡'], ['Â·','·'], ['Ã—','×'], ['â€”','—'], ['â€“','–'], ['â†’','→'], ['â‰ˆ','≈'], ['â‰¤','≤'], ['â€œ','“'], ['â€','”'], ['â€˜','‘'], ['â€™','’'], ['âŒ«','⌫'], ['ï¼‹','＋']
+  ];
+  let out = txt;
+  pares.forEach(([a,b]) => { out = out.split(a).join(b); });
+  return out;
+}
+
 function repararMojibakeTexto(txt){
-  if(typeof txt !== 'string' || !/[ÃÂâð]/.test(txt)) return txt;
+  if(typeof txt !== 'string') return txt;
+  txt = repararMojibakeManual(txt);
+  if(!/[ÃÂâðï]/.test(txt)) return txt;
   try {
-    const dec = decodeURIComponent(escape(txt));
+    const cp1252 = {
+      0x20AC:0x80, 0x201A:0x82, 0x0192:0x83, 0x201E:0x84, 0x2026:0x85, 0x2020:0x86, 0x2021:0x87,
+      0x02C6:0x88, 0x2030:0x89, 0x0160:0x8A, 0x2039:0x8B, 0x0152:0x8C, 0x017D:0x8E,
+      0x2018:0x91, 0x2019:0x92, 0x201C:0x93, 0x201D:0x94, 0x2022:0x95, 0x2013:0x96, 0x2014:0x97,
+      0x02DC:0x98, 0x2122:0x99, 0x0161:0x9A, 0x203A:0x9B, 0x0153:0x9C, 0x017E:0x9E, 0x0178:0x9F
+    };
+    const bytes = [];
+    for(const ch of txt){
+      const code = ch.codePointAt(0);
+      if(code <= 0xFF) bytes.push(code);
+      else if(cp1252[code]) bytes.push(cp1252[code]);
+      else {
+        bytes.length = 0;
+        break;
+      }
+    }
+    if(!bytes.length) return repararMojibakeManual(txt);
+    const dec = repararMojibakeManual(new TextDecoder('utf-8').decode(new Uint8Array(bytes)));
     const score = s => ((s.match(/[ÃÂâð�]/g) || []).length);
     return score(dec) < score(txt) ? dec : txt;
   } catch(e){
-    return txt;
+    return repararMojibakeManual(txt);
   }
+}
+
+function sanearMojibakeEnObjeto(obj, vistos){
+  if(!obj || typeof obj !== 'object') return obj;
+  vistos = vistos || new WeakSet();
+  if(vistos.has(obj)) return obj;
+  vistos.add(obj);
+  if(Array.isArray(obj)){
+    obj.forEach((v,i) => {
+      if(typeof v === 'string') obj[i] = repararMojibakeTexto(v);
+      else sanearMojibakeEnObjeto(v, vistos);
+    });
+    return obj;
+  }
+  Object.keys(obj).forEach(k => {
+    const v = obj[k];
+    if(typeof v === 'string') obj[k] = repararMojibakeTexto(v);
+    else sanearMojibakeEnObjeto(v, vistos);
+  });
+  return obj;
+}
+
+function normalizarEmojisCatalogo(){
+  const catEmoji = {
+    'cat-streaming':'🎬', 'cat-herramienta':'🤖', 'cat-diseno':'🎨',
+    'cat-nube':'☁️', 'cat-iptv':'📡', 'cat-otros':'📦'
+  };
+  const srvEmoji = {
+    'srv-netflix':'🎬', 'srv-spotify':'🎵', 'srv-disney':'🏰', 'srv-hbo':'📺',
+    'srv-chatgpt':'🤖', 'srv-capcut':'✂️', 'srv-canva':'🖌️',
+    'srv-google-one':'💾', 'srv-iptv':'📡'
+  };
+  const gastoEmoji = {
+    'cg-cuentas':'📦', 'cg-publicidad':'📣', 'cg-suscripcion':'🔧',
+    'cg-operativo':'🏧', 'cg-otro':'📌'
+  };
+  CATALOGO_CATEGORIAS.forEach(c => { if(catEmoji[c.uid]) c.emoji = catEmoji[c.uid]; });
+  CATALOGO_SERVICIOS.forEach(s => { if(srvEmoji[s.uid]) s.emoji = srvEmoji[s.uid]; });
+  CATALOGO_CAT_GASTOS.forEach(g => { if(gastoEmoji[g.uid]) g.emoji = gastoEmoji[g.uid]; });
+}
+
+function sanearMojibakeDatos(){
+  sanearMojibakeEnObjeto(APP);
+  sanearMojibakeEnObjeto(CATALOGO_CATEGORIAS);
+  sanearMojibakeEnObjeto(CATALOGO_SERVICIOS);
+  sanearMojibakeEnObjeto(CATALOGO_CAT_GASTOS);
+  sanearMojibakeEnObjeto(PLANTILLAS_WA);
+  normalizarEmojisCatalogo();
 }
 function repararMojibakeDOM(root){
   root = root || document.body;
