@@ -1911,6 +1911,7 @@ let APP = {
   reembolsos: [],
   movimientosBinance: [], // NUEVO: Kardex de movimientos Binance
   ventasEliminadas: [],   // lista negra de UIDs eliminados (para no reinyectar históricas)
+  cuentasEliminadas: [],  // lista negra de cuentas eliminadas (para no reinyectar historicas)
   _ventaCounter: 1,
   _filtroReg: 'hoy',
   _filtroInv: 'todos',
@@ -3231,12 +3232,16 @@ function eliminarVenta(ventaUid){
   if(!confirm(`¿Eliminar la venta de ${v.cliente} — ${v.srvNom} ($${v.precio.toFixed(2)})?\n\nEsto la borrará del registro y de la contabilidad.`)) return;
   quitarCostosDeVenta(v);
   liberarCuposDeVenta(v);
+  if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
+  if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
   APP.ventas = APP.ventas.filter(x => x.uid !== ventaUid);
   renderRegistro();
+  renderInventario();
   renderCostos();
   renderBinance();
   actualizarSaldoBinance();
   renderBadgeVencimientos();
+  if(typeof renderDashboard === 'function') renderDashboard();
   sincronizarConSheets();
 }
 
@@ -4173,6 +4178,8 @@ function eliminarCuenta(uid){
     const borrarCostos = confirm(`Esta cuenta tiene ${costosCuenta.length} costo(s) asociado(s) por $${totalCostos.toFixed(2)}.\n\nSi los eliminas, tambien se quitaran de Costos y del kardex Binance cuando corresponda.\n\nAceptar = borrar cuenta Y costos\nCancelar = borrar solo la cuenta`);
     if(borrarCostos) eliminarCostosAsociadosCuenta(uid);
   }
+  if(!APP.cuentasEliminadas) APP.cuentasEliminadas = [];
+  if(!APP.cuentasEliminadas.includes(uid)) APP.cuentasEliminadas.push(uid);
   desvincularVentasDeCuenta(c);
   APP.cuentas = APP.cuentas.filter(c => c.uid !== uid);
   renderInventario();
@@ -6744,7 +6751,7 @@ function restaurarBackupJSON(input){
       if(!confirm('⚠️ Esto reemplazará TODOS tus datos actuales. ¿Continuar?')) return;
       // SECURITY: Only copy known safe keys, not arbitrary properties
       if(datos.APP && typeof datos.APP === 'object'){
-        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','movimientosBinance','ventasEliminadas','config'];
+        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','movimientosBinance','ventasEliminadas','cuentasEliminadas','config'];
         safeAPPKeys.forEach(k => { if(datos.APP[k] !== undefined) APP[k] = datos.APP[k]; });
         APP._ventaCounter = datos.APP._ventaCounter || 1;
       }
@@ -6895,7 +6902,9 @@ async function _verificarYActualizarDesdeSheets(){
       const data = res.data;
       // Cargar lista negra de UIDs eliminados
       APP.ventasEliminadas = Array.isArray(data.ventasEliminadas) ? data.ventasEliminadas : (APP.ventasEliminadas || []);
+      APP.cuentasEliminadas = Array.isArray(data.cuentasEliminadas) ? data.cuentasEliminadas : (APP.cuentasEliminadas || []);
       const eliminadosSet = new Set(APP.ventasEliminadas);
+      const cuentasEliminadasSet = new Set(APP.cuentasEliminadas);
 
       const ventasSheets = Array.isArray(data.ventas)
         ? data.ventas.map(v => normalizarVenta(v))
@@ -6910,7 +6919,9 @@ async function _verificarYActualizarDesdeSheets(){
         if(v.uid && v.uid.startsWith('hist-')) return { ...v, precio: 0, costoAdq: 0 };
         return v;
       });
-      APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas.map(normalizarCuenta) : APP.cuentas;
+      APP.cuentas = Array.isArray(data.cuentas)
+        ? data.cuentas.map(normalizarCuenta).filter(c => !cuentasEliminadasSet.has(c.uid))
+        : (APP.cuentas || []).filter(c => !cuentasEliminadasSet.has(c.uid));
 
       // ── CORTE FINANCIERO 2026-06-07 ──
       const FECHA_CORTE = '2026-06-07';
@@ -7017,6 +7028,7 @@ function construirPayload(){
     recargas: APP.recargas, reembolsos: APP.reembolsos,
     movimientosBinance: APP.movimientosBinance || [],
     ventasEliminadas: APP.ventasEliminadas || [],  // lista negra de UIDs eliminados
+    cuentasEliminadas: APP.cuentasEliminadas || [],
     catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
     catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: configParaSync()
   };
@@ -7185,7 +7197,8 @@ function normalizarCuenta(c){
       vence: parsearFecha(cu.vence) || cu.vence || '',
       pendienteCobro: cu.pendienteCobro === true || cu.pendienteCobro === 'TRUE' || cu.pendienteCobro === 'true',
       periodoDesde: parsearFecha(cu.periodoDesde) || cu.periodoDesde || '',
-      periodoHasta: parsearFecha(cu.periodoHasta) || cu.periodoHasta || ''
+      periodoHasta: parsearFecha(cu.periodoHasta) || cu.periodoHasta || '',
+      montoVenta: isNaN(parseFloat(cu.montoVenta)) ? 0 : parseFloat(cu.montoVenta)
     })) : []
   };
 }
@@ -7223,6 +7236,7 @@ function normalizarVenta(v){
     dias:   (parseInt(v.dias) > 0) ? parseInt(v.dias) : 30,
     precio: isNaN(parseFloat(v.precio)) ? 0 : parseFloat(v.precio),
     activa: (v.activa === 'false' || v.activa === false) ? false : true,
+    eliminadoRegistro: v.eliminadoRegistro === true || v.eliminadoRegistro === 'TRUE' || v.eliminadoRegistro === 'true',
     wa:     waCorregido,
     correo: v.correo || '',
     metodo: v.metodo || 'Transferencia',
@@ -7241,7 +7255,9 @@ function cargarDesdeSheets(data){
 
   // Cargar lista negra de UIDs eliminados
   APP.ventasEliminadas = Array.isArray(data.ventasEliminadas) ? data.ventasEliminadas : [];
+  APP.cuentasEliminadas = Array.isArray(data.cuentasEliminadas) ? data.cuentasEliminadas : [];
   const eliminadosSet = new Set(APP.ventasEliminadas);
+  const cuentasEliminadasSet = new Set(APP.cuentasEliminadas);
 
   // Normalizar todas las ventas de Sheets
   const ventasSheets = Array.isArray(data.ventas)
@@ -7259,7 +7275,9 @@ function cargarDesdeSheets(data){
     return v;
   });
 
-  APP.cuentas = Array.isArray(data.cuentas) ? data.cuentas.map(normalizarCuenta) : [];
+  APP.cuentas = Array.isArray(data.cuentas)
+    ? data.cuentas.map(normalizarCuenta).filter(c => !cuentasEliminadasSet.has(c.uid))
+    : [];
 
   // ── CORTE FINANCIERO 2026-06-07 ──
   // Conservar costos con fecha >= corte O marcados como esCostoReal
@@ -7347,7 +7365,9 @@ function inyectarDatosPDF(){
   ];
 
   // Solo agregar cuentas al inventario — sin costos ni movimientos Binance
+  const cuentasEliminadasSet = new Set(APP.cuentasEliminadas || []);
   cuentasPDF.forEach(c => {
+    if(cuentasEliminadasSet.has(c.uid)) return;
     if(!APP.cuentas.find(x => x.uid === c.uid)){
       APP.cuentas.push({
         uid: c.uid, srvUid: c.srvUid, srvNom: c.srvNom,
