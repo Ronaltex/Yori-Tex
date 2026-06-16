@@ -7621,7 +7621,69 @@ function inicializarUI(){
   }
 }
 
+function repararMojibakeTexto(txt){
+  if(typeof txt !== 'string' || !/[ÃÂâð]/.test(txt)) return txt;
+  try {
+    const dec = decodeURIComponent(escape(txt));
+    const score = s => ((s.match(/[ÃÂâð�]/g) || []).length);
+    return score(dec) < score(txt) ? dec : txt;
+  } catch(e){
+    return txt;
+  }
+}
+function repararMojibakeDOM(root){
+  root = root || document.body;
+  if(!root || root.nodeType !== 1) return;
+  const attrs = ['placeholder','title','aria-label','alt'];
+  const repararAttrs = el => {
+    attrs.forEach(a => {
+      if(el.hasAttribute && el.hasAttribute(a)){
+        const old = el.getAttribute(a);
+        const fixed = repararMojibakeTexto(old);
+        if(fixed !== old) el.setAttribute(a, fixed);
+      }
+    });
+  };
+  repararAttrs(root);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let n;
+  while((n = walker.nextNode())){
+    if(n.nodeType === 3){
+      const fixed = repararMojibakeTexto(n.nodeValue);
+      if(fixed !== n.nodeValue) n.nodeValue = fixed;
+    } else {
+      repararAttrs(n);
+    }
+  }
+}
+function iniciarReparadorMojibake(){
+  repararMojibakeDOM(document.body);
+  let fixing = false;
+  const obs = new MutationObserver(muts => {
+    if(fixing) return;
+    fixing = true;
+    requestAnimationFrame(() => {
+      muts.forEach(m => {
+        if(m.type === 'characterData' && m.target){
+          const fixed = repararMojibakeTexto(m.target.nodeValue);
+          if(fixed !== m.target.nodeValue) m.target.nodeValue = fixed;
+        }
+        m.addedNodes && m.addedNodes.forEach(node => {
+          if(node.nodeType === 1) repararMojibakeDOM(node);
+          else if(node.nodeType === 3){
+            const fixed = repararMojibakeTexto(node.nodeValue);
+            if(fixed !== node.nodeValue) node.nodeValue = fixed;
+          }
+        });
+      });
+      fixing = false;
+    });
+  });
+  obs.observe(document.body, { childList:true, subtree:true, characterData:true });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  iniciarReparadorMojibake();
   if(new URLSearchParams(location.search).has('clean')){
     try {
       localStorage.removeItem('yoritex_local');
