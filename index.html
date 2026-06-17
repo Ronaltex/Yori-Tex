@@ -789,6 +789,7 @@ body.bg-solid{
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <div id="sync-indicador" style="display:none;font-size:16px;transition:all 0.3s"></div>
+    <button id="cloud-changes-btn" onclick="abrirCambiosNube()" title="Ver cambios de la nube" style="display:none;position:relative;width:32px;height:32px;border-radius:10px;border:1px solid var(--orange-border);background:var(--yellow-bg);color:var(--orange);font-size:16px;font-weight:800">☁<span style="position:absolute;right:4px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--surface)"></span></button>
     <div id="sync-status" class="sync-status" onclick="sincronizarManual()" title="Toca para sincronizar ahora">Sin iniciar</div>
     <div class="header-right" id="header-fecha"></div>
   </div>
@@ -912,6 +913,14 @@ body.bg-solid{
     <div class="kpi morado"><div class="kl">Reembolsos</div><div class="kv" id="d-reemb">$0</div><div class="ksub" id="d-reemb-s">0 reembolsos</div></div>
     <div class="kpi rojo"><div class="kl">Sueldo retirado</div><div class="kv" id="d-sueldo">$0</div><div class="ksub" id="d-sueldo-s">0 retiros</div></div>
     <div class="kpi gris"><div class="kl">Otros egresos</div><div class="kv" id="d-otros-egresos">$0</div><div class="ksub" id="d-otros-egresos-s">0 egresos</div></div>
+  </div>
+  <div class="sec">Caja disponible</div>
+  <div class="kpi-grid">
+    <div class="kpi amarillo"><div class="kl">Binance USDT</div><div class="kv" id="d-caja-usdt">0.00 USDT</div><div class="ksub" id="d-caja-usdt-usd">≈ $0.00</div></div>
+    <div class="kpi verde"><div class="kl">Banco / Transferencia</div><div class="kv" id="d-caja-banco">$0</div><div class="ksub" id="d-caja-banco-s">cobros - salidas</div></div>
+    <div class="kpi azul"><div class="kl">Efectivo</div><div class="kv" id="d-caja-efectivo">$0</div><div class="ksub" id="d-caja-efectivo-s">cobros - salidas</div></div>
+    <div class="kpi morado"><div class="kl">Otros medios</div><div class="kv" id="d-caja-otros">$0</div><div class="ksub" id="d-caja-otros-s">Deuna / tarjeta / otros</div></div>
+    <div class="kpi verde full"><div class="kl">Total disponible estimado</div><div class="kv" id="d-caja-total">$0</div><div class="ksub">caja calculada con datos sincronizados</div></div>
   </div>
   <div class="sec">ðŸ“‹ Estado de cobros</div>
   <div class="kpi-grid" style="grid-template-columns:1fr 1fr 1fr">
@@ -5582,6 +5591,44 @@ function estimarCostosCuentas(desde, hasta){
 }
 function setMoney(id, value){ const el = document.getElementById(id); if(el) el.textContent = '$' + (parseFloat(value)||0).toFixed(2); }
 function setText(id, value){ const el = document.getElementById(id); if(el) el.textContent = value; }
+function metodoCajaKey(m){
+  const k = metodoKeyCosto(m);
+  if(k === 'transferencia') return 'banco';
+  if(k === 'efectivo') return 'efectivo';
+  if(k === 'binance') return 'binance';
+  return 'otros';
+}
+function sumarPorMetodoCaja(items, campoMonto, filtro){
+  return (items || []).reduce((acc, item) => {
+    if(filtro && !filtro(item)) return acc;
+    const key = metodoCajaKey(item.metodo || item.metodoPago || item.metodoAdq);
+    acc[key] = (acc[key] || 0) + (parseFloat(item[campoMonto]) || 0);
+    return acc;
+  }, {banco:0, efectivo:0, binance:0, otros:0});
+}
+function renderCajaDisponible(){
+  const ventasPagadas = (APP.ventas || []).filter(v => v.activa !== false && v.estado === 'pagado');
+  const ingresos = sumarPorMetodoCaja(ventasPagadas, 'precio');
+  const costos = sumarPorMetodoCaja(APP.costos || [], 'montoUSD');
+  const reembolsos = sumarPorMetodoCaja(APP.reembolsos || [], 'monto');
+  const egresos = sumarPorMetodoCaja(APP.egresos || [], 'monto');
+  const neto = key => (ingresos[key] || 0) - (costos[key] || 0) - (reembolsos[key] || 0) - (egresos[key] || 0);
+  const saldoUsdt = getSaldoBinance();
+  const tasa = getTasaPromBinance();
+  const saldoUsdtUsd = saldoUsdt * tasa;
+  const banco = neto('banco');
+  const efectivo = neto('efectivo');
+  const otros = neto('otros');
+  setText('d-caja-usdt', saldoUsdt.toFixed(2) + ' USDT');
+  setText('d-caja-usdt-usd', '≈ $' + saldoUsdtUsd.toFixed(2));
+  setMoney('d-caja-banco', banco);
+  setText('d-caja-banco-s', '$' + (ingresos.banco || 0).toFixed(2) + ' cobrado - $' + (((costos.banco||0)+(reembolsos.banco||0)+(egresos.banco||0)).toFixed(2)) + ' salidas');
+  setMoney('d-caja-efectivo', efectivo);
+  setText('d-caja-efectivo-s', '$' + (ingresos.efectivo || 0).toFixed(2) + ' cobrado - $' + (((costos.efectivo||0)+(reembolsos.efectivo||0)+(egresos.efectivo||0)).toFixed(2)) + ' salidas');
+  setMoney('d-caja-otros', otros);
+  setText('d-caja-otros-s', 'Deuna/tarjeta/otros neto');
+  setMoney('d-caja-total', banco + efectivo + otros + saldoUsdtUsd);
+}
 function renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas){
   const mes = rangoMesActualPendiente(), prox = rangoProximoMes();
   const ingMes = estimarRenovaciones(mes.desde, mes.hasta), ingProx = estimarRenovaciones(prox.desde, prox.hasta);
@@ -5665,6 +5712,7 @@ function renderDashboard(){
   setText('d-sueldo-s', egPeriodo.filter(e => e.tipo === 'sueldo').length + ' retiro(s)');
   setMoney('d-otros-egresos', otrosEgresos);
   setText('d-otros-egresos-s', egPeriodo.filter(e => e.tipo !== 'sueldo').length + ' egreso(s)');
+  renderCajaDisponible();
   renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas);
   document.getElementById('d-pagados').textContent = cobradas.length;
   document.getElementById('d-pendientes').textContent = activas.filter(v => ['pendiente','por_cobrar'].includes(v.estado)).length;
@@ -7509,6 +7557,20 @@ function contarArr(x){ return Array.isArray(x) ? x.length : 0; }
 function firmaCambioDato(x){
   try { return JSON.stringify(x || null); } catch(e){ return ''; }
 }
+function resumenArrayPorUid(actualArr, nubeArr){
+  const a = Array.isArray(actualArr) ? actualArr : [];
+  const b = Array.isArray(nubeArr) ? nubeArr : [];
+  const keyOf = (x, i) => x && x.uid ? String(x.uid) : 'idx-' + i;
+  const mapA = new Map(a.map((x,i) => [keyOf(x,i), firmaCambioDato(x)]));
+  const mapB = new Map(b.map((x,i) => [keyOf(x,i), firmaCambioDato(x)]));
+  let agregados = 0, eliminados = 0, modificados = 0;
+  mapB.forEach((firma, k) => {
+    if(!mapA.has(k)) agregados++;
+    else if(mapA.get(k) !== firma) modificados++;
+  });
+  mapA.forEach((firma, k) => { if(!mapB.has(k)) eliminados++; });
+  return { agregados, eliminados, modificados, antes:a.length, nube:b.length };
+}
 function resumenCambiosNube(data){
   const actual = construirPayload();
   const pares = [
@@ -7519,9 +7581,12 @@ function resumenCambiosNube(data){
     ['plantillasWA','Plantillas'], ['config','Configuracion']
   ];
   return pares.map(([k,n]) => {
-    const antes = contarArr(actual[k]), nube = contarArr(data[k]);
+    const stats = Array.isArray(actual[k]) || Array.isArray(data[k])
+      ? resumenArrayPorUid(actual[k], data[k])
+      : { agregados:0, eliminados:0, modificados: firmaCambioDato(actual[k]) !== firmaCambioDato(data[k]) ? 1 : 0, antes:contarArr(actual[k]), nube:contarArr(data[k]) };
+    const antes = stats.antes, nube = stats.nube;
     const cambioDatos = firmaCambioDato(actual[k]) !== firmaCambioDato(data[k]);
-    return {n, antes, nube, cambioDatos};
+    return {n, antes, nube, cambioDatos, ...stats};
   }).filter(x => x.cambioDatos);
 }
 function mostrarCambiosNube(data){
@@ -7529,16 +7594,41 @@ function mostrarCambiosNube(data){
   const box = document.getElementById('sync-cambios-resumen');
   if(box) box.innerHTML = rows.length
     ? '<div style="font-weight:700;margin-bottom:8px">Cambios detectados:</div>' + rows.map(r => {
-        const detalle = r.antes !== r.nube ? `${r.antes} -> ${r.nube}` : 'datos modificados';
+        const partes = [];
+        if(r.agregados) partes.push('+' + r.agregados);
+        if(r.eliminados) partes.push('-' + r.eliminados);
+        if(r.modificados) partes.push(r.modificados + ' mod.');
+        const detalle = partes.length ? partes.join(' · ') : (r.antes !== r.nube ? `${r.antes} -> ${r.nube}` : 'datos modificados');
         return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)"><b>${r.n}</b><span>${detalle}</span></div>`;
       }).join('')
     : '<div>Hay cambios en datos existentes. Revisa antes de actualizar.</div>';
   abrirModal('modal-cambios-nube');
   repararMojibakeDOM(document.getElementById('modal-cambios-nube'));
 }
+function actualizarIndicadorCambiosNube(){
+  const btn = document.getElementById('cloud-changes-btn');
+  if(!btn) return;
+  if(_cambiosPendientesNube){
+    const rows = resumenCambiosNube(_cambiosPendientesNube.data || {});
+    btn.style.display = 'inline-flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.title = rows.length ? 'Cambios pendientes: ' + rows.map(r => r.n).join(', ') : 'Cambios pendientes en la nube';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+function abrirCambiosNube(){
+  if(!_cambiosPendientesNube){
+    sincronizarManual();
+    return;
+  }
+  mostrarCambiosNube(_cambiosPendientesNube.data);
+}
 function descartarCambiosNube(){
   cerrarModal('modal-cambios-nube');
   setSyncStatus('Cambios pendientes', 'warn');
+  actualizarIndicadorCambiosNube();
 }
 function aplicarCambiosNube(){
   if(!_cambiosPendientesNube) return cerrarModal('modal-cambios-nube');
@@ -7550,6 +7640,7 @@ function aplicarCambiosNube(){
   setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
   const ind = document.getElementById('sync-indicador');
   if(ind) ind.style.display = 'none';
+  actualizarIndicadorCambiosNube();
 }
 async function verificarCambiosNube(){
   if(!_pinVerificado || _syncChecking || _syncDirty) return;
@@ -7562,17 +7653,19 @@ async function verificarCambiosNube(){
       if(_firmaNube && firma && firma !== _firmaNube){
         _cambiosPendientesNube = { data: res.data, firma };
         setSyncStatus('Cambios nuevos', 'warn');
-        mostrarCambiosNube(res.data);
+        actualizarIndicadorCambiosNube();
         const ahora = Date.now();
         if(ahora - _ultimoAvisoCambio > 30000){
           _ultimoAvisoCambio = ahora;
           const ind = document.getElementById('sync-indicador');
-          if(ind){ ind.style.display='flex'; ind.textContent='ðŸ”„'; }
+          if(ind){ ind.style.display='flex'; ind.textContent='☁'; }
         }
       } else {
         _firmaNube = firma || _firmaNube;
         _ultimaSync = Date.now();
         setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
+        _cambiosPendientesNube = null;
+        actualizarIndicadorCambiosNube();
       }
     }
   } catch(e){
