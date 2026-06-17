@@ -935,6 +935,7 @@ body.bg-solid{
     <div class="kpi naranja"><div class="kl">Resultado estimado prÃ³x.</div><div class="kv" id="d-est-res-prox">$0</div></div>
   </div>
   <div class="card" id="dash-metas" style="padding:12px;margin-bottom:12px"></div>
+  <button class="btn btn-navy" style="margin-bottom:12px" onclick="abrirConfigMetas()">Editar metas</button>
   <div class="sec" id="dash-chart-titulo">ðŸ“ˆ Ingresos por semana</div>
   <div class="chart-wrap"><canvas id="chart-ingresos"></canvas></div>
   <div class="sec">ðŸ… Servicios mÃ¡s rentables</div>
@@ -2627,6 +2628,7 @@ function navIr(id, btn){
   if(id === 'dashboard') renderDashboard();
   if(id === 'costos') renderCostos();
   if(id === 'config') renderConfig();
+  setTimeout(sanitizarVistaActual, 0);
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -6663,6 +6665,21 @@ function cfgTab(tab, btn){
   if(tab === 'catalogos') renderCatalogos();
   if(tab === 'plantillas') renderPlantillas();
 }
+function abrirConfigMetas(){
+  const navBtns = Array.from(document.querySelectorAll('.nav-item'));
+  const cfgBtn = navBtns.find(b => (b.textContent || '').includes('Config')) || navBtns[navBtns.length - 1];
+  navIr('config', cfgBtn);
+  setTimeout(() => {
+    const marcaTab = document.querySelector('#s-config .tabs .tab');
+    if(marcaTab) cfgTab('marca', marcaTab);
+    const meta = document.getElementById('cfg-meta-ingresos');
+    if(meta){
+      meta.scrollIntoView({ behavior:'smooth', block:'center' });
+      meta.focus();
+    }
+    repararMojibakeDOM(document.getElementById('s-config'));
+  }, 80);
+}
 
 function catSubTab(tab, btn){
   document.getElementById('cat-subtab-servicios').style.display = tab==='servicios'?'block':'none';
@@ -7489,21 +7506,35 @@ function iniciarAutoSync(){
   setTimeout(verificarCambiosNube, 12000);
 }
 function contarArr(x){ return Array.isArray(x) ? x.length : 0; }
+function firmaCambioDato(x){
+  try { return JSON.stringify(x || null); } catch(e){ return ''; }
+}
 function resumenCambiosNube(data){
   const actual = construirPayload();
   const pares = [
     ['ventas','Ventas'], ['cuentas','Cuentas'], ['costos','Costos'],
-    ['reembolsos','Reembolsos'], ['egresos','Egresos'], ['movimientosBinance','Mov. Binance']
+    ['recargas','Recargas'], ['reembolsos','Reembolsos'], ['egresos','Egresos'],
+    ['movimientosBinance','Mov. Binance'], ['catalogoCategorias','Categorias'],
+    ['catalogoServicios','Servicios'], ['catalogoCatGastos','Cat. gastos'],
+    ['plantillasWA','Plantillas'], ['config','Configuracion']
   ];
-  return pares.map(([k,n]) => ({n, antes:contarArr(actual[k]), nube:contarArr(data[k])})).filter(x => x.antes !== x.nube);
+  return pares.map(([k,n]) => {
+    const antes = contarArr(actual[k]), nube = contarArr(data[k]);
+    const cambioDatos = firmaCambioDato(actual[k]) !== firmaCambioDato(data[k]);
+    return {n, antes, nube, cambioDatos};
+  }).filter(x => x.cambioDatos);
 }
 function mostrarCambiosNube(data){
   const rows = resumenCambiosNube(data);
   const box = document.getElementById('sync-cambios-resumen');
   if(box) box.innerHTML = rows.length
-    ? rows.map(r => `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><b>${r.n}</b><span>${r.antes} â†’ ${r.nube}</span></div>`).join('')
-    : '<div>Hay cambios en datos existentes. RevÃ­salos antes de actualizar.</div>';
+    ? '<div style="font-weight:700;margin-bottom:8px">Cambios detectados:</div>' + rows.map(r => {
+        const detalle = r.antes !== r.nube ? `${r.antes} -> ${r.nube}` : 'datos modificados';
+        return `<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)"><b>${r.n}</b><span>${detalle}</span></div>`;
+      }).join('')
+    : '<div>Hay cambios en datos existentes. Revisa antes de actualizar.</div>';
   abrirModal('modal-cambios-nube');
+  repararMojibakeDOM(document.getElementById('modal-cambios-nube'));
 }
 function descartarCambiosNube(){
   cerrarModal('modal-cambios-nube');
@@ -7949,6 +7980,7 @@ function repararMojibakeManual(txt){
   const pares = [
     ['ðŸ”„','🔄'], ['ðŸ”','🔍'], ['ðŸŽ¬','🎬'], ['ðŸŽµ','🎵'], ['ðŸª','🎵'], ['ðŸŽ¨','🎨'], ['ðŸŽ‰','🎉'], ['ðŸ“¡','📡'], ['ðŸ“¦','📦'], ['ðŸ“‹','📋'], ['ðŸ“§','📧'], ['ðŸ“…','📅'], ['ðŸ“º','📺'], ['ðŸ“£','📣'], ['ðŸ“Œ','📌'],
     ['ðŸ¤–','🤖'], ['ðŸ’¾','💾'], ['ðŸ’¸','💸'], ['ðŸ’³','💳'], ['ðŸ’µ','💵'], ['ðŸ‘‹','👋'], ['ðŸ‘¤','👤'], ['ðŸ˜Š','😊'], ['ðŸ°','🏰'], ['ðŸ–Œï¸','🖌️'],
+    ['ðŸŸ¡','🟡'], ['ðŸŸ¢','🟢'], ['ðŸ”´','🔴'], ['ðŸ•','🕐'], ['ðŸ¦','🏦'], ['ðŸŽ','🍎'], ['ðŸ—‚ï¸','🗂️'], ['ðŸ“¥','📥'], ['ðŸ“±','📱'],
     ['âœ‚ï¸','✂️'], ['âœï¸','✏️'], ['âš¡','⚡'], ['âš™ï¸','⚙️'], ['âš™','⚙️'], ['ðŸ—‘ï¸','🗑️'], ['âœ…','✅'], ['âŒ','❌'], ['âš ï¸','⚠️'], ['â˜ï¸','☁️'], ['ðŸ”','🔐'], ['ðŸ”§','🔧'], ['ðŸ””','🔔'],
     ['Ã¡','á'], ['Ã©','é'], ['Ã­','í'], ['Ã³','ó'], ['Ãº','ú'], ['Ã±','ñ'], ['Ã','Á'], ['Ã‰','É'], ['Ã','Í'], ['Ã“','Ó'], ['Ãš','Ú'], ['Ã‘','Ñ'],
     ['Â¿','¿'], ['Â¡','¡'], ['Â·','·'], ['Ã—','×'], ['â€”','—'], ['â€“','–'], ['â†’','→'], ['â‰ˆ','≈'], ['â‰¤','≤'], ['â€œ','“'], ['â€','”'], ['â€˜','‘'], ['â€™','’'], ['âŒ«','⌫'], ['ï¼‹','＋']
@@ -8093,10 +8125,28 @@ function instalarReparadorMensajes(){
   window.alert = msg => nativeAlert(repararMojibakeTexto(String(msg || '')));
   window.confirm = msg => nativeConfirm(repararMojibakeTexto(String(msg || '')));
 }
+function sanitizarVistaActual(){
+  const active = document.querySelector('.screen.active') || document.body;
+  repararMojibakeDOM(active);
+}
+function instalarSanitizadorRenders(){
+  if(window.__yoritexRenderFix) return;
+  window.__yoritexRenderFix = true;
+  ['renderRegistro','renderInventario','renderVencimientos','renderDashboard','renderCostos','renderConfig'].forEach(name => {
+    const original = window[name];
+    if(typeof original !== 'function') return;
+    window[name] = function(...args){
+      const res = original.apply(this, args);
+      setTimeout(sanitizarVistaActual, 0);
+      return res;
+    };
+  });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   iniciarReparadorMojibake();
   instalarReparadorMensajes();
+  instalarSanitizadorRenders();
   if(new URLSearchParams(location.search).has('clean')){
     try {
       localStorage.removeItem('yoritex_local');
