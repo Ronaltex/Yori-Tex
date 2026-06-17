@@ -902,12 +902,16 @@ body.bg-solid{
   <div class="kpi-grid">
     <div class="kpi verde"><div class="kl">Ingresos cobrados</div><div class="kv" id="d-ingresos">$0</div><div class="ksub" id="d-ingresos-s">0 ventas</div></div>
     <div class="kpi rojo"><div class="kl">Costos totales</div><div class="kv" id="d-costos">$0</div><div class="ksub" id="d-costos-sub">cuentas + gastos (FIFO)</div></div>
+    <div class="kpi naranja"><div class="kl">Egresos totales</div><div class="kv" id="d-egresos">$0</div><div class="ksub" id="d-egresos-s">costos + salidas</div></div>
+    <div class="kpi azul"><div class="kl">Ganancia bruta</div><div class="kv" id="d-gan-bruta">$0</div><div class="ksub">ingresos - costos</div></div>
     <div class="kpi azul full"><div class="kl">Ganancia neta</div><div class="kv" id="d-ganancia">$0</div><div class="ksub" id="d-margen">Margen 0%</div></div>
     <div class="kpi morado"><div class="kl">ROI</div><div class="kv" id="d-roi">0%</div><div class="ksub" id="d-roi-sub">retorno s/ inversiÃ³n</div></div>
     <div class="kpi azul"><div class="kl">Ticket promedio</div><div class="kv" id="d-ticket">$0</div></div>
     <div class="kpi amarillo"><div class="kl">Por cobrar</div><div class="kv" id="d-por-cobrar">$0</div></div>
     <div class="kpi naranja"><div class="kl">Gan. x cuenta</div><div class="kv" id="d-gan-cuenta">$0</div></div>
     <div class="kpi morado"><div class="kl">Reembolsos</div><div class="kv" id="d-reemb">$0</div><div class="ksub" id="d-reemb-s">0 reembolsos</div></div>
+    <div class="kpi rojo"><div class="kl">Sueldo retirado</div><div class="kv" id="d-sueldo">$0</div><div class="ksub" id="d-sueldo-s">0 retiros</div></div>
+    <div class="kpi gris"><div class="kl">Otros egresos</div><div class="kv" id="d-otros-egresos">$0</div><div class="ksub" id="d-otros-egresos-s">0 egresos</div></div>
   </div>
   <div class="sec">ðŸ“‹ Estado de cobros</div>
   <div class="kpi-grid" style="grid-template-columns:1fr 1fr 1fr">
@@ -921,6 +925,16 @@ body.bg-solid{
     <div class="kpi rojo"><div class="kl">No renovaron</div><div class="kv" id="d-inactivos">0</div></div>
     <div class="kpi azul"><div class="kl">Tasa renov.</div><div class="kv" id="d-tasa">0%</div></div>
   </div>
+  <div class="sec">ðŸ“Œ Estimaciones y metas</div>
+  <div class="kpi-grid">
+    <div class="kpi verde"><div class="kl">Renovaciones este mes</div><div class="kv" id="d-est-ing-mes">$0</div><div class="ksub" id="d-est-ing-mes-s">0 clientes/cupos</div></div>
+    <div class="kpi azul"><div class="kl">Renovaciones prÃ³x. mes</div><div class="kv" id="d-est-ing-prox">$0</div><div class="ksub" id="d-est-ing-prox-s">0 clientes/cupos</div></div>
+    <div class="kpi rojo"><div class="kl">Costos cuentas este mes</div><div class="kv" id="d-est-cost-mes">$0</div><div class="ksub" id="d-est-cost-mes-s">0 cuentas renovables</div></div>
+    <div class="kpi rojo"><div class="kl">Costos cuentas prÃ³x. mes</div><div class="kv" id="d-est-cost-prox">$0</div><div class="ksub" id="d-est-cost-prox-s">0 cuentas renovables</div></div>
+    <div class="kpi naranja"><div class="kl">Resultado estimado mes</div><div class="kv" id="d-est-res-mes">$0</div></div>
+    <div class="kpi naranja"><div class="kl">Resultado estimado prÃ³x.</div><div class="kv" id="d-est-res-prox">$0</div></div>
+  </div>
+  <div class="card" id="dash-metas" style="padding:12px;margin-bottom:12px"></div>
   <div class="sec" id="dash-chart-titulo">ðŸ“ˆ Ingresos por semana</div>
   <div class="chart-wrap"><canvas id="chart-ingresos"></canvas></div>
   <div class="sec">ðŸ… Servicios mÃ¡s rentables</div>
@@ -931,7 +945,10 @@ body.bg-solid{
   <div class="chart-wrap"><canvas id="chart-costos"></canvas></div>
   <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
     <span>â†©ï¸ Reembolsos</span>
-    <button class="btn btn-red" style="width:auto;padding:5px 12px;font-size:12px" onclick="abrirModal('modal-reembolso')">ï¼‹ Reembolso</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-navy" style="width:auto;padding:5px 12px;font-size:12px" onclick="abrirNuevoEgreso()">ï¼‹ Egreso</button>
+      <button class="btn btn-red" style="width:auto;padding:5px 12px;font-size:12px" onclick="abrirNuevoReembolso()">ï¼‹ Reembolso</button>
+    </div>
   </div>
   <div id="dash-reembolsos"><div class="empty"><div class="e-ico">ðŸ’¸</div><div>Sin reembolsos</div></div></div>
 </div>
@@ -1039,6 +1056,20 @@ body.bg-solid{
         <div class="field"><label>Texto de firma</label><textarea id="cfg-firma" oninput="actualizarFirmaPreview()"></textarea></div>
         <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Vista previa:</div>
         <div class="msg-preview">Â¡Hola <b>MarÃ­a</b>! ðŸ‘‹<br>Tu acceso estÃ¡ listo ðŸŽ‰<div class="msg-firma" id="firma-preview">â€” Cualquier consulta escrÃ­beme ðŸ˜Š<br>YORI-TEX | Streaming Premium</div></div>
+      </div>
+    </div>
+    <div class="cfg-section">
+      <div class="cfg-section-title">ðŸŽ¯ Metas del mes</div>
+      <div style="padding:14px">
+        <div class="row2">
+          <div class="field"><label>Meta ingresos ($)</label><input type="number" id="cfg-meta-ingresos" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>Meta ganancia neta ($)</label><input type="number" id="cfg-meta-ganancia" step="0.01" placeholder="0.00"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Meta ventas nuevas</label><input type="number" id="cfg-meta-ventas" step="1" placeholder="0"></div>
+          <div class="field"><label>Meta renovaciones</label><input type="number" id="cfg-meta-renovaciones" step="1" placeholder="0"></div>
+        </div>
+        <div class="field"><label>ROI objetivo (%)</label><input type="number" id="cfg-meta-roi" step="0.1" placeholder="0"></div>
       </div>
     </div>
     <div class="cfg-section">
@@ -1326,6 +1357,12 @@ body.bg-solid{
   <div class="row2">
     <div class="field"><label>Desde</label><input type="date" id="nc-desde"/></div>
     <div class="field"><label>Hasta (vence)</label><input type="date" id="nc-hasta"/></div>
+  </div>
+  <div class="field"><label>Tipo de ciclo</label>
+    <select id="nc-renovable">
+      <option value="si">Renovable</option>
+      <option value="no">No renovable / desechar al vencer</option>
+    </select>
   </div>
   <div class="divider"></div>
   <div class="sec">Costo de adquisiciÃ³n</div>
@@ -1790,7 +1827,8 @@ body.bg-solid{
 <div class="modal-overlay" id="modal-reembolso">
 <div class="modal-sheet">
   <div class="modal-handle"></div>
-  <div class="modal-title">â†©ï¸ Nuevo reembolso <button class="modal-close" onclick="cerrarModal('modal-reembolso')">Ã—</button></div>
+  <div class="modal-title" id="rem-modal-titulo">â†©ï¸ Nuevo reembolso <button class="modal-close" onclick="cerrarModal('modal-reembolso')">Ã—</button></div>
+  <input type="hidden" id="rem-edit-uid"/>
   <div class="field"><label>Fecha</label><input type="date" id="rem-fecha"/></div>
   <div class="field"><label>Cliente</label><input type="text" id="rem-cliente" placeholder="Nombre del cliente"/></div>
   <div class="field"><label>Servicio / cuenta</label><input type="text" id="rem-servicio" placeholder="Netflix â€” NET-01"/></div>
@@ -1799,8 +1837,39 @@ body.bg-solid{
     <div class="field"><label>Monto a devolver ($)</label><input type="number" id="rem-monto" placeholder="0.00" step="0.01"/></div>
     <div class="field"><label>MÃ©todo</label><select id="rem-metodo"><option>Transferencia</option><option>Binance USDT</option><option>Efectivo</option><option>Descuento prÃ³x.</option></select></div>
   </div>
-  <div class="aviso">âš ï¸ El reembolso se restarÃ¡ de los ingresos en el Dashboard.</div>
-  <button class="btn btn-red" onclick="remGuardar()">ðŸ’¾ Registrar reembolso</button>
+  <div class="aviso">âš ï¸ El reembolso se contarÃ¡ como egreso y bajarÃ¡ la ganancia neta.</div>
+  <button class="btn btn-red" onclick="remGuardar()">ðŸ’¾ Guardar reembolso</button>
+</div>
+</div>
+
+<!-- MODAL EGRESO -->
+<div class="modal-overlay" id="modal-egreso">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title" id="eg-modal-titulo">ðŸ’¸ Nuevo egreso <button class="modal-close" onclick="cerrarModal('modal-egreso')">Ã—</button></div>
+  <input type="hidden" id="eg-edit-uid"/>
+  <div class="field"><label>Fecha</label><input type="date" id="eg-fecha"/></div>
+  <div class="row2">
+    <div class="field"><label>Tipo</label><select id="eg-tipo"><option value="sueldo">Sueldo retirado</option><option value="otro">Otro egreso</option></select></div>
+    <div class="field"><label>MÃ©todo</label><select id="eg-metodo"><option>Transferencia</option><option>Binance USDT</option><option>Efectivo</option><option>Deuna</option><option>Tarjeta</option></select></div>
+  </div>
+  <div class="field"><label>DescripciÃ³n</label><input type="text" id="eg-desc" placeholder="Ej: sueldo semanal, comisiÃ³n, gasto interno..."/></div>
+  <div class="field"><label>Monto ($)</label><input type="number" id="eg-monto" placeholder="0.00" step="0.01"/></div>
+  <div class="field"><label>Notas</label><textarea id="eg-notas" placeholder="Opcional"></textarea></div>
+  <button class="btn btn-primary" onclick="egGuardar()">ðŸ’¾ Guardar egreso</button>
+</div>
+</div>
+
+<!-- MODAL CAMBIOS NUBE -->
+<div class="modal-overlay" id="modal-cambios-nube">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">ðŸ”„ Cambios nuevos en la nube <button class="modal-close" onclick="cerrarModal('modal-cambios-nube')">Ã—</button></div>
+  <div id="sync-cambios-resumen" class="card" style="padding:12px;margin-bottom:10px"></div>
+  <div class="row2">
+    <button class="btn btn-navy" onclick="descartarCambiosNube()">Ahora no</button>
+    <button class="btn btn-green" onclick="aplicarCambiosNube()">Actualizar ahora</button>
+  </div>
 </div>
 </div>
 
@@ -1858,6 +1927,18 @@ body.bg-solid{
   <div class="modal-handle"></div>
   <div class="modal-title" id="plt-modal-titulo">ðŸ’¬ Nueva plantilla <button class="modal-close" onclick="cerrarModal('modal-nueva-plantilla')">Ã—</button></div>
   <input type="hidden" id="plt-edit-uid"/>
+  <div class="field"><label>Se usarÃ¡ en</label>
+    <select id="plt-contexto">
+      <option value="general">General</option>
+      <option value="venta_nueva">Venta nueva</option>
+      <option value="cobro_pendiente">Cobro pendiente</option>
+      <option value="vencimiento">Vencimiento</option>
+      <option value="renovacion">RenovaciÃ³n</option>
+      <option value="no_renovo">No renovÃ³</option>
+      <option value="cuenta_caida">Cuenta caÃ­da</option>
+      <option value="reembolso">Reembolso</option>
+    </select>
+  </div>
   <div class="field"><label>Nombre de la plantilla</label><input type="text" id="plt-nombre" placeholder="Ej: Bienvenida, Recordatorio..."/></div>
   <div class="aviso" style="margin-top:4px">Variables disponibles: <span class="var-tag" onclick="insertVar('[CLIENTE]')"><b>[CLIENTE]</b></span> <span class="var-tag" onclick="insertVar('[SERVICIO]')"><b>[SERVICIO]</b></span> <span class="var-tag" onclick="insertVar('[VENCE]')"><b>[VENCE]</b></span> <span class="var-tag" onclick="insertVar('[PRECIO]')"><b>[PRECIO]</b></span> <span class="var-tag" onclick="insertVar('[PERFIL]')"><b>[PERFIL]</b></span> <span class="var-tag" onclick="insertVar('[PIN]')"><b>[PIN]</b></span> <span class="var-tag" onclick="insertVar('[CORREO]')"><b>[CORREO]</b></span></div>
   <div class="field"><label>Texto del mensaje</label><textarea id="plt-texto" style="height:140px" placeholder="Hola [CLIENTE]! Tu servicio [SERVICIO] vence el [VENCE]..."></textarea></div>
@@ -1880,6 +1961,7 @@ let _syncTimer = null;
 let _ultimaSync = null;
 let _firmaNube = '';
 let _ultimoAvisoCambio = 0;
+let _cambiosPendientesNube = null;
 
 // SECURITY: PIN brute-force lockout â€” max 5 intentos, luego bloqueo de 60 s
 let _pinIntentos = 0;
@@ -1915,6 +1997,7 @@ let APP = {
   costos: [],
   recargas: [],
   reembolsos: [],
+  egresos: [],
   movimientosBinance: [], // NUEVO: Kardex de movimientos Binance
   ventasEliminadas: [],   // lista negra de UIDs eliminados (para no reinyectar histÃ³ricas)
   cuentasEliminadas: [],  // lista negra de cuentas eliminadas (para no reinyectar historicas)
@@ -1934,7 +2017,8 @@ let APP = {
     fondoColor: '#091421',
     fondoImagen: null,
     fondoOpacidad: 16,
-    notifVenc: true
+    notifVenc: true,
+    metas: { ingresos: 0, ganancia: 0, ventas: 0, renovaciones: 0, roi: 0 }
   }
 };
 
@@ -2267,6 +2351,7 @@ function normalizarFechasApp(){
     APP.costos || [],
     APP.recargas || [],
     APP.reembolsos || [],
+    APP.egresos || [],
     APP.movimientosBinance || []
   ];
   listas.forEach(lista => lista.forEach(x => {
@@ -3667,6 +3752,7 @@ function enviarWA(numero, msg){
   const wa = String(numero).replace(/\D/g,'');
   if(!wa){ alert('NÃºmero de WhatsApp no disponible'); return; }
   // Abrir WA directamente con el mensaje en la URL â€” funciona en Android e iOS
+  msg = repararMojibakeTexto(msg);
   const url = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(msg);
   window.open(url, '_blank');
 }
@@ -4230,6 +4316,7 @@ function abrirEditarCuenta(cuentaUID){
     document.getElementById('nc-desde').value = c.desde || '';
     document.getElementById('nc-hasta').value = c.hasta || '';
     if(document.getElementById('nc-metodo-pago')) document.getElementById('nc-metodo-pago').value = c.metodoPago || 'Efectivo';
+    if(document.getElementById('nc-renovable')) document.getElementById('nc-renovable').value = (c.renovable === false || c.renovable === 'false' || c.renovable === 'no') ? 'no' : 'si';
     // Calcular cupos vendidos
     const vendidos = c.cupos.filter(cu => cu.estado === 'ocupado').length;
     document.getElementById('nc-vendidos').value = vendidos;
@@ -4476,6 +4563,7 @@ function abrirNuevaCuenta(){
   ncSetModo('individual');
   const modoTabs = document.getElementById('nc-modo-tabs');
   if(modoTabs) modoTabs.style.display = '';
+  if(document.getElementById('nc-renovable')) document.getElementById('nc-renovable').value = 'si';
   ncPoblarCategorias();
   abrirModal('modal-nueva-cuenta');
 }
@@ -4543,6 +4631,7 @@ function ncGuardarMasivo(){
   const ncDesde = document.getElementById('nc-desde').value;
   const ncHasta = document.getElementById('nc-hasta').value;
   const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
+  const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
   const notas = document.getElementById('nc-notas').value;
   const baseNum = APP.cuentas.length + 1;
   items.forEach((item, idx) => {
@@ -4552,6 +4641,7 @@ function ncGuardarMasivo(){
       uid: cuentaUID, srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo: item.correo,
       pass: item.pass,
       costo: costoCuenta, metodoPago, desde: ncDesde, hasta: ncHasta,
+      renovable,
       pventa,
       notas,
       cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
@@ -4586,6 +4676,7 @@ function ncGuardar(){
   const ncDesde = document.getElementById('nc-desde').value;
   const ncHasta = document.getElementById('nc-hasta').value;
   const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
+  const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
   if(editUID){
     const i = APP.cuentas.findIndex(c => c.uid === editUID);
     if(i > -1){
@@ -4597,6 +4688,7 @@ function ncGuardar(){
         ...APP.cuentas[i], srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo,
         pass: document.getElementById('nc-pass').value,
         costo: costoTotal, metodoPago, desde: ncDesde, hasta: ncHasta,
+        renovable,
         pventa,
         notas: document.getElementById('nc-notas').value,
         cupos: Array.from({length:numCupos}, (_,k) => old[k] || {estado:'libre'})
@@ -4608,6 +4700,7 @@ function ncGuardar(){
       uid: nuevaCuentaUID, srvUid, srvNom: srv ? srv.nombre : srvUid, id: idVal, correo,
       pass: document.getElementById('nc-pass').value,
       costo: costoTotal, metodoPago, desde: ncDesde, hasta: ncHasta,
+      renovable,
       pventa,
       notas: document.getElementById('nc-notas').value,
       cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
@@ -5454,6 +5547,66 @@ function filtrarInversionDash(){
   const p2pSum = recargas.reduce((s,r) => s + parseFloat((r.usdt * (r.tasa||1)).toFixed(2)), 0);
   return { p2pSum, directosSum, total: p2pSum + directosSum, recargasCnt: recargas.length };
 }
+function fechaEnPeriodoDash(fecha){
+  if(!fecha) return false;
+  if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta) return fecha >= _dashDesde && fecha <= _dashHasta;
+  if(_dashPeriodo === 'mes') return fecha.startsWith(String(_dashAnio)+'-'+String(_dashMes+1).padStart(2,'0'));
+  if(_dashPeriodo === 'semana'){ const d = new Date(); d.setDate(d.getDate()-7); return fecha >= d.toISOString().split('T')[0]; }
+  return true;
+}
+function rangoMesActualPendiente(){
+  const h = hoy();
+  const d = new Date(h + 'T12:00:00');
+  const fin = new Date(d.getFullYear(), d.getMonth()+1, 0);
+  return { desde:h, hasta:fin.toISOString().split('T')[0] };
+}
+function rangoProximoMes(){
+  const d = new Date(hoy() + 'T12:00:00');
+  const ini = new Date(d.getFullYear(), d.getMonth()+1, 1);
+  const fin = new Date(d.getFullYear(), d.getMonth()+2, 0);
+  return { desde:ini.toISOString().split('T')[0], hasta:fin.toISOString().split('T')[0] };
+}
+function fechaEnRango(fecha, desde, hasta){ return !!(fecha && fecha >= desde && fecha <= hasta); }
+function estimarRenovaciones(desde, hasta){
+  const ventas = (APP.ventas||[]).filter(v => v.activa !== false && fechaEnRango(v.vence, desde, hasta));
+  return { cnt: ventas.length, total: ventas.reduce((s,v)=>s+(parseFloat(v.precio)||0),0) };
+}
+function estimarCostosCuentas(desde, hasta){
+  const cuentas = (APP.cuentas||[]).filter(c =>
+    c.renovable !== false && c.renovable !== 'false' && c.renovable !== 'no' &&
+    fechaEnRango(c.hasta, desde, hasta)
+  );
+  return { cnt: cuentas.length, total: cuentas.reduce((s,c)=>s+(parseFloat(c.costo)||0),0) };
+}
+function setMoney(id, value){ const el = document.getElementById(id); if(el) el.textContent = '$' + (parseFloat(value)||0).toFixed(2); }
+function setText(id, value){ const el = document.getElementById(id); if(el) el.textContent = value; }
+function renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas){
+  const mes = rangoMesActualPendiente(), prox = rangoProximoMes();
+  const ingMes = estimarRenovaciones(mes.desde, mes.hasta), ingProx = estimarRenovaciones(prox.desde, prox.hasta);
+  const cosMes = estimarCostosCuentas(mes.desde, mes.hasta), cosProx = estimarCostosCuentas(prox.desde, prox.hasta);
+  setMoney('d-est-ing-mes', ingMes.total); setText('d-est-ing-mes-s', ingMes.cnt + ' clientes/cupos');
+  setMoney('d-est-ing-prox', ingProx.total); setText('d-est-ing-prox-s', ingProx.cnt + ' clientes/cupos');
+  setMoney('d-est-cost-mes', cosMes.total); setText('d-est-cost-mes-s', cosMes.cnt + ' cuentas renovables');
+  setMoney('d-est-cost-prox', cosProx.total); setText('d-est-cost-prox-s', cosProx.cnt + ' cuentas renovables');
+  setMoney('d-est-res-mes', ingMes.total - cosMes.total);
+  setMoney('d-est-res-prox', ingProx.total - cosProx.total);
+  const metas = APP.config.metas || {};
+  const rows = [
+    ['Ingresos', ingresos, metas.ingresos || 0, '$'],
+    ['Ganancia neta', ganancia, metas.ganancia || 0, '$'],
+    ['Ventas cobradas', cobradas.length, metas.ventas || 0, ''],
+    ['Renovaciones estimadas', ingMes.cnt, metas.renovaciones || 0, ''],
+    ['ROI', parseFloat(roi)||0, metas.roi || 0, '%']
+  ];
+  const el = document.getElementById('dash-metas');
+  if(!el) return;
+  el.innerHTML = rows.map(([n,act,meta,prefix]) => {
+    const pct = meta > 0 ? Math.min(100, (act/meta)*100) : 0;
+    const actTxt = prefix === '$' ? '$'+Number(act).toFixed(2) : Number(act).toFixed(prefix==='%'?1:0)+(prefix==='%'?'%':'');
+    const metaTxt = meta ? (prefix === '$' ? '$'+Number(meta).toFixed(2) : Number(meta).toFixed(prefix==='%'?1:0)+(prefix==='%'?'%':'')) : 'sin meta';
+    return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2)"><b>${n}</b><span>${actTxt} / ${metaTxt}</span></div><div class="bar-bg" style="height:7px"><div class="bar-fill" style="width:${pct.toFixed(0)}%;background:var(--orange)"></div></div></div>`;
+  }).join('');
+}
 function renderDashboard(){
   // Actualizar label de periodo
   let periodoLbl;
@@ -5472,25 +5625,26 @@ function renderDashboard(){
   const activas = ventas.filter(v => v.activa !== false);
   const cobradas = activas.filter(v => v.estado === 'pagado');
   const ingresos = cobradas.reduce((s,v) => s+v.precio, 0);
-  const remPeriodo = APP.reembolsos.filter(r => {
-    if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta)
-      return r.fecha && r.fecha >= _dashDesde && r.fecha <= _dashHasta;
-    if(_dashPeriodo === 'mes') return r.fecha && r.fecha.startsWith(String(_dashAnio)+'-'+String(_dashMes+1).padStart(2,'0'));
-    if(_dashPeriodo === 'semana'){ const d = new Date(); d.setDate(d.getDate()-7); return r.fecha >= d.toISOString().split('T')[0]; }
-    return true;
-  });
-  const totalRemb = remPeriodo.reduce((s,r) => s+r.monto, 0);
-  const ingresoNeto = ingresos - totalRemb;
+  const remPeriodo = (APP.reembolsos||[]).filter(r => fechaEnPeriodoDash(r.fecha));
+  const egPeriodo = (APP.egresos||[]).filter(e => fechaEnPeriodoDash(e.fecha));
+  const totalRemb = remPeriodo.reduce((s,r) => s+(parseFloat(r.monto)||0), 0);
+  const sueldoTotal = egPeriodo.filter(e => e.tipo === 'sueldo').reduce((s,e) => s+(parseFloat(e.monto)||0), 0);
+  const otrosEgresos = egPeriodo.filter(e => e.tipo !== 'sueldo').reduce((s,e) => s+(parseFloat(e.monto)||0), 0);
   const costosTot = gastos.reduce((s,g) => s+g.montoUSD, 0);
-  const ganancia = ingresoNeto - costosTot;
-  const margen = ingresoNeto > 0 ? ((ganancia/ingresoNeto)*100).toFixed(1) : 0;
-  const roi = costosTot > 0 ? ((ganancia/costosTot)*100).toFixed(1) : 0;
+  const egresosTot = costosTot + totalRemb + sueldoTotal + otrosEgresos;
+  const gananciaBruta = ingresos - costosTot;
+  const ganancia = ingresos - egresosTot;
+  const margen = ingresos > 0 ? ((ganancia/ingresos)*100).toFixed(1) : 0;
+  const roi = egresosTot > 0 ? ((ganancia/egresosTot)*100).toFixed(1) : 0;
   const ticket = cobradas.length ? (ingresos/cobradas.length).toFixed(2) : 0;
   const porCobrar = activas.filter(v => v.estado !== 'pagado').reduce((s,v) => s+v.precio, 0);
   const ganCuenta = APP.cuentas.length ? (ganancia/APP.cuentas.length).toFixed(2) : 0;
-  document.getElementById('d-ingresos').textContent = '$' + ingresoNeto.toFixed(2);
+  document.getElementById('d-ingresos').textContent = '$' + ingresos.toFixed(2);
   document.getElementById('d-ingresos-s').textContent = cobradas.length + ' cobradas';
   document.getElementById('d-costos').textContent = '$' + costosTot.toFixed(2);
+  setMoney('d-egresos', egresosTot);
+  setText('d-egresos-s', 'costos + reembolsos + sueldo');
+  setMoney('d-gan-bruta', gananciaBruta);
   const costosSub = document.getElementById('d-costos-sub');
   if(costosSub) costosSub.textContent = gastos.length + ' gasto' + (gastos.length!==1?'s':'') + ' Â· costo FIFO exacto';
   document.getElementById('d-ganancia').textContent = '$' + ganancia.toFixed(2);
@@ -5505,6 +5659,11 @@ function renderDashboard(){
   document.getElementById('d-gan-cuenta').textContent = '$' + ganCuenta;
   document.getElementById('d-reemb').textContent = '-$' + totalRemb.toFixed(2);
   document.getElementById('d-reemb-s').textContent = remPeriodo.length + ' reembolso' + (remPeriodo.length!==1?'s':'');
+  setMoney('d-sueldo', sueldoTotal);
+  setText('d-sueldo-s', egPeriodo.filter(e => e.tipo === 'sueldo').length + ' retiro(s)');
+  setMoney('d-otros-egresos', otrosEgresos);
+  setText('d-otros-egresos-s', egPeriodo.filter(e => e.tipo !== 'sueldo').length + ' egreso(s)');
+  renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas);
   document.getElementById('d-pagados').textContent = cobradas.length;
   document.getElementById('d-pendientes').textContent = activas.filter(v => ['pendiente','por_cobrar'].includes(v.estado)).length;
   document.getElementById('d-parciales').textContent = activas.filter(v => v.estado==='parcial').length;
@@ -5649,12 +5808,32 @@ function renderDashboard(){
     `<div class="reemb-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
         <div style="font-size:13px;font-weight:600;color:var(--white)">${r.cliente}</div>
-        <div style="font-size:14px;font-weight:700;color:var(--purple)">-$${r.monto.toFixed(2)}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <div style="font-size:14px;font-weight:700;color:var(--purple)">-$${r.monto.toFixed(2)}</div>
+          <button class="btn-sm" onclick="abrirEditarReembolso('${esc(r.uid)}')">âœï¸</button>
+          <button class="btn-sm" onclick="eliminarReembolso('${esc(r.uid)}')">ðŸ—‘ï¸</button>
+        </div>
       </div>
       <div style="font-size:12px;color:var(--text3)">${r.motivo||'â€”'} Â· ${r.metodo||'â€”'} Â· ${fmtFecha(r.fecha)}</div>
       <div style="font-size:12px;color:var(--text3);margin-top:2px">Servicio: ${r.servicio||'â€”'}</div>
     </div>`
   ).join('') : '<div class="empty"><div class="e-ico">ðŸ’¸</div><div>Sin reembolsos registrados</div></div>';
+  const egresosDash = (APP.egresos||[]).filter(e => fechaEnPeriodoDash(e.fecha));
+  if(egresosDash.length){
+    remEl.innerHTML += '<div class="sec" style="margin-top:12px">ðŸ’¸ Sueldo y otros egresos</div>' + egresosDash.map(e =>
+      `<div class="reemb-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <div style="font-size:13px;font-weight:600;color:var(--white)">${e.tipo === 'sueldo' ? 'Sueldo retirado' : 'Otro egreso'}</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <div style="font-size:14px;font-weight:700;color:var(--red)">-$${(parseFloat(e.monto)||0).toFixed(2)}</div>
+            <button class="btn-sm" onclick="abrirEditarEgreso('${esc(e.uid)}')">âœï¸</button>
+            <button class="btn-sm" onclick="eliminarEgreso('${esc(e.uid)}')">ðŸ—‘ï¸</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text3)">${esc(e.desc||'â€”')} Â· ${esc(e.metodo||'â€”')} Â· ${fmtFecha(e.fecha)}</div>
+      </div>`
+    ).join('');
+  }
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -6368,18 +6547,104 @@ function confirmarEliminarRecarga(ruid){
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // REEMBOLSOS
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+function abrirNuevoReembolso(){
+  document.getElementById('rem-modal-titulo').innerHTML = 'â†©ï¸ Nuevo reembolso <button class="modal-close" onclick="cerrarModal(\'modal-reembolso\')">Ã—</button>';
+  document.getElementById('rem-edit-uid').value = '';
+  ['rem-cliente','rem-servicio','rem-motivo','rem-monto'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('rem-fecha').value = hoy();
+  document.getElementById('rem-metodo').value = 'Transferencia';
+  abrirModal('modal-reembolso');
+}
 function remGuardar(){
   const cliente = document.getElementById('rem-cliente').value.trim();
   const monto = parseFloat(document.getElementById('rem-monto').value) || 0;
   if(!cliente || !monto){ alert('Completa cliente y monto'); return; }
-  APP.reembolsos.push({
-    uid: uid(), fecha: document.getElementById('rem-fecha').value || hoy(),
+  const datos = {
+    fecha: document.getElementById('rem-fecha').value || hoy(),
     cliente, servicio: document.getElementById('rem-servicio').value,
     motivo: document.getElementById('rem-motivo').value,
     monto, metodo: document.getElementById('rem-metodo').value,
     esCostoReal: true
-  });
+  };
+  const editUID = document.getElementById('rem-edit-uid').value;
+  if(editUID){
+    const i = APP.reembolsos.findIndex(r => r.uid === editUID);
+    if(i > -1) APP.reembolsos[i] = {...APP.reembolsos[i], ...datos};
+  } else {
+    APP.reembolsos.push({ uid: uid(), ...datos });
+  }
+  document.getElementById('rem-edit-uid').value = '';
   cerrarModal('modal-reembolso');
+  renderDashboard();
+  sincronizarConSheets();
+}
+function abrirEditarReembolso(ruid){
+  const r = (APP.reembolsos||[]).find(x => x.uid === ruid);
+  if(!r) return;
+  document.getElementById('rem-modal-titulo').innerHTML = 'âœï¸ Editar reembolso <button class="modal-close" onclick="cerrarModal(\'modal-reembolso\')">Ã—</button>';
+  document.getElementById('rem-edit-uid').value = ruid;
+  document.getElementById('rem-fecha').value = r.fecha || hoy();
+  document.getElementById('rem-cliente').value = r.cliente || '';
+  document.getElementById('rem-servicio').value = r.servicio || '';
+  document.getElementById('rem-motivo').value = r.motivo || '';
+  document.getElementById('rem-monto').value = r.monto || '';
+  document.getElementById('rem-metodo').value = r.metodo || 'Transferencia';
+  abrirModal('modal-reembolso');
+}
+function eliminarReembolso(ruid){
+  if(!confirm('Â¿Eliminar este reembolso?')) return;
+  APP.reembolsos = (APP.reembolsos||[]).filter(r => r.uid !== ruid);
+  renderDashboard();
+  sincronizarConSheets();
+}
+function abrirNuevoEgreso(){
+  document.getElementById('eg-modal-titulo').innerHTML = 'ðŸ’¸ Nuevo egreso <button class="modal-close" onclick="cerrarModal(\'modal-egreso\')">Ã—</button>';
+  document.getElementById('eg-edit-uid').value = '';
+  ['eg-desc','eg-monto','eg-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('eg-fecha').value = hoy();
+  document.getElementById('eg-tipo').value = 'sueldo';
+  document.getElementById('eg-metodo').value = 'Transferencia';
+  abrirModal('modal-egreso');
+}
+function egGuardar(){
+  const monto = parseFloat(document.getElementById('eg-monto').value) || 0;
+  const desc = document.getElementById('eg-desc').value.trim();
+  if(!monto || !desc){ alert('Completa descripciÃ³n y monto'); return; }
+  const datos = {
+    fecha: document.getElementById('eg-fecha').value || hoy(),
+    tipo: document.getElementById('eg-tipo').value,
+    metodo: document.getElementById('eg-metodo').value,
+    desc, monto, notas: document.getElementById('eg-notas').value
+  };
+  const editUID = document.getElementById('eg-edit-uid').value;
+  if(!APP.egresos) APP.egresos = [];
+  if(editUID){
+    const i = APP.egresos.findIndex(e => e.uid === editUID);
+    if(i > -1) APP.egresos[i] = {...APP.egresos[i], ...datos};
+  } else {
+    APP.egresos.push({ uid: uid(), ...datos });
+  }
+  document.getElementById('eg-edit-uid').value = '';
+  cerrarModal('modal-egreso');
+  renderDashboard();
+  sincronizarConSheets();
+}
+function abrirEditarEgreso(euid){
+  const e = (APP.egresos||[]).find(x => x.uid === euid);
+  if(!e) return;
+  document.getElementById('eg-modal-titulo').innerHTML = 'âœï¸ Editar egreso <button class="modal-close" onclick="cerrarModal(\'modal-egreso\')">Ã—</button>';
+  document.getElementById('eg-edit-uid').value = euid;
+  document.getElementById('eg-fecha').value = e.fecha || hoy();
+  document.getElementById('eg-tipo').value = e.tipo || 'otro';
+  document.getElementById('eg-metodo').value = e.metodo || 'Transferencia';
+  document.getElementById('eg-desc').value = e.desc || '';
+  document.getElementById('eg-monto').value = e.monto || '';
+  document.getElementById('eg-notas').value = e.notas || '';
+  abrirModal('modal-egreso');
+}
+function eliminarEgreso(euid){
+  if(!confirm('Â¿Eliminar este egreso?')) return;
+  APP.egresos = (APP.egresos||[]).filter(e => e.uid !== euid);
   renderDashboard();
   sincronizarConSheets();
 }
@@ -6415,6 +6680,11 @@ function renderConfig(){
   document.getElementById('cfg-nombre').value = APP.config.nombre;
   document.getElementById('cfg-slogan').value = APP.config.slogan || '';
   document.getElementById('cfg-wa').value = APP.config.wa || '';
+  const metas = APP.config.metas || {};
+  ['ingresos','ganancia','ventas','renovaciones','roi'].forEach(k => {
+    const el = document.getElementById('cfg-meta-' + k);
+    if(el) el.value = metas[k] || '';
+  });
   if(APP.config.logo){
     // SECURITY: Validate data URL before injecting
     if(/^data:image\/(png|jpeg|gif|webp);base64,/.test(APP.config.logo)){
@@ -6578,7 +6848,14 @@ function guardarConfig(){
     fondoColor: document.getElementById('cfg-fondo-color')?.value || APP.config.fondoColor || '#091421',
     fondoOpacidad: parseInt(document.getElementById('cfg-fondo-opacidad')?.value || APP.config.fondoOpacidad || 16),
     fondoImagen: APP.config.fondoImagen || null,
-    notifVenc: document.getElementById('notif-venc').checked
+    notifVenc: document.getElementById('notif-venc').checked,
+    metas: {
+      ingresos: parseFloat(document.getElementById('cfg-meta-ingresos')?.value) || 0,
+      ganancia: parseFloat(document.getElementById('cfg-meta-ganancia')?.value) || 0,
+      ventas: parseInt(document.getElementById('cfg-meta-ventas')?.value) || 0,
+      renovaciones: parseInt(document.getElementById('cfg-meta-renovaciones')?.value) || 0,
+      roi: parseFloat(document.getElementById('cfg-meta-roi')?.value) || 0
+    }
   };
   aplicarFondoMarca();
   const btn = event.target;
@@ -6761,7 +7038,7 @@ function eliminarCatGasto(cgUid){
 function resolverPlantilla(texto){
   // Reemplaza variables con datos del cliente si hay una venta activa seleccionada
   // Como las plantillas se usan en contexto general, hacemos sustituciÃ³n bÃ¡sica
-  return texto
+  return repararMojibakeTexto(texto || '')
     .replace(/\[FIRMA\]/g, APP.config.firma || '');
 }
 function copiarPlantilla(puid){
@@ -6792,7 +7069,7 @@ function renderPlantillas(){
   lista.innerHTML = PLANTILLAS_WA.map(p =>
     `<div class="plantilla-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="plantilla-titulo">${esc(p.nombre)}</div>
+        <div><div class="plantilla-titulo">${esc(p.nombre)}</div><div style="font-size:10px;color:var(--orange);text-transform:uppercase;font-weight:700">${esc(p.contexto||'general')}</div></div>
         <div style="display:flex;gap:4px">
           <button class="btn-sm" title="Copiar al portapapeles" onclick="copiarPlantilla('${esc(p.uid)}')">ðŸ“‹</button>
           <button class="btn-sm" onclick="abrirEditarPlantilla('${esc(p.uid)}')">âœï¸</button>
@@ -6816,9 +7093,10 @@ function pltGuardar(){
   const nombre = document.getElementById('plt-nombre').value.trim();
   const texto = document.getElementById('plt-texto').value.trim();
   if(!nombre || !texto){ alert('Completa nombre y texto'); return; }
+  const contexto = document.getElementById('plt-contexto')?.value || 'general';
   const editUID = document.getElementById('plt-edit-uid').value;
-  if(editUID){ const i = PLANTILLAS_WA.findIndex(p=>p.uid===editUID); if(i>-1) PLANTILLAS_WA[i]={...PLANTILLAS_WA[i],nombre,texto}; }
-  else PLANTILLAS_WA.push({ uid:uid(), nombre, texto });
+  if(editUID){ const i = PLANTILLAS_WA.findIndex(p=>p.uid===editUID); if(i>-1) PLANTILLAS_WA[i]={...PLANTILLAS_WA[i],nombre,texto,contexto}; }
+  else PLANTILLAS_WA.push({ uid:uid(), nombre, texto, contexto });
   document.getElementById('plt-edit-uid').value = '';
   cerrarModal('modal-nueva-plantilla');
   renderPlantillas();
@@ -6830,6 +7108,7 @@ function abrirEditarPlantilla(puid){
   document.getElementById('plt-edit-uid').value = puid;
   document.getElementById('plt-modal-titulo').innerHTML = 'âœï¸ Editar plantilla <button class="modal-close" onclick="cerrarModal(\'modal-nueva-plantilla\')">Ã—</button>';
   document.getElementById('plt-nombre').value = p.nombre;
+  if(document.getElementById('plt-contexto')) document.getElementById('plt-contexto').value = p.contexto || 'general';
   document.getElementById('plt-texto').value = p.texto;
   abrirModal('modal-nueva-plantilla');
 }
@@ -7079,6 +7358,9 @@ async function _verificarYActualizarDesdeSheets(){
       APP.reembolsos = Array.isArray(data.reembolsos)
         ? data.reembolsos.filter(r => r.esCostoReal == true || (r.fecha && r.fecha >= FECHA_CORTE)).map(r => ({...r, monto: parseFloat(r.monto)||0, esCostoReal: true}))
         : APP.reembolsos;
+      APP.egresos = Array.isArray(data.egresos)
+        ? data.egresos.filter(e => e.fecha && e.fecha >= FECHA_CORTE).map(e => ({...e, monto: parseFloat(e.monto)||0}))
+        : (APP.egresos || []);
       APP.movimientosBinance = Array.isArray(data.movimientosBinance)
         ? data.movimientosBinance.map(m => ({...m, usdt: parseFloat(m.usdt)||0, tasa: parseFloat(m.tasa)||0, montoUSD: parseFloat(m.montoUSD)||0, esCostoReal: true}))
         : APP.movimientosBinance;
@@ -7170,7 +7452,7 @@ function construirPayload(){
   }));
   return {
     ventas: ventasPayload, cuentas: APP.cuentas, costos: APP.costos,
-    recargas: APP.recargas, reembolsos: APP.reembolsos,
+    recargas: APP.recargas, reembolsos: APP.reembolsos, egresos: APP.egresos || [],
     movimientosBinance: APP.movimientosBinance || [],
     ventasEliminadas: APP.ventasEliminadas || [],  // lista negra de UIDs eliminados
     cuentasEliminadas: APP.cuentasEliminadas || [],
@@ -7206,6 +7488,38 @@ function iniciarAutoSync(){
   _syncTimer = setInterval(verificarCambiosNube, 60000);
   setTimeout(verificarCambiosNube, 12000);
 }
+function contarArr(x){ return Array.isArray(x) ? x.length : 0; }
+function resumenCambiosNube(data){
+  const actual = construirPayload();
+  const pares = [
+    ['ventas','Ventas'], ['cuentas','Cuentas'], ['costos','Costos'],
+    ['reembolsos','Reembolsos'], ['egresos','Egresos'], ['movimientosBinance','Mov. Binance']
+  ];
+  return pares.map(([k,n]) => ({n, antes:contarArr(actual[k]), nube:contarArr(data[k])})).filter(x => x.antes !== x.nube);
+}
+function mostrarCambiosNube(data){
+  const rows = resumenCambiosNube(data);
+  const box = document.getElementById('sync-cambios-resumen');
+  if(box) box.innerHTML = rows.length
+    ? rows.map(r => `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><b>${r.n}</b><span>${r.antes} â†’ ${r.nube}</span></div>`).join('')
+    : '<div>Hay cambios en datos existentes. RevÃ­salos antes de actualizar.</div>';
+  abrirModal('modal-cambios-nube');
+}
+function descartarCambiosNube(){
+  cerrarModal('modal-cambios-nube');
+  setSyncStatus('Cambios pendientes', 'warn');
+}
+function aplicarCambiosNube(){
+  if(!_cambiosPendientesNube) return cerrarModal('modal-cambios-nube');
+  cargarDesdeSheets(_cambiosPendientesNube.data);
+  _firmaNube = _cambiosPendientesNube.firma;
+  _ultimaSync = Date.now();
+  _cambiosPendientesNube = null;
+  cerrarModal('modal-cambios-nube');
+  setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
+  const ind = document.getElementById('sync-indicador');
+  if(ind) ind.style.display = 'none';
+}
 async function verificarCambiosNube(){
   if(!_pinVerificado || _syncChecking || _syncDirty) return;
   _syncChecking = true;
@@ -7215,15 +7529,14 @@ async function verificarCambiosNube(){
     if(res && res.ok && res.data){
       const firma = firmaDatos(res.data);
       if(_firmaNube && firma && firma !== _firmaNube){
-        cargarDesdeSheets(res.data);
-        _firmaNube = firma;
-        _ultimaSync = Date.now();
+        _cambiosPendientesNube = { data: res.data, firma };
         setSyncStatus('Cambios nuevos', 'warn');
+        mostrarCambiosNube(res.data);
         const ahora = Date.now();
         if(ahora - _ultimoAvisoCambio > 30000){
           _ultimoAvisoCambio = ahora;
           const ind = document.getElementById('sync-indicador');
-          if(ind){ ind.style.display='flex'; ind.textContent='ðŸ”„'; setTimeout(()=>{ ind.style.display='none'; }, 3000); }
+          if(ind){ ind.style.display='flex'; ind.textContent='ðŸ”„'; }
         }
       } else {
         _firmaNube = firma || _firmaNube;
@@ -7337,6 +7650,7 @@ function normalizarCuenta(c){
     hasta: parsearFecha(c.hasta) || c.hasta || '',
     costo: parseFloat(c.costo) || 0,
     archivada: c.archivada === true || c.archivada === 'TRUE' || c.archivada === 'true',
+    renovable: !(c.renovable === false || c.renovable === 'FALSE' || c.renovable === 'false' || c.renovable === 'no'),
     cupos: Array.isArray(c.cupos) ? c.cupos.map(cu => ({
       ...cu,
       vence: parsearFecha(cu.vence) || cu.vence || '',
@@ -7445,6 +7759,11 @@ function cargarDesdeSheets(data){
     ? data.reembolsos
         .filter(r => r.esCostoReal == true || (r.fecha && r.fecha >= FECHA_CORTE))
         .map(r => ({...r, monto: parseFloat(r.monto)||0, esCostoReal: true}))
+    : [];
+  APP.egresos = Array.isArray(data.egresos)
+    ? data.egresos
+        .filter(e => e.fecha && e.fecha >= FECHA_CORTE)
+        .map(e => ({...e, monto: parseFloat(e.monto)||0}))
     : [];
   APP.movimientosBinance = Array.isArray(data.movimientosBinance)
     ? data.movimientosBinance
@@ -7571,6 +7890,7 @@ function cerrarSesion(){
   APP.costos = [];
   APP.recargas = [];
   APP.reembolsos = [];
+  APP.egresos = [];
   APP.movimientosBinance = [];
   // SECURITY: Remove local cache so it isn't accessible without PIN
   localStorage.removeItem('yoritex_local');
@@ -7765,9 +8085,18 @@ function iniciarReparadorMojibake(){
   });
   obs.observe(document.body, { childList:true, subtree:true, characterData:true });
 }
+function instalarReparadorMensajes(){
+  if(window.__yoritexMsgFix) return;
+  window.__yoritexMsgFix = true;
+  const nativeAlert = window.alert.bind(window);
+  const nativeConfirm = window.confirm.bind(window);
+  window.alert = msg => nativeAlert(repararMojibakeTexto(String(msg || '')));
+  window.confirm = msg => nativeConfirm(repararMojibakeTexto(String(msg || '')));
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   iniciarReparadorMojibake();
+  instalarReparadorMensajes();
   if(new URLSearchParams(location.search).has('clean')){
     try {
       localStorage.removeItem('yoritex_local');
