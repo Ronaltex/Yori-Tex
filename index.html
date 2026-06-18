@@ -940,6 +940,171 @@ body::before{
   .logo-hex{width:46px;height:46px}
   .logo-text{font-size:17px}
 }
+
+/* VISUAL REFRESH v5 - motion and brand experience */
+body{
+  overflow-x:hidden;
+}
+body::before{
+  animation:bgDrift 18s linear infinite;
+}
+body::after{
+  filter:drop-shadow(0 0 34px rgba(245,166,35,.16));
+}
+.app-header::after{
+  content:'';
+  position:absolute;
+  left:18px;
+  right:18px;
+  bottom:-1px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(245,166,35,.65),transparent);
+  opacity:.7;
+}
+.logo-hex{
+  position:relative;
+  isolation:isolate;
+}
+.logo-hex::after{
+  content:'';
+  position:absolute;
+  inset:-45%;
+  background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.42),transparent 62%);
+  transform:translateX(-75%) rotate(8deg);
+  animation:logoSweep 4.8s ease-in-out infinite;
+  z-index:2;
+  pointer-events:none;
+}
+.logo-hex img{
+  position:relative;
+  z-index:1;
+}
+.screen{
+  opacity:0;
+  transform:translateY(10px) scale(.992);
+}
+.screen.active{
+  opacity:1;
+  transform:none;
+}
+.screen.screen-enter{
+  animation:screenEnter .34s cubic-bezier(.2,.85,.2,1) both;
+}
+.screen.active > *{
+  animation:itemRise .34s cubic-bezier(.2,.85,.2,1) both;
+}
+.screen.active > *:nth-child(2){animation-delay:.025s}
+.screen.active > *:nth-child(3){animation-delay:.05s}
+.screen.active > *:nth-child(4){animation-delay:.075s}
+.screen.active > *:nth-child(5){animation-delay:.1s}
+.kpi,.card,.cuenta-card,.ven-card,.cfg-section,.chart-wrap,.plantilla-card,.reemb-card,.saldo-box{
+  will-change:transform;
+}
+.kpi:active,.card:active,.cuenta-card:active,.ven-card:active,.plantilla-card:active,.reemb-card:active{
+  transform:translateY(1px) scale(.994);
+}
+.btn-primary,.filter-btn.active,.tab.active,.inv-status-btn.active{
+  position:relative;
+  overflow:hidden;
+}
+.btn-primary::after,.filter-btn.active::after,.tab.active::after,.inv-status-btn.active::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(110deg,transparent 0%,rgba(255,255,255,.28) 45%,transparent 62%);
+  transform:translateX(-120%);
+  animation:softShine 3.6s ease-in-out infinite;
+}
+.bottom-nav{
+  isolation:isolate;
+}
+.bottom-nav::before{
+  content:'';
+  position:absolute;
+  inset:-1px;
+  border-radius:inherit;
+  background:linear-gradient(90deg,rgba(245,166,35,.34),rgba(59,158,222,.18),rgba(34,201,122,.18),rgba(245,166,35,.34));
+  opacity:.25;
+  z-index:-1;
+  animation:navAura 8s linear infinite;
+}
+.nav-item.active .ni{
+  animation:navPop .32s cubic-bezier(.2,.85,.2,1) both;
+  filter:drop-shadow(0 0 12px rgba(245,166,35,.32));
+}
+.nav-badge{
+  animation:pulseBadge 1.9s ease-in-out infinite;
+}
+.modal-overlay.open{
+  animation:fadeOverlay .18s ease both;
+}
+.modal-overlay.open .modal-sheet{
+  animation:sheetSpring .32s cubic-bezier(.18,.9,.2,1) both;
+}
+.search-wrap:focus-within{
+  transform:translateY(-1px);
+  transition:transform .18s ease;
+}
+.search-wrap:focus-within .search-ico{
+  color:var(--orange);
+}
+.chip.verde,.badge-ok{box-shadow:0 0 18px rgba(34,201,122,.08)}
+.chip.rojo,.badge-vencido{box-shadow:0 0 18px rgba(231,76,60,.08)}
+.chip.amarillo,.badge-hoy,.chip.naranja,.badge-pronto{box-shadow:0 0 18px rgba(245,166,35,.08)}
+@keyframes bgDrift{
+  from{background-position:0 0,0 0}
+  to{background-position:56px 28px,28px 56px}
+}
+@keyframes logoSweep{
+  0%,58%,100%{transform:translateX(-85%) rotate(8deg);opacity:0}
+  68%{opacity:.7}
+  82%{transform:translateX(85%) rotate(8deg);opacity:0}
+}
+@keyframes screenEnter{
+  from{opacity:0;transform:translateY(14px) scale(.985);filter:blur(3px)}
+  to{opacity:1;transform:none;filter:none}
+}
+@keyframes itemRise{
+  from{opacity:0;transform:translateY(9px)}
+  to{opacity:1;transform:none}
+}
+@keyframes softShine{
+  0%,45%,100%{transform:translateX(-120%);opacity:0}
+  55%{opacity:.7}
+  72%{transform:translateX(120%);opacity:0}
+}
+@keyframes navAura{
+  from{filter:hue-rotate(0deg)}
+  to{filter:hue-rotate(360deg)}
+}
+@keyframes navPop{
+  0%{transform:translateY(2px) scale(.86)}
+  70%{transform:translateY(-2px) scale(1.08)}
+  100%{transform:none}
+}
+@keyframes pulseBadge{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.12)}
+}
+@keyframes fadeOverlay{
+  from{opacity:0}
+  to{opacity:1}
+}
+@keyframes sheetSpring{
+  from{opacity:.5;transform:translateY(34px) scale(.98)}
+  to{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion:reduce){
+  body::before,.logo-hex::after,.bottom-nav::before,.nav-badge,.btn-primary::after,.filter-btn.active::after,.tab.active::after,.inv-status-btn.active::after{
+    animation:none!important;
+  }
+  .screen,.screen.active,.screen.screen-enter,.screen.active>*{
+    animation:none!important;
+    opacity:1!important;
+    transform:none!important;
+    filter:none!important;
+  }
+}
 </style>
 </head>
 <body>
@@ -2836,7 +3001,11 @@ document.addEventListener('click', e => {
 function navIr(id, btn){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('s-' + id).classList.add('active');
+  const screen = document.getElementById('s-' + id);
+  screen.classList.remove('screen-enter');
+  screen.classList.add('active');
+  void screen.offsetWidth;
+  screen.classList.add('screen-enter');
   btn.classList.add('active');
   if(id === 'inventario') renderInventario();
   if(id === 'vencimientos') renderVencimientos();
