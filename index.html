@@ -743,6 +743,203 @@ body.bg-solid{
 @media (min-width:431px){
   body{box-shadow:0 0 0 1px rgba(137,165,204,.12),0 0 60px rgba(0,0,0,.35)}
 }
+
+/* VISUAL REFRESH v4 - premium hierarchy */
+html{
+  background:#050b13;
+}
+body{
+  max-width:480px;
+  background:
+    linear-gradient(180deg,rgba(6,14,25,.96),rgba(8,18,31,.98)),
+    radial-gradient(circle at 50% -10%,rgba(245,166,35,.12),transparent 36%);
+}
+body::before{
+  opacity:.12;
+  background-size:28px 28px;
+}
+.app-header{
+  min-height:76px;
+  padding:14px 18px;
+  border-bottom-color:rgba(245,166,35,.22);
+}
+.header-logo{
+  gap:12px;
+  min-width:0;
+}
+.logo-hex{
+  width:52px;
+  height:52px;
+  border-radius:14px;
+  background:linear-gradient(180deg,var(--orange2),var(--orange));
+}
+.logo-hex img{
+  border-radius:14px;
+}
+.logo-text{
+  font-size:19px;
+  line-height:1;
+}
+.sync-status{
+  padding:6px 8px;
+  border-radius:999px;
+  background:rgba(34,201,122,.06);
+  border:1px solid rgba(34,201,122,.12);
+}
+.sync-status.warn{
+  background:rgba(245,166,35,.07);
+  border-color:rgba(245,166,35,.16);
+}
+.sync-status.err{
+  background:rgba(231,76,60,.07);
+  border-color:rgba(231,76,60,.16);
+}
+.screen{
+  padding:18px 16px 18px;
+}
+#s-registro > div:first-child,
+#s-inventario > div:first-child,
+#s-vencimientos > div:first-child,
+#s-dashboard > div:first-child,
+#s-costos > div:first-child{
+  padding:18px!important;
+  border-radius:18px;
+  border-color:rgba(245,166,35,.24);
+}
+.page-title{
+  font-size:26px;
+  font-weight:900;
+  letter-spacing:-.01em;
+}
+.page-sub{
+  color:#a9bad2;
+}
+.kpi-grid{
+  gap:10px;
+}
+.kpi{
+  min-height:96px;
+  border-radius:14px;
+  padding:16px!important;
+}
+.kpi .kl{
+  font-size:10px;
+  color:#a9bad2;
+}
+.kpi .kv{
+  font-size:28px;
+  font-weight:900;
+}
+.kpi .ksub{
+  color:#7890ad;
+}
+.card,.cuenta-card,.ven-card,.cfg-section,.chart-wrap,.plantilla-card,.reemb-card,.saldo-box{
+  border-radius:16px!important;
+  background:linear-gradient(180deg,rgba(17,33,53,.94),rgba(10,22,38,.94))!important;
+  box-shadow:0 18px 42px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.035);
+}
+.cuenta-card{
+  margin-bottom:12px;
+}
+.cuenta-hdr{
+  align-items:flex-start;
+  gap:10px;
+}
+.cuenta-nombre{
+  font-size:16px;
+}
+.chip,.badge{
+  min-height:25px;
+  padding:4px 10px;
+  font-weight:800;
+}
+.prod-grid{
+  gap:8px;
+}
+.prod-mini{
+  min-height:54px;
+}
+.prod-mini .pv{
+  font-size:15px!important;
+}
+.filters{
+  gap:8px;
+}
+.filter-btn,.inv-service-btn,.inv-status-btn{
+  min-height:34px;
+  border-radius:12px;
+}
+.search-wrap{
+  margin-bottom:14px;
+}
+.search-wrap input{
+  min-height:46px;
+  border-radius:14px;
+  font-size:14px;
+}
+.btn{
+  min-height:48px;
+  border-radius:14px;
+  font-size:15px;
+}
+.btn-sm{
+  min-width:34px!important;
+  height:34px!important;
+  border-radius:12px!important;
+  background:rgba(137,165,204,.1)!important;
+}
+.bottom-nav{
+  max-width:480px;
+  width:calc(100% - 18px);
+  min-height:70px;
+  border-radius:22px;
+}
+.nav-item{
+  padding:10px 2px 12px;
+}
+.nav-item.active{
+  background:rgba(245,166,35,.16);
+}
+.nav-item .ni{
+  font-size:23px;
+}
+.nav-item .nl{
+  font-size:10px;
+  font-weight:750;
+}
+.modal-sheet{
+  max-width:480px;
+  border-radius:24px 24px 0 0;
+  padding:22px 18px 38px;
+}
+.modal-title{
+  font-size:18px;
+  font-weight:900;
+}
+.field label{
+  font-size:12.5px;
+  font-weight:750;
+}
+.field input,.field select,.field textarea{
+  border-radius:14px;
+  min-height:48px;
+  font-size:15px;
+}
+.sec{
+  font-size:11px;
+  color:#c0cfe3;
+}
+.empty{
+  border-radius:16px;
+}
+@media (max-width:380px){
+  .screen{padding-left:12px;padding-right:12px}
+  .page-title{font-size:23px}
+  .kpi{padding:14px!important}
+  .kpi .kv{font-size:24px}
+  .logo-hex{width:46px;height:46px}
+  .logo-text{font-size:17px}
+}
 </style>
 </head>
 <body>
