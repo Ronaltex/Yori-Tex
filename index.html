@@ -1126,6 +1126,20 @@ body::after{
 </style>
 </head>
 <body>
+<!-- ACCESO FIREBASE -->
+<div id="auth-screen" style="position:fixed;inset:0;background:#0d1b2a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;padding:24px">
+  <div style="width:100%;max-width:330px">
+    <div style="font-size:40px;text-align:center;margin-bottom:8px">🔐</div>
+    <div style="font-size:22px;font-weight:800;color:#fff;text-align:center">YORI<span style="color:var(--orange)">-TEX</span></div>
+    <div style="font-size:13px;color:#8fa8c8;text-align:center;margin:7px 0 24px">Ingresa con tu correo y contraseña</div>
+    <div class="field"><label>Correo</label><input type="email" id="auth-email" autocomplete="email" placeholder="admin@yori-tex.com" onkeydown="if(event.key==='Enter') authIniciarSesion()"></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="auth-password" autocomplete="current-password" placeholder="Tu contraseña" onkeydown="if(event.key==='Enter') authIniciarSesion()"></div>
+    <button class="btn btn-primary" id="auth-login-btn" onclick="authIniciarSesion()">Ingresar</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="authRecuperarClave()">Olvidé mi contraseña</button>
+    <div id="auth-error" style="min-height:36px;margin-top:14px;text-align:center;font-size:12px;color:var(--red);line-height:1.4"></div>
+  </div>
+</div>
+
 <!-- PANTALLA DE PIN -->
 <div id="pin-screen" style="position:fixed;inset:0;background:#0d1b2a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;padding:24px">
   <div style="font-size:40px;margin-bottom:8px">🔐</div>
@@ -1497,6 +1511,16 @@ body::after{
         <div class="aviso">El inicio por correo se activará al conectar Firebase. El PIN actual seguirá funcionando durante la transición.</div>
       </div>
     </div>
+    <div class="cfg-section">
+      <div class="cfg-section-title">Seguridad adicional</div>
+      <div style="padding:0 14px 14px">
+        <div class="toggle-row"><div class="toggle-info"><div class="tl">Pedir PIN después del correo</div><div class="ts">Actívalo si quieres correo, contraseña y PIN cada vez que abras YORI-TEX.</div></div><label class="toggle"><input type="checkbox" id="cfg-pin-segundo" checked><span class="toggle-slider"></span></label></div>
+        <div class="divider"></div>
+        <div class="field"><label>PIN actual</label><input type="password" inputmode="numeric" id="cfg-pin-actual" maxlength="8" placeholder="PIN actual"></div>
+        <div class="row2"><div class="field"><label>PIN nuevo</label><input type="password" inputmode="numeric" id="cfg-pin-nuevo" maxlength="8" placeholder="4 a 8 números"></div><div class="field"><label>Confirmar PIN</label><input type="password" inputmode="numeric" id="cfg-pin-confirmar" maxlength="8" placeholder="Repite el PIN"></div></div>
+        <button class="btn btn-navy" onclick="cambiarPinAcceso()">Cambiar PIN</button>
+      </div>
+    </div>
     <button class="btn btn-primary" onclick="guardarConfig()">💾 Guardar configuración</button>
     <div style="height:14px"></div>
   </div>
@@ -1540,7 +1564,7 @@ body::after{
     <div class="cfg-section">
       <div class="cfg-section-title">☁️ Google Sheets</div>
       <div class="cfg-row" onclick="sincronizarManual()"><div class="cfg-left"><div class="cfg-ico" style="background:var(--green-bg)">🔄</div><div><div class="cfg-label" style="color:var(--green)">Sincronizar ahora</div><div class="cfg-sub">Forzar guardado en Google Sheets</div></div></div><div class="cfg-arrow">›</div></div>
-      <div class="cfg-row" onclick="cerrarSesion()"><div class="cfg-left"><div class="cfg-ico" style="background:var(--red-bg)">🔐</div><div><div class="cfg-label" style="color:var(--red)">Cerrar sesión</div><div class="cfg-sub">Bloquear la app con PIN</div></div></div><div class="cfg-arrow">›</div></div>
+      <div class="cfg-row" onclick="cerrarSesion()"><div class="cfg-left"><div class="cfg-ico" style="background:var(--red-bg)">🔐</div><div><div class="cfg-label" style="color:var(--red)">Cerrar sesión</div><div class="cfg-sub">Volver a pedir correo, contraseña y PIN</div></div></div><div class="cfg-arrow">›</div></div>
     </div>
       <div class="cfg-row" onclick="exportarCSV('ventas')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--green-bg)">📋</div><div><div class="cfg-label">Ventas a Excel (CSV)</div><div class="cfg-sub">Registro completo de ventas</div></div></div><div class="cfg-arrow">›</div></div>
       <div class="cfg-row" onclick="exportarCSV('inventario')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--blue-bg)">📦</div><div><div class="cfg-label">Inventario a Excel (CSV)</div><div class="cfg-sub">Cuentas, cupos y clientes</div></div></div><div class="cfg-arrow">›</div></div>
@@ -2456,6 +2480,7 @@ body::after{
 </body>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script>
 // ══════════════════════════════════════
 // CONFIGURACIÓN API & PIN
@@ -2472,6 +2497,8 @@ const FIREBASE_CONFIG = {
 const FIREBASE_VAPID_KEY = 'BFlF6C5D7neug0bceA4UNDUPzZVzih4DOzjl874oGrYjWpCNz0-1Qv-ieyTzcZfJqU4wOkSvMsheJHq8LcYIZfE';
 let _firebaseMessaging = null;
 let _firebaseEscuchaActiva = false;
+let _firebaseAuth = null;
+let _firebaseUsuario = null;
 let _pinIngresado = '';
 let _pinVerificado = false;
 let _pinGuardado = ''; // Se carga desde Sheets al verificar
@@ -2505,6 +2532,92 @@ function esc(str){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#x27;');
+}
+
+function mostrarPantallaAuth(mostrar){
+  const auth = document.getElementById('auth-screen');
+  const pin = document.getElementById('pin-screen');
+  if(auth) auth.style.display = mostrar ? 'flex' : 'none';
+  if(mostrar && pin) pin.style.display = 'none';
+}
+function requierePinSegundoFactor(){
+  try{
+    const local = JSON.parse(localStorage.getItem('yoritex_local') || '{}');
+    if(local?.data?.config?.pinSegundoFactor === false) return false;
+  }catch(e){}
+  return APP.config?.pinSegundoFactor !== false;
+}
+function continuarDespuesCorreo(){
+  const pin = document.getElementById('pin-screen');
+  let pinGuardado = '';
+  try { pinGuardado = JSON.parse(localStorage.getItem('yoritex_local') || '{}')._pin || ''; } catch(e){}
+  if(!requierePinSegundoFactor() && pinGuardado){
+    _pinIngresado = pinGuardado;
+    if(pin) pin.style.display = 'flex';
+    pinVerificar();
+    return;
+  }
+  _pinIngresado = '';
+  pinActualizarDots();
+  if(pin) pin.style.display = 'flex';
+}
+function inicializarAuthFirebase(){
+  const error = document.getElementById('auth-error');
+  try{
+    if(!window.firebase) throw new Error('No se pudo cargar Firebase. Revisa tu conexión e intenta de nuevo.');
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    _firebaseAuth = firebase.auth();
+    _firebaseAuth.onAuthStateChanged(usuario => {
+      _firebaseUsuario = usuario || null;
+      mostrarPantallaAuth(!usuario);
+      if(usuario){
+        continuarDespuesCorreo();
+        if(error) error.textContent = '';
+        const email = document.getElementById('auth-email');
+        if(email) email.value = usuario.email || '';
+      }
+    });
+  }catch(e){
+    if(error) error.textContent = e.message || 'No se pudo iniciar el acceso con correo.';
+    mostrarPantallaAuth(true);
+  }
+}
+async function authIniciarSesion(){
+  const email = document.getElementById('auth-email')?.value.trim();
+  const password = document.getElementById('auth-password')?.value || '';
+  const error = document.getElementById('auth-error');
+  const boton = document.getElementById('auth-login-btn');
+  if(!email || !password){ if(error) error.textContent='Ingresa tu correo y contraseña.'; return; }
+  if(!_firebaseAuth){ inicializarAuthFirebase(); }
+  if(!_firebaseAuth){ if(error) error.textContent='Firebase no está listo. Revisa tu conexión.'; return; }
+  if(error) error.textContent='';
+  if(boton){ boton.disabled=true; boton.textContent='Ingresando...'; }
+  try{
+    await _firebaseAuth.signInWithEmailAndPassword(email,password);
+    document.getElementById('auth-password').value='';
+  }catch(e){
+    const mensajes = {
+      'auth/invalid-email':'El correo no es válido.',
+      'auth/invalid-credential':'Correo o contraseña incorrectos.',
+      'auth/user-disabled':'Este usuario está desactivado.',
+      'auth/too-many-requests':'Demasiados intentos. Espera un momento.'
+    };
+    if(error) error.textContent=mensajes[e.code] || 'No se pudo iniciar sesión. Revisa tus datos.';
+  }finally{
+    if(boton){ boton.disabled=false; boton.textContent='Ingresar'; }
+  }
+}
+async function authRecuperarClave(){
+  const email = document.getElementById('auth-email')?.value.trim();
+  const error = document.getElementById('auth-error');
+  if(!email){ if(error) error.textContent='Escribe primero tu correo para recuperar la contraseña.'; return; }
+  try{
+    if(!_firebaseAuth) inicializarAuthFirebase();
+    await _firebaseAuth.sendPasswordResetEmail(email);
+    if(error){ error.style.color='var(--green)'; error.textContent='Enviamos un enlace de recuperación a tu correo.'; }
+  }catch(e){
+    if(error) error.textContent='No se pudo enviar el correo de recuperación.';
+  }
 }
 
 // ══════════════════════════════════════
@@ -2554,6 +2667,7 @@ let APP = {
     correoAdmin: '',
     firebase: null,
     dispositivosFcm: [],
+    pinSegundoFactor: true,
     metas: { ingresos: 0, ganancia: 0, ventas: 0, renovaciones: 0, roi: 0 }
   }
 };
@@ -7073,7 +7187,10 @@ function abrirNotificacionPendiente(){
   } else if(pantalla === 'registro'){
     APP._filtroReg = 'todos'; navIr('registro');
     setTimeout(()=>resaltarDestino(`#reg-${CSS.escape(params.get('venta') || '')}`),120);
-  } else navIr(['inventario','costos','dashboard'].includes(pantalla) ? pantalla : 'dashboard');
+  } else if(pantalla === 'inventario'){
+    navIr('inventario');
+    setTimeout(()=>resaltarDestino(`#cuenta-${CSS.escape(params.get('cuenta') || '')}`),120);
+  } else navIr(['costos','dashboard'].includes(pantalla) ? pantalla : 'dashboard');
   history.replaceState(null, '', location.pathname);
 }
 function renderNotificaciones(){
@@ -7917,6 +8034,7 @@ function renderConfig(){
   if(document.getElementById('notif-venc')) document.getElementById('notif-venc').checked = APP.config.notifVenc !== false;
   if(document.getElementById('notif-ventas')) document.getElementById('notif-ventas').checked = APP.config.notifVentas !== false;
   if(document.getElementById('notif-dias')) document.getElementById('notif-dias').value = (APP.config.notifDias || [3,1,0]).join(', ');
+  if(document.getElementById('cfg-pin-segundo')) document.getElementById('cfg-pin-segundo').checked = APP.config.pinSegundoFactor !== false;
   if(document.getElementById('cfg-dominio')) document.getElementById('cfg-dominio').value = APP.config.dominio || 'yori-tex.com';
   if(document.getElementById('cfg-correo-admin')) document.getElementById('cfg-correo-admin').value = APP.config.correoAdmin || '';
   actualizarEstadoNotificaciones();
@@ -8094,6 +8212,7 @@ function guardarConfig(){
     dominio: 'yori-tex.com',
     appUrl: urlPublicaActual(),
     correoAdmin: sanitizarTexto(document.getElementById('cfg-correo-admin')?.value || '',200),
+    pinSegundoFactor: document.getElementById('cfg-pin-segundo')?.checked !== false,
     metas: {
       ingresos: parseFloat(document.getElementById('cfg-meta-ingresos')?.value) || 0,
       ganancia: parseFloat(document.getElementById('cfg-meta-ganancia')?.value) || 0,
@@ -8107,6 +8226,24 @@ function guardarConfig(){
   btn.textContent = '✅ ¡Guardado!'; btn.style.background = 'var(--green)';
   setTimeout(() => { btn.textContent = '💾 Guardar configuración'; btn.style.background = ''; }, 2000);
   sincronizarConSheets();
+}
+async function cambiarPinAcceso(){
+  const actual = document.getElementById('cfg-pin-actual')?.value || '';
+  const nuevo = document.getElementById('cfg-pin-nuevo')?.value || '';
+  const confirmar = document.getElementById('cfg-pin-confirmar')?.value || '';
+  if(!/^\d{4,8}$/.test(nuevo)){ alert('El PIN nuevo debe tener entre 4 y 8 números.'); return; }
+  if(nuevo !== confirmar){ alert('La confirmación del PIN no coincide.'); return; }
+  if(!actual){ alert('Escribe tu PIN actual para cambiarlo.'); return; }
+  try{
+    await apiCall({accion:'cambiarPin',pin:actual,nuevoPin:nuevo},45000);
+    _pinGuardado = nuevo;
+    _pinIngresado = nuevo;
+    guardarLocal(construirPayload());
+    ['cfg-pin-actual','cfg-pin-nuevo','cfg-pin-confirmar'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    alert('PIN actualizado correctamente.');
+  }catch(e){
+    alert('No se pudo cambiar el PIN. Verifica el PIN actual e intenta otra vez.');
+  }
 }
 
 // ══════════════════════════════════════
@@ -9281,8 +9418,8 @@ async function sincronizarManual(){
   ocultarSync();
   alert(ok ? '✅ Sincronizado con Google Sheets.' : '⚠️ No se pudo sincronizar con Google Sheets. Tus cambios quedaron guardados solo en este navegador.');
 }
-function cerrarSesion(){
-  if(!confirm('¿Cerrar sesión? La app se bloqueará con PIN.')) return;
+async function cerrarSesion(){
+  if(!confirm('¿Cerrar sesión? Tendrás que ingresar correo, contraseña y PIN nuevamente.')) return;
   _pinVerificado = false;
   _pinGuardado = '';
   _pinIngresado = '';
@@ -9302,7 +9439,8 @@ function cerrarSesion(){
   localStorage.removeItem('yoritex_local');
   pinActualizarDots();
   document.getElementById('pin-error').textContent = '';
-  document.getElementById('pin-screen').style.display = 'flex';
+  try { if(_firebaseAuth) await _firebaseAuth.signOut(); } catch(e) {}
+  mostrarPantallaAuth(true);
 }
 
 // ══════════════════════════════════════
@@ -9515,6 +9653,7 @@ function instalarSanitizadorRenders(){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  inicializarAuthFirebase();
   iniciarReparadorMojibake();
   instalarReparadorMensajes();
   instalarSanitizadorRenders();
