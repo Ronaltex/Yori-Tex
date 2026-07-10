@@ -1,5 +1,18 @@
-const CACHE_NAME = 'yoritex-v7-20260710';
+const CACHE_NAME = 'yoritex-v8-20260710';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
+  authDomain: 'yori-tex.firebaseapp.com',
+  projectId: 'yori-tex',
+  storageBucket: 'yori-tex.firebasestorage.app',
+  messagingSenderId: '249055898385',
+  appId: '1:249055898385:web:01b09ed80cbe8be413bab0'
+};
+
+importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js');
+firebase.initializeApp(FIREBASE_CONFIG);
+const messaging = firebase.messaging();
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -31,6 +44,7 @@ self.addEventListener('fetch', event => {
   })));
 });
 
+/* Legacy generic push handler; Firebase Messaging handles production pushes below.
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch(e) { data = {body:event.data?.text() || ''}; }
@@ -39,6 +53,16 @@ self.addEventListener('push', event => {
     icon: './icon.svg', badge: './icon.svg', tag: data.tag || 'yoritex-push',
     data: {url: data.url || './'}
   }));
+});
+*/
+
+messaging.onBackgroundMessage(payload => {
+  const data = payload.data || {};
+  return self.registration.showNotification(data.title || 'YORI-TEX', {
+    body: data.body || 'Tienes una nueva notificacion.',
+    icon: './icon.svg', badge: './icon.svg', tag: data.tag || 'yoritex-fcm',
+    data: {url: data.url || './'}
+  });
 });
 
 self.addEventListener('notificationclick', event => {

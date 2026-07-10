@@ -1485,6 +1485,7 @@ body::after{
         <div class="toggle-row"><div class="toggle-info"><div class="tl">Ventas y renovaciones</div><div class="ts">Avisar cuando se registra actividad</div></div><label class="toggle"><input type="checkbox" id="notif-ventas" checked><span class="toggle-slider"></span></label></div>
         <div class="field" style="margin-top:10px"><label>Días de aviso antes de vencer</label><input type="text" id="notif-dias" value="3, 1, 0" placeholder="3, 1, 0"/></div>
         <button class="btn btn-navy" id="notif-activar-btn" onclick="activarNotificacionesDispositivo()">Activar avisos en este teléfono</button>
+        <button class="btn btn-ghost" style="margin-top:7px" onclick="probarNotificacionFirebase()">Probar aviso externo</button>
         <div id="notif-estado" style="font-size:11px;color:var(--text3);margin-top:7px"></div>
       </div>
     </div>
@@ -2453,11 +2454,24 @@ body::after{
 </div>
 
 </body>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js"></script>
 <script>
 // ══════════════════════════════════════
 // CONFIGURACIÓN API & PIN
 // ══════════════════════════════════════
 const API_URL = 'https://script.google.com/macros/s/AKfycbyI1ecwaMem5dQUAPBNywxx3BoJZ_z874Lk7XNmOTnyO2PnFCeJn6kE63MQ_-ZDMVPV/exec';
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
+  authDomain: 'yori-tex.firebaseapp.com',
+  projectId: 'yori-tex',
+  storageBucket: 'yori-tex.firebasestorage.app',
+  messagingSenderId: '249055898385',
+  appId: '1:249055898385:web:01b09ed80cbe8be413bab0'
+};
+const FIREBASE_VAPID_KEY = 'BFlF6C5D7neug0bceA4UNDUPzZVzih4DOzjl874oGrYjWpCNz0-1Qv-ieyTzcZfJqU4wOkSvMsheJHq8LcYIZfE';
+let _firebaseMessaging = null;
+let _firebaseEscuchaActiva = false;
 let _pinIngresado = '';
 let _pinVerificado = false;
 let _pinGuardado = ''; // Se carga desde Sheets al verificar
@@ -2536,9 +2550,10 @@ let APP = {
     notifVentas: true,
     notifPagos: true,
     dominio: 'yori-tex.com',
-    appUrl: 'https://app.yori-tex.com',
+    appUrl: 'https://ronaltex.github.io/Yori-Tex/',
     correoAdmin: '',
     firebase: null,
+    dispositivosFcm: [],
     metas: { ingresos: 0, ganancia: 0, ventas: 0, renovaciones: 0, roi: 0 }
   }
 };
@@ -2555,6 +2570,9 @@ function sanitizarNumero(val, min=0, max=999999){
   const n = parseFloat(val);
   if(isNaN(n)) return 0;
   return Math.max(min, Math.min(max, n));
+}
+function urlPublicaActual(){
+  return location.protocol === 'https:' ? new URL('./', location.href).href : (APP.config.appUrl || 'https://ronaltex.github.io/Yori-Tex/');
 }
 const VENTAS_HISTORICAS = (function(){
   const srvMap = {
@@ -6976,11 +6994,11 @@ function actualizarBadgeNotificaciones(){
   badge.textContent = pendientes;
   badge.style.display = pendientes ? 'flex' : 'none';
 }
-async function mostrarNotificacionSistema(titulo, cuerpo, notificacionUid){
+async function mostrarNotificacionSistema(titulo, cuerpo, notificacionUid, urlDirecta){
   if(!APP.config.notifExterna || !('Notification' in window) || Notification.permission !== 'granted') return;
   try{
     const reg = await navigator.serviceWorker?.ready;
-    const url = notificacionUid ? `./?notificacion=${encodeURIComponent(notificacionUid)}` : './';
+    const url = urlDirecta || (notificacionUid ? `./?notificacion=${encodeURIComponent(notificacionUid)}` : './');
     if(reg) await reg.showNotification(titulo,{body:cuerpo,icon:'icon.svg',badge:'icon.svg',tag:'yoritex-'+titulo,data:{url}});
     else new Notification(titulo,{body:cuerpo});
   }catch(e){}
@@ -7040,9 +7058,22 @@ function irANotificacion(notificacionUid, desdeEnlace=false){
   if(!desdeEnlace) sincronizarConSheets();
 }
 function abrirNotificacionPendiente(){
-  const uidAviso = new URLSearchParams(location.search).get('notificacion');
-  if(!uidAviso || !(APP.notificaciones || []).some(n => n.uid === uidAviso)) return;
-  irANotificacion(uidAviso, true);
+  const params = new URLSearchParams(location.search);
+  const uidAviso = params.get('notificacion');
+  if(uidAviso && (APP.notificaciones || []).some(n => n.uid === uidAviso)){
+    irANotificacion(uidAviso, true);
+    history.replaceState(null, '', location.pathname);
+    return;
+  }
+  const pantalla = params.get('pantalla');
+  if(!pantalla) return;
+  if(pantalla === 'vencimientos'){
+    APP._filtroVen = 'todos'; navIr('vencimientos');
+    setTimeout(()=>resaltarDestino(`#vcard-${CSS.escape(params.get('venta') || '')}`),120);
+  } else if(pantalla === 'registro'){
+    APP._filtroReg = 'todos'; navIr('registro');
+    setTimeout(()=>resaltarDestino(`#reg-${CSS.escape(params.get('venta') || '')}`),120);
+  } else navIr(['inventario','costos','dashboard'].includes(pantalla) ? pantalla : 'dashboard');
   history.replaceState(null, '', location.pathname);
 }
 function renderNotificaciones(){
@@ -7072,9 +7103,56 @@ async function activarNotificacionesDispositivo(){
   if(!('Notification' in window)){ if(estado) estado.textContent='Este navegador no admite notificaciones.'; return; }
   const permiso=await Notification.requestPermission();
   APP.config.notifExterna=permiso==='granted';
-  if(estado) estado.textContent=permiso==='granted'?'Avisos activados en este dispositivo.':'Permiso no concedido.';
-  if(permiso==='granted') mostrarNotificacionSistema('YORI-TEX','Notificaciones activadas correctamente.');
+  if(permiso==='granted'){
+    const ok = await registrarDispositivoFirebase();
+    if(estado) estado.textContent=ok?'Avisos activados en este dispositivo.':'El permiso fue aceptado, pero no se pudo registrar este dispositivo. Vuelve a intentar con internet.';
+    mostrarNotificacionSistema('YORI-TEX','Notificaciones activadas correctamente.');
+  } else if(estado) estado.textContent='Permiso no concedido.';
   sincronizarConSheets();
+}
+async function probarNotificacionFirebase(){
+  const estado=document.getElementById('notif-estado');
+  if(!_pinVerificado){ if(estado) estado.textContent='Ingresa primero con tu PIN.'; return; }
+  if(estado) estado.textContent='Enviando prueba al dispositivo...';
+  try{
+    await sincronizarConSheets(true);
+    await apiCall({accion:'probarPush',pin:_pinGuardado},60000);
+    if(estado) estado.textContent='Prueba enviada. Cierra YORI-TEX y revisa la notificación.';
+  }catch(e){
+    if(estado) estado.textContent='No se pudo enviar. Revisa que el servicio privado de Firebase esté configurado.';
+  }
+}
+function nombreDispositivoFcm(){
+  const movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  return movil ? 'Telefono Android' : 'Computadora';
+}
+async function registrarDispositivoFirebase(){
+  try{
+    if(!window.firebase || !('serviceWorker' in navigator)) return false;
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    _firebaseMessaging = _firebaseMessaging || firebase.messaging();
+    if(!_firebaseEscuchaActiva){
+      _firebaseMessaging.onMessage(payload => {
+        const data = payload.data || {};
+        mostrarNotificacionSistema(data.title || 'YORI-TEX', data.body || 'Tienes una nueva notificacion.', null, data.url || './');
+      });
+      _firebaseEscuchaActiva = true;
+    }
+    const registro = await navigator.serviceWorker.ready;
+    const token = await _firebaseMessaging.getToken({vapidKey:FIREBASE_VAPID_KEY,serviceWorkerRegistration:registro});
+    if(!token) return false;
+    const dispositivos = Array.isArray(APP.config.dispositivosFcm) ? APP.config.dispositivosFcm : [];
+    const actual = {token,nombre:nombreDispositivoFcm(),actualizado:new Date().toISOString()};
+    const indice = dispositivos.findIndex(d=>d && d.token===token);
+    if(indice >= 0) dispositivos[indice] = {...dispositivos[indice],...actual};
+    else dispositivos.push(actual);
+    APP.config.dispositivosFcm = dispositivos.slice(-12);
+    guardarLocal(construirPayload());
+    return true;
+  }catch(e){
+    console.warn('[YORITEX] Firebase Messaging:',e.message);
+    return false;
+  }
 }
 function generarAvisosVencimientos(){
   if(!APP.config.notifVenc) return;
@@ -8014,7 +8092,7 @@ function guardarConfig(){
     notifVentas: document.getElementById('notif-ventas')?.checked !== false,
     notifDias: (document.getElementById('notif-dias')?.value || '3,1,0').split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>=0&&x<=30),
     dominio: 'yori-tex.com',
-    appUrl: 'https://app.yori-tex.com',
+    appUrl: urlPublicaActual(),
     correoAdmin: sanitizarTexto(document.getElementById('cfg-correo-admin')?.value || '',200),
     metas: {
       ingresos: parseFloat(document.getElementById('cfg-meta-ingresos')?.value) || 0,
@@ -9233,6 +9311,7 @@ function cerrarSesion(){
 function inicializarUI(){
   sanearMojibakeDatos();
   normalizarFechasApp();
+  if(!Array.isArray(APP.config.dispositivosFcm)) APP.config.dispositivosFcm = [];
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
   ['mv-fecha','costo-fecha','bin-fecha','rem-fecha','adel-fecha'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = hoy();
@@ -9268,6 +9347,9 @@ function inicializarUI(){
     }
   }
   aplicarFondoMarca();
+  if(APP.config.notifExterna && 'Notification' in window && Notification.permission === 'granted'){
+    setTimeout(registrarDispositivoFirebase, 800);
+  }
   // Si el dashboard ya está visible al cargar datos (ej. recarga en background), re-renderizarlo
   const dashScreen = document.getElementById('s-dashboard');
   if(dashScreen && dashScreen.classList.contains('active')){
