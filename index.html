@@ -177,6 +177,20 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .hist-row:last-child{border-bottom:none}
 .hist-left{flex:1}.hist-nombre{font-size:13px;font-weight:500;color:var(--white)}.hist-sub{font-size:11px;color:var(--text3);margin-top:2px}
 .hist-right{text-align:right;margin-left:10px}.hist-precio{font-size:13px;font-weight:700;color:var(--green)}.hist-badge{font-size:10px;margin-top:3px}
+.periodo-accordion{border-bottom:1px solid var(--border)}
+.periodo-accordion:last-child{border-bottom:none}
+.periodo-accordion summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;color:var(--text);font-size:12px;font-weight:700}
+.periodo-accordion summary::-webkit-details-marker{display:none}
+.periodo-accordion summary::after{content:'›';color:var(--text3);font-size:18px;line-height:1;transform:rotate(0);transition:transform .16s ease}
+.periodo-accordion[open]>summary::after{transform:rotate(90deg)}
+.periodo-accordion .periodo-meta{font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap}
+.periodo-accordion.nivel-semana{margin:0 8px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.018)}
+.periodo-accordion.nivel-semana+ .periodo-accordion.nivel-semana{margin-top:6px}
+.periodo-accordion.nivel-dia{margin:0 8px;border-left:2px solid rgba(245,166,35,.42);background:rgba(255,255,255,.012)}
+.periodo-items{border-top:1px solid var(--border);padding:0 10px 8px}
+.periodo-items .hist-row,.periodo-items .cost-row{padding-left:4px;padding-right:4px}
+.notif-group-title{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 2px 7px;color:var(--text2);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.notif-group-title:first-child{padding-top:0}
 .rank-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);gap:10px}
 .rank-row:last-child{border-bottom:none}
 .rank-num{font-size:12px;font-weight:700;color:var(--text3);min-width:20px}
@@ -1151,6 +1165,7 @@ body::after{
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <div id="sync-indicador" style="display:none;font-size:16px;transition:all 0.3s"></div>
+    <button id="notif-btn" onclick="abrirCentroNotificaciones()" title="Notificaciones" style="position:relative;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px">🔔<span id="notif-badge" class="nav-badge" style="display:none;right:-4px;top:-5px">0</span></button>
     <button id="cloud-changes-btn" onclick="abrirCambiosNube()" title="Ver cambios de la nube" style="display:none;position:relative;width:32px;height:32px;border-radius:10px;border:1px solid var(--orange-border);background:var(--yellow-bg);color:var(--orange);font-size:16px;font-weight:800">☁<span style="position:absolute;right:4px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--surface)"></span></button>
     <div id="sync-status" class="sync-status" onclick="sincronizarManual()" title="Toca para sincronizar ahora">Sin iniciar</div>
     <div class="header-right" id="header-fecha"></div>
@@ -1316,6 +1331,13 @@ body::after{
   <div class="sec">📉 Costos desglosados</div>
   <div class="chart-wrap"><canvas id="chart-costos"></canvas></div>
   <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+    <span>Movimientos por fecha</span>
+    <select id="dash-mov-tipo" onchange="renderMovimientosDashboard()" style="width:auto;padding:6px 9px;font-size:11px">
+      <option value="todos">Todos</option><option value="ingreso">Ingresos</option><option value="salida">Salidas</option>
+    </select>
+  </div>
+  <div id="dash-movimientos" class="card"><div class="empty" style="padding:16px 0">Sin movimientos</div></div>
+  <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
     <span>↩️ Reembolsos</span>
     <div style="display:flex;gap:6px">
       <button class="btn btn-navy" style="width:auto;padding:5px 12px;font-size:12px" onclick="abrirNuevoEgreso()">＋ Egreso</button>
@@ -1336,6 +1358,14 @@ body::after{
     <div><div class="sl">💱 Saldo Binance disponible</div><div class="sv" id="saldo-usdt">0.00 USDT</div><div class="ss" id="saldo-usd">≈ $0.00 USD</div></div>
     <button class="btn btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;border-color:var(--yellow-border);color:var(--yellow)" onclick="abrirModal('modal-recarga-binance')">＋ Recarga P2P</button>
   </div>
+  <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+    <span>Proveedores y adelantos</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-navy" style="width:auto;padding:6px 10px;font-size:11px" onclick="abrirNuevoProveedor()">＋ Proveedor</button>
+      <button class="btn btn-primary" style="width:auto;padding:6px 10px;font-size:11px" onclick="abrirNuevoAdelanto()">＋ Adelanto</button>
+    </div>
+  </div>
+  <div id="proveedores-resumen" style="margin-bottom:12px"></div>
   <!-- Fila 1: Total -->
   <div class="kpi-grid" style="grid-template-columns:1fr;margin-bottom:6px">
     <div class="kpi rojo" id="kpi-total" style="cursor:pointer" onclick="costoFiltrar('todos','cat',this)">
@@ -1446,8 +1476,20 @@ body::after{
     </div>
     <div class="cfg-section">
       <div class="cfg-section-title">🔔 Preferencias</div>
-      <div style="padding:0 14px">
+      <div style="padding:0 14px 14px">
         <div class="toggle-row"><div class="toggle-info"><div class="tl">Alertas de vencimiento</div><div class="ts">Badge en nav cuando queden ≤5 días</div></div><label class="toggle"><input type="checkbox" id="notif-venc" checked><span class="toggle-slider"></span></label></div>
+        <div class="toggle-row"><div class="toggle-info"><div class="tl">Ventas y renovaciones</div><div class="ts">Avisar cuando se registra actividad</div></div><label class="toggle"><input type="checkbox" id="notif-ventas" checked><span class="toggle-slider"></span></label></div>
+        <div class="field" style="margin-top:10px"><label>Días de aviso antes de vencer</label><input type="text" id="notif-dias" value="3, 1, 0" placeholder="3, 1, 0"/></div>
+        <button class="btn btn-navy" id="notif-activar-btn" onclick="activarNotificacionesDispositivo()">Activar avisos en este teléfono</button>
+        <div id="notif-estado" style="font-size:11px;color:var(--text3);margin-top:7px"></div>
+      </div>
+    </div>
+    <div class="cfg-section">
+      <div class="cfg-section-title">Dominio y acceso</div>
+      <div style="padding:14px">
+        <div class="field"><label>Dominio oficial</label><input type="text" id="cfg-dominio" value="yori-tex.com" readonly/></div>
+        <div class="field"><label>Correo administrador</label><input type="email" id="cfg-correo-admin" placeholder="admin@yori-tex.com"/></div>
+        <div class="aviso">El inicio por correo se activará al conectar Firebase. El PIN actual seguirá funcionando durante la transición.</div>
       </div>
     </div>
     <button class="btn btn-primary" onclick="guardarConfig()">💾 Guardar configuración</button>
@@ -1485,7 +1527,7 @@ body::after{
   <div id="cfg-tab-plantillas" style="display:none">
     <div class="aviso">💡 Usa variables como <span class="var-tag">[CLIENTE]</span> <span class="var-tag">[SERVICIO]</span> <span class="var-tag">[VENCE]</span> <span class="var-tag">[PRECIO]</span> <span class="var-tag">[CUENTA]</span> <span class="var-tag">[CORREO]</span> <span class="var-tag">[PASS]</span> <span class="var-tag">[PERFIL]</span> <span class="var-tag">[PIN]</span> <span class="var-tag">[ACCESOS]</span>. Se reemplazan automáticamente cuando hay contexto de venta.</div>
     <div id="plantillas-lista"></div>
-    <button class="btn btn-ghost" onclick="abrirModal('modal-nueva-plantilla')" style="margin-top:4px">＋ Nueva plantilla</button>
+    <button class="btn btn-ghost" onclick="abrirNuevaPlantilla()" style="margin-top:4px">＋ Nueva plantilla</button>
   </div>
 
   <!-- RESPALDO -->
@@ -1685,7 +1727,15 @@ body::after{
   <div id="mv-vence-box" class="vence-box" style="display:none"><span>📅 Vence el</span><span id="mv-vence-val">—</span></div>
   <div class="field" style="margin-top:10px"><label>Notas</label><textarea id="mv-notas" placeholder="Observaciones..."></textarea></div>
   <div class="divider"></div>
-  <button class="btn btn-wa" onclick="mvGenWA()" style="margin-bottom:8px">📱 Generar mensaje WhatsApp</button>
+  <button class="btn btn-wa" onclick="mvGenWA()" style="margin-bottom:8px">📱 Preparar mensaje WhatsApp</button>
+  <div id="mv-wa-preview-wrap" style="display:none;margin-bottom:10px">
+    <div class="field"><label>Plantilla</label><select id="mv-plantilla" onchange="mvActualizarMensajePlantilla()"></select></div>
+    <div class="field"><label>Mensaje editable</label><textarea id="mv-wa-texto" style="height:190px"></textarea></div>
+    <div class="row2">
+      <button class="btn btn-wa" onclick="mvEnviarWAPreview()">Enviar</button>
+      <button class="btn btn-navy" onclick="guardarMensajeActualComoPlantilla('venta_nueva','mv-wa-texto')">Guardar plantilla</button>
+    </div>
+  </div>
   <button class="btn btn-primary" onclick="mvGuardar()">💾 Guardar venta</button>
 </div>
 </div>
@@ -1757,6 +1807,11 @@ body::after{
         <option value="Tarjeta">💳 Tarjeta</option>
       </select>
     </div>
+  </div>
+  <div class="field" id="nc-adelanto-wrap">
+    <label>Origen del costo</label>
+    <select id="nc-adelanto"><option value="">Pago independiente / no descontar adelanto</option></select>
+    <div style="font-size:11px;color:var(--text3);margin-top:5px">Elige exactamente el proveedor y pago adelantado que financió esta cuenta.</div>
   </div>
   <div class="row2">
     <div class="field"><label>Precio venta / cupo ($)</label><input type="number" id="nc-pventa" placeholder="0.00" step="0.01"/></div>
@@ -1866,6 +1921,7 @@ body::after{
   </div>
   <!-- Correo (siempre visible, se autocompleta desde inventario) -->
   <div class="field"><label>📧 Correo resultante</label><input type="text" id="ev-correo" placeholder="correo@ejemplo.com" readonly style="background:var(--surface);color:var(--text2)"/></div>
+  <div id="ev-acceso-actual" class="msg-preview" style="display:none;margin-bottom:10px"></div>
   <div class="field" id="ev-perfil-f"><label>Perfil</label><input type="text" id="ev-perfil" placeholder="Perfil asignado"/></div>
   <div class="field" id="ev-pin-f"><label>PIN</label><input type="text" id="ev-pin" placeholder="PIN de acceso"/></div>
   <div class="divider"></div>
@@ -1994,6 +2050,11 @@ body::after{
       </div>
     </div>
     <div style="font-size:11px;color:var(--text3);margin-top:6px">⚡ Binance USDT: descuenta del saldo. Otros métodos: se registra en Gastos.</div>
+  </div>
+  <button class="btn btn-wa" onclick="renPrevisualizarWA()" style="margin-bottom:8px">📱 Vista previa del mensaje</button>
+  <div id="ren-wa-preview-wrap" style="display:none;margin-bottom:10px">
+    <div class="field"><label>Plantilla</label><select id="ren-plantilla" onchange="renActualizarMensajePlantilla()"></select></div>
+    <div class="field"><label>Mensaje editable</label><textarea id="ren-wa-texto" style="height:170px"></textarea></div>
   </div>
   <button class="btn btn-green" onclick="renGuardar()">✅ Confirmar renovación</button>
 </div>
@@ -2177,8 +2238,40 @@ body::after{
     </div>
   </div>
   <div id="costo-usd-campo" class="field"><label>Monto en USD ($)</label><input type="number" id="costo-usd" placeholder="0.00" step="0.01"/></div>
+  <div class="field"><label>Descontar de un adelanto</label><select id="costo-adelanto"><option value="">No, es un pago independiente</option></select></div>
   <div class="field"><label>Notas</label><textarea id="costo-notas" placeholder="Observaciones..."></textarea></div>
   <button class="btn btn-primary" onclick="costoGuardar()">💾 Registrar gasto</button>
+</div>
+</div>
+
+<!-- MODAL PROVEEDOR -->
+<div class="modal-overlay" id="modal-proveedor">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">Proveedor <button class="modal-close" onclick="cerrarModal('modal-proveedor')">×</button></div>
+  <input type="hidden" id="prov-edit-uid"/>
+  <div class="field"><label>Nombre</label><input type="text" id="prov-nombre" placeholder="Ej: Andrés Streaming"/></div>
+  <div class="field"><label>WhatsApp / contacto</label><input type="text" id="prov-contacto" placeholder="Opcional"/></div>
+  <div class="field"><label>Productos habituales</label><input type="text" id="prov-productos" placeholder="Spotify, Netflix, CapCut..."/></div>
+  <div class="field"><label>Notas</label><textarea id="prov-notas" placeholder="Condiciones, tiempos de entrega..."></textarea></div>
+  <button class="btn btn-primary" onclick="provGuardar()">Guardar proveedor</button>
+</div>
+</div>
+
+<!-- MODAL ADELANTO A PROVEEDOR -->
+<div class="modal-overlay" id="modal-adelanto">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">Pago adelantado <button class="modal-close" onclick="cerrarModal('modal-adelanto')">×</button></div>
+  <div class="field"><label>Proveedor</label><select id="adel-proveedor"></select></div>
+  <div class="row2">
+    <div class="field"><label>Fecha</label><input type="date" id="adel-fecha"/></div>
+    <div class="field"><label>Monto</label><input type="number" id="adel-monto" min="0" step="0.01" placeholder="50.00"/></div>
+  </div>
+  <div class="field"><label>Método utilizado</label><select id="adel-metodo"><option>Binance USDT</option><option>Transferencia</option><option>Tarjeta</option><option>Efectivo</option></select></div>
+  <div class="field"><label>Referencia / evidencia</label><input type="text" id="adel-referencia" placeholder="ID de transacción o nota"/></div>
+  <div class="aviso">Este pago reduce tu caja, pero el gasto se reconoce poco a poco cuando asignas cuentas del proveedor.</div>
+  <button class="btn btn-primary" onclick="adelGuardar()">Guardar adelanto</button>
 </div>
 </div>
 
@@ -2320,10 +2413,38 @@ body::after{
       <option value="reembolso">Reembolso</option>
     </select>
   </div>
+  <div class="field"><label>Producto / servicio</label><select id="plt-servicio"><option value="todos">Todos los productos</option></select></div>
   <div class="field"><label>Nombre de la plantilla</label><input type="text" id="plt-nombre" placeholder="Ej: Bienvenida, Recordatorio..."/></div>
   <div class="aviso" style="margin-top:4px">Variables disponibles: <span class="var-tag" onclick="insertVar('[CLIENTE]')"><b>[CLIENTE]</b></span> <span class="var-tag" onclick="insertVar('[SERVICIO]')"><b>[SERVICIO]</b></span> <span class="var-tag" onclick="insertVar('[VENCE]')"><b>[VENCE]</b></span> <span class="var-tag" onclick="insertVar('[PRECIO]')"><b>[PRECIO]</b></span> <span class="var-tag" onclick="insertVar('[CUENTA]')"><b>[CUENTA]</b></span> <span class="var-tag" onclick="insertVar('[CORREO]')"><b>[CORREO]</b></span> <span class="var-tag" onclick="insertVar('[PASS]')"><b>[PASS]</b></span> <span class="var-tag" onclick="insertVar('[PERFIL]')"><b>[PERFIL]</b></span> <span class="var-tag" onclick="insertVar('[PIN]')"><b>[PIN]</b></span> <span class="var-tag" onclick="insertVar('[ACCESOS]')"><b>[ACCESOS]</b></span></div>
   <div class="field"><label>Texto del mensaje</label><textarea id="plt-texto" style="height:140px" placeholder="Hola [CLIENTE]! Tu servicio [SERVICIO] vence el [VENCE]..."></textarea></div>
   <button class="btn btn-primary" onclick="pltGuardar()">💾 Guardar plantilla</button>
+</div>
+</div>
+
+<!-- MENSAJE DESPUÉS DE GUARDAR / RENOVAR -->
+<div class="modal-overlay" id="modal-mensaje-wa">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">📱 Mensaje para el cliente <button class="modal-close" onclick="cerrarModal('modal-mensaje-wa')">×</button></div>
+  <input type="hidden" id="post-wa-numero"/>
+  <input type="hidden" id="post-wa-contexto"/>
+  <input type="hidden" id="post-wa-servicio"/>
+  <div class="field"><label>Plantilla</label><select id="post-wa-plantilla" onchange="postActualizarMensajePlantilla()"></select></div>
+  <div class="field"><label>Puedes modificarlo antes de enviar</label><textarea id="post-wa-texto" style="height:220px"></textarea></div>
+  <div class="row2">
+    <button class="btn btn-wa" onclick="postEnviarWA()">Enviar WhatsApp</button>
+    <button class="btn btn-navy" onclick="guardarMensajeActualComoPlantilla(document.getElementById('post-wa-contexto').value,'post-wa-texto',document.getElementById('post-wa-servicio').value)">Guardar plantilla</button>
+  </div>
+</div>
+</div>
+
+<!-- CENTRO DE NOTIFICACIONES -->
+<div class="modal-overlay" id="modal-notificaciones">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">Notificaciones <button class="modal-close" onclick="cerrarModal('modal-notificaciones')">×</button></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-navy" style="width:auto;padding:6px 10px;font-size:11px" onclick="marcarTodasNotificacionesLeidas()">Marcar leídas</button></div>
+  <div id="notif-lista"></div>
 </div>
 </div>
 
@@ -2343,6 +2464,10 @@ let _ultimaSync = null;
 let _firmaNube = '';
 let _ultimoAvisoCambio = 0;
 let _cambiosPendientesNube = null;
+let _syncGuardarTimer = null;
+let _syncGuardando = false;
+let _syncPendiente = null;
+let _syncEsperas = [];
 
 // SECURITY: PIN brute-force lockout — max 5 intentos, luego bloqueo de 60 s
 let _pinIntentos = 0;
@@ -2380,6 +2505,10 @@ let APP = {
   reembolsos: [],
   egresos: [],
   movimientosBinance: [], // NUEVO: Kardex de movimientos Binance
+  proveedores: [],
+  adelantosProveedor: [],
+  asignacionesProveedor: [],
+  notificaciones: [],
   ventasEliminadas: [],   // lista negra de UIDs eliminados (para no reinyectar históricas)
   cuentasEliminadas: [],  // lista negra de cuentas eliminadas (para no reinyectar historicas)
   _ventaCounter: 1,
@@ -2399,6 +2528,13 @@ let APP = {
     fondoImagen: null,
     fondoOpacidad: 16,
     notifVenc: true,
+    notifDias: [3,1,0],
+    notifVentas: true,
+    notifPagos: true,
+    dominio: 'yori-tex.com',
+    appUrl: 'https://app.yori-tex.com',
+    correoAdmin: '',
+    firebase: null,
     metas: { ingresos: 0, ganancia: 0, ventas: 0, renovaciones: 0, roi: 0 }
   }
 };
@@ -2583,10 +2719,18 @@ let CATALOGO_CAT_GASTOS = [
 ];
 
 let PLANTILLAS_WA = [
-  { uid: 'plt-bienvenida', nombre: '🎉 Bienvenida', texto: '¡Hola [CLIENTE]! 👋\n\nTu acceso está listo:\n\n✨ *[SERVICIO]*\n📧 [CORREO]\n👤 Perfil: [PERFIL]\n🔐 PIN: [PIN]\n📅 Vence: [VENCE]\n\n⚠️ _No compartas ni modifiques los datos._\n_Ante cualquier problema escríbeme_ 😊\n\n[FIRMA]' },
-  { uid: 'plt-recordatorio', nombre: '🔔 Recordatorio de cobro', texto: '¡Hola [CLIENTE]! 👋\n\nTe recuerdo que tu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄 Cualquier consulta escríbeme.\n\n[FIRMA]' },
-  { uid: 'plt-no-renovacion', nombre: '❌ Aviso de no renovación', texto: 'Hola [CLIENTE], te informo que tu acceso a *[SERVICIO]* ha vencido y no fue renovado.\n\nSi deseas reactivarlo en el futuro, con gusto te ayudo. ¡Saludos! 😊\n\n[FIRMA]' }
+  { uid: 'plt-bienvenida', nombre: '🎉 Bienvenida', contexto:'venta_nueva', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTu acceso está listo:\n\n✨ *[SERVICIO]*\n[ACCESOS]\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n⚠️ _No compartas ni modifiques los datos._\n_Ante cualquier problema escríbeme_ 😊\n\n[FIRMA]' },
+  { uid: 'plt-renovacion', nombre: '✅ Servicio renovado', contexto:'renovacion', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n[ACCESOS]\n📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\nGracias por seguir con nosotros.\n\n[FIRMA]' },
+  { uid: 'plt-recordatorio', nombre: '🔔 Recordatorio de cobro', contexto:'vencimiento', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTe recuerdo que tu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄 Cualquier consulta escríbeme.\n\n[FIRMA]' },
+  { uid: 'plt-reposicion', nombre: '🔄 Cuenta reemplazada', contexto:'cuenta_caida', srvUid:'todos', texto: 'Hola [CLIENTE] 👋\n\nTu acceso de *[SERVICIO]* fue reemplazado correctamente.\n\n[ACCESOS]\n📅 Vence: [VENCE]\n\n[FIRMA]' },
+  { uid: 'plt-no-renovacion', nombre: '❌ Aviso de no renovación', contexto:'no_renovo', srvUid:'todos', texto: 'Hola [CLIENTE], te informo que tu acceso a *[SERVICIO]* ha vencido y no fue renovado.\n\nSi deseas reactivarlo en el futuro, con gusto te ayudo. ¡Saludos! 😊\n\n[FIRMA]' }
 ];
+const PLANTILLAS_BASE_WA = PLANTILLAS_WA.map(p => ({...p}));
+function asegurarPlantillasBase(){
+  PLANTILLAS_BASE_WA.forEach(base => {
+    if(!PLANTILLAS_WA.some(p => p.uid === base.uid)) PLANTILLAS_WA.push({...base});
+  });
+}
 
 // ESTADO DASHBOARD
 const _hoyEC = new Date(Date.now()-5*3600000); // UTC-5 Ecuador
@@ -2825,6 +2969,7 @@ function quitarCostosDeVenta(v){
   if(!removidos.length) return;
   const ids = new Set(removidos.map(g => g.uid));
   APP.costos = (APP.costos || []).filter(g => !ids.has(g.uid));
+  APP.asignacionesProveedor = (APP.asignacionesProveedor || []).filter(a => !ids.has(a.costoUID));
   APP.movimientosBinance = (APP.movimientosBinance || []).filter(m => {
     if(m.tipo !== 'salida') return true;
     if(m.costoUID && ids.has(m.costoUID)) return false;
@@ -2844,6 +2989,7 @@ function eliminarCostosAsociadosCuenta(cuentaUID){
   const costos = costosAsociadosCuenta(cuentaUID);
   const ids = new Set(costos.map(g => g.uid).filter(Boolean));
   APP.costos = (APP.costos || []).filter(g => g.cuentaUID !== cuentaUID);
+  APP.asignacionesProveedor = (APP.asignacionesProveedor || []).filter(a => a.cuentaUID !== cuentaUID && !ids.has(a.costoUID));
   APP.movimientosBinance = (APP.movimientosBinance || []).filter(m => {
     if(m.cuentaUID !== cuentaUID) return true;
     if(m.costoUID && ids.has(m.costoUID)) return false;
@@ -3425,13 +3571,37 @@ function renderRegistro(){
       <div class="hist-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <div class="hist-precio">$${v.precio.toFixed(2)}</div>
         <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
-        <div style="display:flex;gap:4px">
+        <div style="display:flex;gap:4px;align-items:center">
+          ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 8px;color:var(--green);border-color:var(--green-border)" title="Marcar como pagada">Pagó</button>` : ''}
           <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
           <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
           <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
         </div>
       </div>
     </div>`).join('');
+}
+
+function marcarVentaPagada(ventaUid){
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  if(!v || v.estado === 'pagado') return;
+  if(!confirm(`¿Confirmar que ${v.cliente} pagó $${(parseFloat(v.precio)||0).toFixed(2)}?`)) return;
+  v.estado = 'pagado';
+  const asignaciones = asignacionesCuposVenta(v);
+  asignaciones.forEach(a => {
+    const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+    const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)];
+    if(!cupo) return;
+    cupo.estado = 'ocupado';
+    cupo.pendienteCobro = false;
+    cupo.ventaUid = v.uid;
+    cupo.montoVenta = parseFloat(a.precio) || parseFloat(v.precio) || 0;
+  });
+  if(Array.isArray(v.cuposAsignados)) v.cuposAsignados.forEach(a => { a.estado = 'pagado'; });
+  crearNotificacionLocal('pago', 'Pago confirmado', `${v.cliente} pagó $${(parseFloat(v.precio)||0).toFixed(2)} por ${v.srvNom || 'su servicio'}.`, `pago-${v.uid}`);
+  renderRegistro();
+  renderInventario();
+  renderDashboard();
+  sincronizarConSheets();
 }
 
 // ══════════════════════════════════════
@@ -3646,6 +3816,17 @@ function abrirEditarVenta(ventaUid){
   document.getElementById('ev-costo-cuenta').value = v.costoAdq || '';
   if(document.getElementById('ev-metodo-adq')) document.getElementById('ev-metodo-adq').value = v.metodoAdq || 'Transferencia';
   const asignacionesActuales = asignacionesCuposVenta(v);
+  const accesoActualEl = document.getElementById('ev-acceso-actual');
+  if(accesoActualEl){
+    const accesosInfo = (asignacionesActuales.length ? asignacionesActuales : [{cuentaUID:v.cuentaUID,cupoIdx:v.cupoIdx,perfil:v.perfil,pin:v.pin}]).map((a, idx) => {
+      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+      const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)] || {};
+      if(!cuenta && !v.correo) return '';
+      return `<div style="margin-bottom:${idx === asignacionesActuales.length-1 ? 0 : 8}px"><strong>${esc(cuenta?.id || 'Acceso manual')}</strong><br>Correo: ${esc(cuenta?.correo || v.correo || '—')}<br>Contraseña: ${esc(cuenta?.pass || 'No registrada')}<br>Perfil: ${esc(a.perfil || cupo.perfil || v.perfil || '—')} · PIN: ${esc(a.pin || cupo.pin || v.pin || '—')}</div>`;
+    }).filter(Boolean).join('');
+    accesoActualEl.innerHTML = accesosInfo;
+    accesoActualEl.style.display = accesosInfo ? 'block' : 'none';
+  }
   const cuentasActuales = [...new Set(asignacionesActuales.map(a => a.cuentaUID).filter(Boolean))];
   const cuposActuales = asignacionesActuales.length || (v.cupoIdx !== null && v.cupoIdx !== undefined ? 1 : 1);
   document.getElementById('ev-cupos-plan').value = Math.max(1, cuposActuales);
@@ -3863,6 +4044,7 @@ function abrirNuevaVenta(){
   _mvCuentaSelUID = null;
   _mvCuentaSelUIDs = [];
   _mvInvMode = true;
+  document.getElementById('mv-wa-preview-wrap').style.display = 'none';
   ['mv-nombre','mv-wa','mv-precio','mv-perfil','mv-pin','mv-inv-correo','mv-notas','mv-cactus-correo','mv-cactus-pass','mv-cactus-costo'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value = '';
@@ -4147,13 +4329,77 @@ function mvCalcVence(){
 function enviarWA(numero, msg){
   const wa = String(numero).replace(/\D/g,'');
   if(!wa){ alert('Número de WhatsApp no disponible'); return; }
-  // Abrir WA directamente con el mensaje en la URL — funciona en Android e iOS
-  msg = repararMojibakeTexto(msg);
-  const url = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(msg);
-  window.open(url, '_blank');
+  const texto = String(msg || '');
+  if(texto.includes('\uFFFD')){
+    alert('Este mensaje tiene caracteres dañados. Corrige la plantilla antes de enviarlo para que el cliente no reciba símbolos extraños.');
+    return;
+  }
+  const enlace = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texto);
+  const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(esMovil){ window.open(enlace, '_blank'); return; }
+
+  // WhatsApp Desktop interpreta mejor el protocolo directo que el salto wa.me -> api.whatsapp.com.
+  // El texto se mantiene con UTF-8 y se copia como respaldo por si Windows no abre la app.
+  if(navigator.clipboard?.writeText) navigator.clipboard.writeText(texto).catch(()=>{});
+  const protocoloDesktop = 'whatsapp://send?phone=' + wa + '&text=' + encodeURIComponent(texto);
+  const ventana = window.open(protocoloDesktop, '_blank');
+  setTimeout(() => {
+    if(!ventana || ventana.closed) window.open(enlace, '_blank');
+  }, 900);
 }
 
-function mvGenWA(){
+function contextoPlantillaNormalizado(p){
+  if(p?.contexto) return p.contexto;
+  if(p?.uid === 'plt-bienvenida') return 'venta_nueva';
+  if(p?.uid === 'plt-recordatorio') return 'vencimiento';
+  if(p?.uid === 'plt-no-renovacion') return 'no_renovo';
+  return 'general';
+}
+function plantillasDisponibles(contexto, srvUid){
+  const exactas = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === srvUid);
+  const generales = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === 'todos');
+  const otras = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === 'general' && ['todos',srvUid].includes(p.srvUid || 'todos'));
+  return [...exactas, ...generales, ...otras].filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
+}
+function llenarSelectPlantillas(selectId, contexto, srvUid){
+  const sel = document.getElementById(selectId);
+  if(!sel) return [];
+  const lista = plantillasDisponibles(contexto, srvUid);
+  sel.innerHTML = lista.length
+    ? lista.map(p => `<option value="${esc(p.uid)}">${esc(p.nombre)}${(p.srvUid && p.srvUid !== 'todos') ? ' · producto' : ''}</option>`).join('')
+    : '<option value="">Mensaje automático</option>';
+  return lista;
+}
+function accesosDeVentaParaMensaje(v){
+  const asigs = asignacionesCuposVenta(v);
+  if(asigs.length){
+    return asigs.map(a => {
+      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID) || {};
+      const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)] || {};
+      return { cuenta, cupoIdx:parseInt(a.cupoIdx), perfil:a.perfil || cupo.perfil || v.perfil || '', pin:a.pin || cupo.pin || v.pin || '' };
+    });
+  }
+  const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID) || {};
+  return (cuenta.correo || v.correo) ? [{cuenta:{...cuenta,correo:cuenta.correo || v.correo},cupoIdx:v.cupoIdx,perfil:v.perfil||'',pin:v.pin||''}] : [];
+}
+function ctxMensajeVenta(v){
+  return {
+    cliente:v.cliente || 'Cliente', servicio:v.srvNom || getSrv(v.srvUid)?.nombre || 'Servicio',
+    vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
+    perfil:v.perfil || '', pin:v.pin || '', enviarPass:!!v.enviarPass,
+    accesos:accesosDeVentaParaMensaje(v)
+  };
+}
+function mensajeAutomatico(contexto, ctx){
+  if(contexto === 'renovacion') return `¡Hola ${ctx.cliente}! 👋\n\nTu servicio *${ctx.servicio}* fue renovado correctamente ✅\n\n📅 Nuevo vencimiento: ${ctx.vence}\n💵 Monto: $${ctx.precio}\n\n${APP.config.firma || ''}`;
+  return `¡Hola ${ctx.cliente}! 👋\n\nTu acceso de *${ctx.servicio}* está listo ✅\n\n📅 Vence: ${ctx.vence}\n💵 Monto: $${ctx.precio}\n\n${APP.config.firma || ''}`;
+}
+function resolverMensajeSeleccionado(contexto, srvUid, selectId, ctx){
+  const puid = document.getElementById(selectId)?.value;
+  const p = PLANTILLAS_WA.find(x => x.uid === puid) || plantillasDisponibles(contexto, srvUid)[0];
+  return p ? resolverPlantilla(p.texto, ctx) : mensajeAutomatico(contexto, ctx);
+}
+function mvContextoFormulario(){
   const nombre = document.getElementById('mv-nombre').value || 'Cliente';
   const srvUid = document.getElementById('mv-srv').value;
   const srv = getSrv(srvUid);
@@ -4165,31 +4411,22 @@ function mvGenWA(){
   const pin = document.getElementById('mv-pin')?.value || '';
   const vence = document.getElementById('mv-vence-val').textContent || '\u2014';
   const precio = document.getElementById('mv-precio').value || '\u2014';
-  const firma = APP.config.firma || '';
   const enviarPass = !!document.getElementById('mv-enviar-pass')?.checked;
-  let msg = '\u00a1Hola ' + nombre + '! \ud83d\udc4b\nTu acceso est\u00e1 listo \ud83c\udf89\n\n\u2728 *' + srvNom + '*\n';
-  if(accesos.length > 1){
-    msg += '\ud83d\udd10 *Accesos del combo:*\n';
-    accesos.forEach((a, i) => {
-      msg += '\n' + (i+1) + '. \ud83d\udce7 ' + (a.cuenta.correo || 'Correo no definido') + '\n';
-      if(enviarPass && a.cuenta.pass) msg += '   \ud83d\udd11 Pass: ' + a.cuenta.pass + '\n';
-      msg += '   \ud83d\udc64 Perfil: ' + (a.perfil || ('Cupo ' + ((a.cupoIdx ?? i) + 1))) + '\n';
-      if(a.pin) msg += '   \ud83d\udd10 PIN: ' + a.pin + '\n';
-    });
-  } else {
-    const acceso = accesos[0];
-    const correoMsg = acceso?.cuenta?.correo || correo;
-    const passMsg = acceso?.cuenta?.pass || (!_mvInvMode ? document.getElementById('mv-cactus-pass')?.value : '');
-    const perfilMsg = acceso?.perfil || perfil;
-    const pinMsg = acceso?.pin || pin;
-    if(correoMsg) msg += '\ud83d\udce7 ' + correoMsg + '\n';
-    if(enviarPass && passMsg) msg += '\ud83d\udd11 Pass: ' + passMsg + '\n';
-    if(perfilMsg) msg += '\ud83d\udc64 Perfil: ' + perfilMsg + '\n';
-    if(pinMsg) msg += '\ud83d\udd10 PIN: ' + pinMsg + '\n';
-  }
-  msg += '\ud83d\udcc5 Vence: ' + vence + '\n\ud83d\udcb5 Monto: $' + precio + '\n\n\u26a0\ufe0f _No compartas ni modifiques los datos._\n\n' + firma;
-  const wa = document.getElementById('mv-wa').value;
-  enviarWA(wa, msg);
+  const accesoManual = !_mvInvMode && correo ? [{cuenta:{correo,pass:document.getElementById('mv-cactus-pass')?.value || ''},perfil,pin,cupoIdx:0}] : [];
+  return {srvUid, ctx:{cliente:nombre,servicio:srvNom,vence,precio,correo,perfil,pin,enviarPass,accesos:accesos.length ? accesos : accesoManual}};
+}
+function mvGenWA(){
+  const {srvUid,ctx} = mvContextoFormulario();
+  llenarSelectPlantillas('mv-plantilla','venta_nueva',srvUid);
+  document.getElementById('mv-wa-texto').value = resolverMensajeSeleccionado('venta_nueva',srvUid,'mv-plantilla',ctx);
+  document.getElementById('mv-wa-preview-wrap').style.display = 'block';
+}
+function mvActualizarMensajePlantilla(){
+  const {srvUid,ctx} = mvContextoFormulario();
+  document.getElementById('mv-wa-texto').value = resolverMensajeSeleccionado('venta_nueva',srvUid,'mv-plantilla',ctx);
+}
+function mvEnviarWAPreview(){
+  enviarWA(document.getElementById('mv-wa').value, document.getElementById('mv-wa-texto').value);
 }
 function mvGuardar(){
   const nombre = sanitizarTexto(document.getElementById('mv-nombre').value, 100);
@@ -4327,6 +4564,7 @@ function mvGuardar(){
   renderRegistro();
   renderBadgeVencimientos();
   alert(`✅ Venta ${venta.id} guardada`);
+  if(APP.config.notifVentas) crearNotificacionLocal('venta','Nueva venta registrada',`${venta.cliente} · ${venta.srvNom} · $${venta.precio.toFixed(2)}`,`venta-${venta.uid}`);
   sincronizarConSheets();
 }
 
@@ -4966,6 +5204,8 @@ function abrirNuevaCuenta(){
   const modoTabs = document.getElementById('nc-modo-tabs');
   if(modoTabs) modoTabs.style.display = '';
   if(document.getElementById('nc-renovable')) document.getElementById('nc-renovable').value = 'si';
+  poblarSelectAdelantos('nc-adelanto');
+  if(document.getElementById('nc-adelanto')) document.getElementById('nc-adelanto').value = '';
   ncPoblarCategorias();
   abrirModal('modal-nueva-cuenta');
 }
@@ -4989,11 +5229,17 @@ function ncActCat(){
   });
 }
 function ncActSrv(){}
-function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, fecha){
-  if(costoCuenta <= 0) return;
-  const esUsdt = metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
+function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, fecha, adelantoUID){
+  if(costoCuenta <= 0) return true;
+  const costoUID = uid();
+  const usaAdelanto = !!adelantoUID;
+  const esUsdt = !usaAdelanto && metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
   let montoUSDReal = costoCuenta;
   let usdtUsado = 0;
+  if(usaAdelanto){
+    const ok = consumirAdelanto(adelantoUID,costoCuenta,{fecha:fecha||hoy(),cuentaUID,costoUID,descripcion:`Adquisición ${idVal}`});
+    if(!ok) return false;
+  }
   if(esUsdt){
     const fifo = calcFIFO(costoCuenta);
     usdtUsado = costoCuenta;
@@ -5001,18 +5247,21 @@ function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, m
     descontarUSDTBinance(costoCuenta, `Adquisicion cuenta madre - ${idVal} (${srv ? srv.nombre : srvUid})`, cuentaUID, null, fecha || hoy());
   }
   APP.costos.push({
-    uid: uid(),
+    uid: costoUID,
     tipo: 'adquisicion_cuenta',
     cuentaUID,
     fecha: fecha || hoy(),
     catUid: 'cg-cuentas',
     desc: `Adquisicion cuenta madre - ${srv ? srv.nombre : srvUid} - ${idVal}`,
-    metodo: metodoPago || 'Transferencia',
+    metodo: usaAdelanto ? 'Saldo proveedor' : (metodoPago || 'Transferencia'),
     montoUSD: montoUSDReal,
     usdtUsado,
     esCostoReal: true,
-    notas: `Registrado automaticamente al crear cuenta ${idVal}`
+    adelantoUID: adelantoUID || '',
+    proveedorUID: usaAdelanto ? ((APP.adelantosProveedor||[]).find(a=>a.uid===adelantoUID)?.proveedorUID || '') : '',
+    notas: `Registrado automaticamente al crear cuenta ${idVal}${usaAdelanto ? ' · descontado de adelanto' : ''}`
   });
+  return true;
 }
 function ncGuardarMasivo(){
   const srvUid = document.getElementById('nc-srv').value;
@@ -5030,12 +5279,17 @@ function ncGuardarMasivo(){
   const costoTotal = parseFloat(document.getElementById('nc-costo').value)||0;
   const costoCuenta = items.length ? parseFloat((costoTotal / items.length).toFixed(6)) : 0;
   const metodoPago = document.getElementById('nc-metodo-pago').value;
+  const adelantoUID = document.getElementById('nc-adelanto')?.value || '';
   const ncDesde = document.getElementById('nc-desde').value;
   const ncHasta = document.getElementById('nc-hasta').value;
   const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
   const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
   const notas = document.getElementById('nc-notas').value;
   const baseNum = APP.cuentas.length + 1;
+  if(adelantoUID){
+    const adelanto = (APP.adelantosProveedor||[]).find(a=>a.uid===adelantoUID);
+    if(!adelanto || costoTotal > saldoAdelanto(adelanto) + 0.0001){ alert('El adelanto seleccionado no tiene saldo suficiente para toda la carga.'); return; }
+  }
   items.forEach((item, idx) => {
     const cuentaUID = uid();
     const idVal = `${prefijo}-${String(baseNum + idx).padStart(2,'0')}`;
@@ -5048,7 +5302,7 @@ function ncGuardarMasivo(){
       notas,
       cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
     });
-    registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, ncDesde || hoy());
+    registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, ncDesde || hoy(), adelantoUID);
   });
   cerrarModal('modal-nueva-cuenta');
   renderInventario();
@@ -5075,6 +5329,7 @@ function ncGuardar(){
   const editUID = document.getElementById('nc-edit-uid').value;
   const costoTotal = parseFloat(document.getElementById('nc-costo').value)||0;
   const metodoPago = document.getElementById('nc-metodo-pago').value;
+  const adelantoUID = document.getElementById('nc-adelanto')?.value || '';
   const ncDesde = document.getElementById('nc-desde').value;
   const ncHasta = document.getElementById('nc-hasta').value;
   const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
@@ -5108,44 +5363,10 @@ function ncGuardar(){
       cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
     });
 
-    // ── Auto-registrar costo real al crear cuenta madre ──
-    if(costoTotal > 0){
-      // Evitar duplicados: verificar si ya existe costo para esta cuenta
-      const yaExisteCosto = APP.costos.some(c =>
-        c.cuentaUID === nuevaCuentaUID && c.tipo === 'adquisicion_cuenta'
-      );
-      if(!yaExisteCosto){
-        const esUsdt = metodoPago && (metodoPago.toLowerCase().includes('usdt') || metodoPago.toLowerCase().includes('binance'));
-        let montoUSDReal = costoTotal;
-        let usdtUsado = 0;
-        if(esUsdt){
-          // Calcular costo USD exacto FIFO ANTES de descontar
-          const fifo = calcFIFO(costoTotal);
-          usdtUsado = costoTotal;
-          montoUSDReal = fifo.total || costoTotal; // costo USD exacto por lote, fallback al costo
-          // FIX: Descontar de Binance pero NO cancelar el registro del costo si el usuario cancela
-          // El costo se registra siempre — el saldo de Binance se ajusta si el usuario acepta
-          descontarUSDTBinance(costoTotal,
-            `Adquisición cuenta madre — ${idVal} (${srv ? srv.nombre : srvUid})`,
-            nuevaCuentaUID, null,
-            ncDesde || hoy()
-          );
-        }
-        // FIX: El costo se registra SIEMPRE, independiente del confirm de Binance
-        APP.costos.push({
-          uid: uid(),
-          tipo: 'adquisicion_cuenta',
-          cuentaUID: nuevaCuentaUID,
-          fecha: ncDesde || hoy(),
-          catUid: 'cg-cuentas',
-          desc: `Adquisición cuenta madre — ${srv ? srv.nombre : srvUid} · ${idVal}`,
-          metodo: metodoPago || 'Transferencia',
-          montoUSD: montoUSDReal,
-          usdtUsado,
-          esCostoReal: true,
-          notas: `Registrado automáticamente al crear cuenta ${idVal}`
-        });
-      }
+    // Auto-registrar el costo real y, si se eligió, descontarlo del adelanto exacto.
+    if(costoTotal > 0 && !APP.costos.some(c => c.cuentaUID === nuevaCuentaUID && c.tipo === 'adquisicion_cuenta')){
+      const okCosto = registrarCostoCuentaMadre(nuevaCuentaUID,idVal,srv,srvUid,costoTotal,metodoPago,ncDesde||hoy(),adelantoUID);
+      if(!okCosto){ APP.cuentas = APP.cuentas.filter(c=>c.uid!==nuevaCuentaUID); return; }
     }
   }
   document.getElementById('nc-edit-uid').value = '';
@@ -5353,6 +5574,16 @@ function venBulkEliminarConfirmar(){
   sincronizarConSheets();
 }
 
+function seccionVencimiento(venta, dias){
+  if(venta.activa === false) return {orden:90, titulo:'Servicios inactivos'};
+  if(dias === null) return {orden:80, titulo:'Sin fecha de vencimiento'};
+  if(dias < 0) return {orden:0, titulo:'Vencidos'};
+  if(dias === 0) return {orden:1, titulo:'Vencen hoy'};
+  if(dias === 1) return {orden:2, titulo:'Vencen mañana'};
+  if(dias <= 3) return {orden:3, titulo:'Próximos 3 días'};
+  if(dias <= 7) return {orden:4, titulo:'Esta semana'};
+  return {orden:5, titulo:'Más adelante'};
+}
 function renderVencimientos(){
   let ventas = APP._filtroVen === 'inactivo'
     ? APP.ventas.filter(v => v.activa === false && !v.eliminadoRegistro)
@@ -5374,17 +5605,24 @@ function renderVencimientos(){
     ventas = ventas.filter(v => coincideBusqueda(textoBusquedaVenta(v), _venBusq));
   }
   venMsgWA = {};
-  const ord = {vencido:0,hoy:1,pronto:2,ok:3};
-  ventas.sort((a,b) => (ord[estadoVen(a.vence)]||4) - (ord[estadoVen(b.vence)]||4));
+  ventas.sort((a,b) => {
+    const ga = seccionVencimiento(a, diasHasta(a.vence));
+    const gb = seccionVencimiento(b, diasHasta(b.vence));
+    return ga.orden - gb.orden || String(a.vence||'9999-99-99').localeCompare(String(b.vence||'9999-99-99')) || String(a.cliente||'').localeCompare(String(b.cliente||''));
+  });
   const lista = document.getElementById('ven-lista');
   if(!ventas.length){
     lista.innerHTML = '<div class="empty"><div class="e-ico">⏰</div><div>Sin vencimientos para mostrar.</div></div>';
     return;
   }
+  let seccionAnterior = '';
   lista.innerHTML = ventas.map(v => {
     const st = estadoVen(v.vence);
     const wa = v.wa ? v.wa.replace(/\D/g,'') : '';
     const d = diasHasta(v.vence);
+    const seccion = seccionVencimiento(v, d).titulo;
+    const encabezado = seccion !== seccionAnterior ? `<div class="sec" style="margin:16px 2px 8px">${esc(seccion)}</div>` : '';
+    seccionAnterior = seccion;
     const isInactivo = v.activa === false;
     const isSel = _venSeleccionados.has(v.uid);
     let msgWA = '';
@@ -5409,7 +5647,7 @@ function renderVencimientos(){
       : '';
     const cardClick  = _venSelMode ? `onclick="venToggleItem('${esc(v.uid)}')"` : '';
     const extraClass = _venSelMode ? (' ven-selmode' + (isSel ? ' ven-seleccionada' : '')) : '';
-    return `<div id="vcard-${esc(v.uid)}" class="ven-card ${isInactivo?'inactivo':st}${extraClass}" ${cardClick}>
+    return encabezado + `<div id="vcard-${esc(v.uid)}" class="ven-card ${isInactivo?'inactivo':st}${extraClass}" ${cardClick}>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div style="display:flex;align-items:flex-start;gap:10px;flex:1">
           ${chkHtml}
@@ -5485,6 +5723,7 @@ function renSelCupo(){
 function abrirRenovar(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
+  document.getElementById('ren-wa-preview-wrap').style.display = 'none';
   document.getElementById('ren-venta-uid').value = ventaUid;
   document.getElementById('ren-info').textContent = `${v.cliente} · ${v.srvNom||'?'} · ${v.id}`;
   document.getElementById('ren-perfil').value = '';
@@ -5609,6 +5848,58 @@ function renSelCuenta(){
     infoEl.textContent = `📦 ${c.id} · Sin costo registrado`;
   }
 }
+function renVentaFormulario(){
+  const base = APP.ventas.find(x => x.uid === document.getElementById('ren-venta-uid').value) || {};
+  const srvUid = document.getElementById('ren-srv').value || base.srvUid || '';
+  const srv = getSrv(srvUid);
+  const cuentaUID = document.getElementById('ren-cuenta-inv')?.value || base.cuentaUID || null;
+  const cupoVal = document.getElementById('ren-cupo-inv')?.value;
+  const correo = document.getElementById('ren-correo').value || base.correo || '';
+  return {
+    ...base,
+    srvUid,
+    srvNom:srv ? `${srv.emoji} ${srv.nombre}` : base.srvNom,
+    cuentaUID,
+    cupoIdx:cupoVal !== '' && cupoVal !== undefined ? parseInt(cupoVal) : base.cupoIdx,
+    correo,
+    wa:document.getElementById('ren-wa').value || base.wa,
+    perfil:document.getElementById('ren-perfil').value || base.perfil,
+    vence:document.getElementById('ren-vence').value || base.vence,
+    precio:parseFloat(document.getElementById('ren-precio').value) || base.precio,
+    estado:document.getElementById('ren-estado').value || base.estado
+  };
+}
+function renPrevisualizarWA(){
+  const v = renVentaFormulario();
+  llenarSelectPlantillas('ren-plantilla','renovacion',v.srvUid);
+  document.getElementById('ren-wa-texto').value = resolverMensajeSeleccionado('renovacion',v.srvUid,'ren-plantilla',ctxMensajeVenta(v));
+  document.getElementById('ren-wa-preview-wrap').style.display = 'block';
+}
+function renActualizarMensajePlantilla(){
+  const v = renVentaFormulario();
+  document.getElementById('ren-wa-texto').value = resolverMensajeSeleccionado('renovacion',v.srvUid,'ren-plantilla',ctxMensajeVenta(v));
+}
+function mostrarMensajePostVenta(v, contexto){
+  if(!v) return;
+  document.getElementById('post-wa-numero').value = v.wa || '';
+  document.getElementById('post-wa-contexto').value = contexto;
+  document.getElementById('post-wa-servicio').value = v.srvUid || '';
+  document.getElementById('modal-mensaje-wa').dataset.ventaUid = v.uid || '';
+  llenarSelectPlantillas('post-wa-plantilla',contexto,v.srvUid || '');
+  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v));
+  abrirModal('modal-mensaje-wa');
+}
+function postActualizarMensajePlantilla(){
+  const uidVenta = document.getElementById('modal-mensaje-wa').dataset.ventaUid;
+  const v = APP.ventas.find(x => x.uid === uidVenta);
+  if(!v) return;
+  const contexto = document.getElementById('post-wa-contexto').value;
+  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v));
+}
+function postEnviarWA(){
+  enviarWA(document.getElementById('post-wa-numero').value, document.getElementById('post-wa-texto').value);
+}
+
 function renGuardar(){
   const ventaUid = document.getElementById('ren-venta-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
@@ -5617,6 +5908,7 @@ function renGuardar(){
   const cupoAnteriorIdx = v.cupoIdx;
   const nuevoWA = sanitizarTexto(document.getElementById('ren-wa').value, 20);
   const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
+  const mensajeRenPreparado = document.getElementById('ren-wa-preview-wrap')?.style.display !== 'none' ? document.getElementById('ren-wa-texto')?.value : '';
 
   // Leer correo según origen
   const nuevoCorreo = origen === 'manual'
@@ -5706,6 +5998,31 @@ function renGuardar(){
     v.cupoIdx = null;
   }
 
+  // Normalizar todas las asignaciones de la renovación para que apunten a la venta nueva.
+  if(nuevaVenta.cuentaUID){
+    let asignacionesRen = asignacionesCuposVenta(nuevaVenta);
+    if(cuentaInvUID && (cuentaAnteriorUID !== nuevaVenta.cuentaUID || String(cupoAnteriorIdx) !== String(nuevaVenta.cupoIdx))){
+      asignacionesRen = asignacionesRen.map(a => (a.cuentaUID === cuentaAnteriorUID && parseInt(a.cupoIdx) === parseInt(cupoAnteriorIdx))
+        ? {...a,cuentaUID:nuevaVenta.cuentaUID,cupoIdx:nuevaVenta.cupoIdx}
+        : a);
+    }
+    if(!asignacionesRen.length) asignacionesRen = [{cuentaUID:nuevaVenta.cuentaUID,cupoIdx:nuevaVenta.cupoIdx}];
+    const precioPorCupo = asignacionesRen.length ? (parseFloat(nuevaVenta.precio)||0)/asignacionesRen.length : (parseFloat(nuevaVenta.precio)||0);
+    nuevaVenta.cuposAsignados = asignacionesRen.map(a => {
+      const cuenta = APP.cuentas.find(c=>c.uid===a.cuentaUID);
+      const idx = parseInt(a.cupoIdx);
+      const cupo = cuenta?.cupos?.[idx] || {};
+      if(cuenta?.cupos?.[idx]) cuenta.cupos[idx] = {...cupo,estado:'ocupado',cliente:nuevaVenta.cliente,wa:nuevaVenta.wa,vence:nuevaVenta.vence,ventaUid:nuevaVenta.uid,pendienteCobro:nuevaVenta.estado!=='pagado',periodoDesde:nuevaVenta.fecha,periodoHasta:nuevaVenta.vence,montoVenta:precioPorCupo};
+      return {...a,cuentaUID:a.cuentaUID,cupoIdx:idx,correo:cuenta?.correo||'',cuentaId:cuenta?.id||'',perfil:cupo.perfil||a.perfil||nuevaVenta.perfil||'',pin:cupo.pin||a.pin||nuevaVenta.pin||'',precio:precioPorCupo,estado:nuevaVenta.estado,fecha:nuevaVenta.fecha,vence:nuevaVenta.vence};
+    });
+    nuevaVenta.cuentaUID = nuevaVenta.cuposAsignados[0]?.cuentaUID || nuevaVenta.cuentaUID;
+    nuevaVenta.cupoIdx = nuevaVenta.cuposAsignados[0]?.cupoIdx ?? nuevaVenta.cupoIdx;
+    nuevaVenta.cupoIdxs = nuevaVenta.cuposAsignados.filter(a=>a.cuentaUID===nuevaVenta.cuentaUID).map(a=>a.cupoIdx);
+  } else {
+    nuevaVenta.cuposAsignados = [];
+    nuevaVenta.cupoIdxs = [];
+  }
+
   // Registrar costo si aplica
   const costoAdq = parseFloat(document.getElementById('ren-costo-cuenta').value) || 0;
   const metodoAdq = document.getElementById('ren-metodo-adq')?.value || 'Transferencia';
@@ -5731,27 +6048,14 @@ function renGuardar(){
   actualizarSaldoBinance();
   renderBinance();
   alert(`✅ Renovación ${nuevaVenta.id} guardada`);
+  crearNotificacionLocal('renovacion', 'Servicio renovado', `${nuevaVenta.cliente} renovó ${nuevaVenta.srvNom || 'su servicio'} hasta ${fmtFecha(nuevaVenta.vence)}.`, `renovacion-${nuevaVenta.uid}`);
   sincronizarConSheetsSilencioso();
+  mostrarMensajePostVenta(nuevaVenta, 'renovacion');
+  if(mensajeRenPreparado) document.getElementById('post-wa-texto').value = mensajeRenPreparado;
 }
 
-// Sincronización silenciosa — guarda sin mostrar overlay bloqueante
-async function sincronizarConSheetsSilencioso(){
-  if(!_pinVerificado) return;
-  // Solo mostrar un pequeño indicador no bloqueante
-  const ind = document.getElementById('sync-indicador');
-  if(ind){ ind.style.display = 'flex'; ind.textContent = '💾'; }
-  try {
-    // FIX: usar construirPayload() para garantizar que ventasEliminadas
-    // siempre se incluya — antes se construía manualmente y se olvidaba ese campo,
-    // causando que las ventas eliminadas reaparecieran al recargar.
-    const payload = construirPayload();
-    localStorage.setItem('yoritex_local', JSON.stringify({ _pin: _pinGuardado, data: payload, _ts: Date.now() }));
-    await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload });
-    if(ind){ ind.textContent = '✅'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
-  } catch(err) {
-    if(ind){ ind.textContent = '📱'; setTimeout(()=>{ ind.style.display='none'; }, 1500); }
-  }
-}
+// Todas las rutas usan la misma cola: evita que una renovación y otra edición se pisen.
+function sincronizarConSheetsSilencioso(){ return sincronizarConSheets(); }
 function abrirNoRenovo(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
@@ -6000,10 +6304,12 @@ function sumarPorMetodoCaja(items, campoMonto, filtro){
 function renderCajaDisponible(){
   const ventasPagadas = (APP.ventas || []).filter(v => v.activa !== false && v.estado === 'pagado');
   const ingresos = sumarPorMetodoCaja(ventasPagadas, 'precio');
-  const costos = sumarPorMetodoCaja(APP.costos || [], 'montoUSD');
+  // Los costos consumidos desde adelantos ya salieron de caja al pagar al proveedor.
+  const costos = sumarPorMetodoCaja((APP.costos || []).filter(g => !g.adelantoUID), 'montoUSD');
   const reembolsos = sumarPorMetodoCaja(APP.reembolsos || [], 'monto');
   const egresos = sumarPorMetodoCaja(APP.egresos || [], 'monto');
-  const neto = key => (ingresos[key] || 0) - (costos[key] || 0) - (reembolsos[key] || 0) - (egresos[key] || 0);
+  const adelantosCaja = sumarPorMetodoCaja((APP.adelantosProveedor || []).filter(a => !String(a.metodo||'').toLowerCase().includes('binance')), 'monto');
+  const neto = key => (ingresos[key] || 0) - (costos[key] || 0) - (reembolsos[key] || 0) - (egresos[key] || 0) - (adelantosCaja[key] || 0);
   const saldoUsdt = getSaldoBinance();
   const tasa = getTasaPromBinance();
   const saldoUsdtUsd = saldoUsdt * tasa;
@@ -6013,9 +6319,9 @@ function renderCajaDisponible(){
   setText('d-caja-usdt', saldoUsdt.toFixed(2) + ' USDT');
   setText('d-caja-usdt-usd', '≈ $' + saldoUsdtUsd.toFixed(2));
   setMoney('d-caja-banco', banco);
-  setText('d-caja-banco-s', '$' + (ingresos.banco || 0).toFixed(2) + ' cobrado - $' + (((costos.banco||0)+(reembolsos.banco||0)+(egresos.banco||0)).toFixed(2)) + ' salidas');
+  setText('d-caja-banco-s', '$' + (ingresos.banco || 0).toFixed(2) + ' cobrado - $' + (((costos.banco||0)+(reembolsos.banco||0)+(egresos.banco||0)+(adelantosCaja.banco||0)).toFixed(2)) + ' salidas');
   setMoney('d-caja-efectivo', efectivo);
-  setText('d-caja-efectivo-s', '$' + (ingresos.efectivo || 0).toFixed(2) + ' cobrado - $' + (((costos.efectivo||0)+(reembolsos.efectivo||0)+(egresos.efectivo||0)).toFixed(2)) + ' salidas');
+  setText('d-caja-efectivo-s', '$' + (ingresos.efectivo || 0).toFixed(2) + ' cobrado - $' + (((costos.efectivo||0)+(reembolsos.efectivo||0)+(egresos.efectivo||0)+(adelantosCaja.efectivo||0)).toFixed(2)) + ' salidas');
   setMoney('d-caja-otros', otros);
   setText('d-caja-otros-s', 'Deuna/tarjeta/otros neto');
   setMoney('d-caja-total', banco + efectivo + otros + saldoUsdtUsd);
@@ -6047,6 +6353,83 @@ function renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas){
     return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2)"><b>${n}</b><span>${actTxt} / ${metaTxt}</span></div><div class="bar-bg" style="height:7px"><div class="bar-fill" style="width:${pct.toFixed(0)}%;background:var(--orange)"></div></div></div>`;
   }).join('');
 }
+function isoFechaLocal(fecha){
+  const d = new Date(String(fecha || hoy()) + 'T12:00:00');
+  return isNaN(d) ? hoy() : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function inicioSemana(fecha){
+  const d = new Date(isoFechaLocal(fecha) + 'T12:00:00');
+  d.setDate(d.getDate() - ((d.getDay()+6)%7));
+  return isoFechaLocal(d.toISOString().slice(0,10));
+}
+function etiquetaSemana(inicio){
+  return `${fmtFecha(inicio)} - ${fmtFecha(sumarDias(inicio,6))}`;
+}
+function etiquetaMes(clave){
+  const [anio, mes] = clave.split('-').map(Number);
+  return `${MESES_LARGOS[(mes||1)-1] || clave} ${anio || ''}`.trim();
+}
+function detallePeriodo(titulo, meta, contenido, nivel){
+  return `<details class="periodo-accordion ${nivel || ''}"><summary><span>${esc(titulo)}</span><span class="periodo-meta">${esc(meta)}</span></summary><div class="periodo-items">${contenido}</div></details>`;
+}
+function historialPlegable(items, renderItem, profundidad='mes'){
+  const porFecha = new Map();
+  items.forEach(item => {
+    const fecha = isoFechaLocal(item.fecha);
+    if(!porFecha.has(fecha)) porFecha.set(fecha, []);
+    porFecha.get(fecha).push(item);
+  });
+  const dias = [...porFecha.keys()].sort((a,b)=>b.localeCompare(a));
+  const htmlDia = fecha => detallePeriodo(fmtFecha(fecha), `${porFecha.get(fecha).length} movimiento${porFecha.get(fecha).length===1?'':'s'}`, porFecha.get(fecha).map(renderItem).join(''), 'nivel-dia');
+  if(profundidad === 'dia') return dias.map(htmlDia).join('');
+
+  const porSemana = new Map();
+  dias.forEach(fecha => {
+    const semana = inicioSemana(fecha);
+    if(!porSemana.has(semana)) porSemana.set(semana, []);
+    porSemana.get(semana).push(fecha);
+  });
+  const semanas = [...porSemana.keys()].sort((a,b)=>b.localeCompare(a));
+  const htmlSemana = semana => {
+    const fechas = porSemana.get(semana);
+    const cantidad = fechas.reduce((s,f)=>s+porFecha.get(f).length,0);
+    return detallePeriodo(etiquetaSemana(semana), `${cantidad} movimiento${cantidad===1?'':'s'}`, fechas.map(htmlDia).join(''), 'nivel-semana');
+  };
+  if(profundidad === 'semana') return semanas.map(htmlSemana).join('');
+
+  const porMes = new Map();
+  semanas.forEach(semana => {
+    const mes = semana.slice(0,7);
+    if(!porMes.has(mes)) porMes.set(mes, []);
+    porMes.get(mes).push(semana);
+  });
+  return [...porMes.keys()].sort((a,b)=>b.localeCompare(a)).map(mes => {
+    const semanasMes = porMes.get(mes);
+    const cantidad = semanasMes.reduce((s,semana)=>s+porSemana.get(semana).reduce((x,fecha)=>x+porFecha.get(fecha).length,0),0);
+    return detallePeriodo(etiquetaMes(mes), `${cantidad} movimiento${cantidad===1?'':'s'}`, semanasMes.map(htmlSemana).join(''), 'nivel-mes');
+  }).join('');
+}
+function profundidadHistorialDashboard(){
+  if(_dashPeriodo === 'historial') return 'mes';
+  if(_dashPeriodo === 'semana') return 'dia';
+  if(_dashPeriodo === 'rango' && _dashDesde && _dashHasta && diasHasta(_dashHasta) - diasHasta(_dashDesde) <= 6) return 'dia';
+  return 'semana';
+}
+function renderMovimientosDashboard(){
+  const el = document.getElementById('dash-movimientos');
+  if(!el) return;
+  const filtro = document.getElementById('dash-mov-tipo')?.value || 'todos';
+  const movs = [];
+  (APP.ventas||[]).filter(v=>v.estado==='pagado' && fechaEnPeriodoDash(v.fecha)).forEach(v=>movs.push({fecha:v.fecha,tipo:'ingreso',concepto:`${v.srvNom || 'Venta'} · ${v.cliente}`,metodo:v.metodo,monto:parseFloat(v.precio)||0}));
+  (APP.costos||[]).filter(g=>fechaEnPeriodoDash(g.fecha)).forEach(g=>movs.push({fecha:g.fecha,tipo:'salida',concepto:g.desc||'Costo',metodo:g.metodo,monto:parseFloat(g.montoUSD)||0,tag:g.adelantoUID?'Consumo de adelanto':'Costo'}));
+  (APP.reembolsos||[]).filter(r=>fechaEnPeriodoDash(r.fecha)).forEach(r=>movs.push({fecha:r.fecha,tipo:'salida',concepto:`Reembolso · ${r.cliente||''}`,metodo:r.metodo,monto:parseFloat(r.monto)||0,tag:'Reembolso'}));
+  (APP.egresos||[]).filter(e=>fechaEnPeriodoDash(e.fecha)).forEach(e=>movs.push({fecha:e.fecha,tipo:'salida',concepto:e.desc||'Egreso',metodo:e.metodo,monto:parseFloat(e.monto)||0,tag:e.tipo==='sueldo'?'Sueldo':'Egreso'}));
+  (APP.adelantosProveedor||[]).filter(a=>fechaEnPeriodoDash(a.fecha)).forEach(a=>movs.push({fecha:a.fecha,tipo:'salida',concepto:`Adelanto · ${proveedorDeAdelanto(a)?.nombre||'Proveedor'}`,metodo:a.metodo,monto:parseFloat(a.monto)||0,tag:'Movimiento de caja',noResultado:true}));
+  const visibles = movs.filter(m=>filtro==='todos'||m.tipo===filtro).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  if(!visibles.length){ el.innerHTML='<div class="empty" style="padding:16px 0">Sin movimientos en este período</div>'; return; }
+  el.innerHTML = historialPlegable(visibles, m => `<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><div><div style="font-size:12px;color:var(--text)">${esc(m.concepto)}</div><div style="font-size:10px;color:var(--text3)">${esc(m.tag||m.tipo)} · ${esc(m.metodo||'—')}</div></div><strong style="font-size:12px;color:${m.tipo==='ingreso'?'var(--green)':'var(--red)'}">${m.tipo==='ingreso'?'+':'-'}$${m.monto.toFixed(2)}</strong></div>`, profundidadHistorialDashboard());
+}
+
 function renderDashboard(){
   // Actualizar label de periodo
   let periodoLbl;
@@ -6105,6 +6488,7 @@ function renderDashboard(){
   setText('d-otros-egresos-s', egPeriodo.filter(e => e.tipo !== 'sueldo').length + ' egreso(s)');
   renderCajaDisponible();
   renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas);
+  renderMovimientosDashboard();
   document.getElementById('d-pagados').textContent = cobradas.length;
   document.getElementById('d-pendientes').textContent = activas.filter(v => ['pendiente','por_cobrar'].includes(v.estado)).length;
   document.getElementById('d-parciales').textContent = activas.filter(v => v.estado==='parcial').length;
@@ -6390,6 +6774,63 @@ function ccRegistrarCostoConFIFO(monto, metodo, desc, fecha, catUid, cuentaUID){
   return true;
 }
 
+function ccAplicarReposicionVenta(ventaRel, cuentaOrigenUID, cupoOrigenIdx, cuentaDestino, cupoDestinoIdx, cupoOrigen){
+  if(!ventaRel || !cuentaDestino) return;
+  const idxDestino = parseInt(cupoDestinoIdx);
+  const precioTotal = parseFloat(ventaRel.precio) || parseFloat(cupoOrigen?.montoVenta) || 0;
+  const anteriores = asignacionesCuposVenta(ventaRel);
+  let reemplazoHecho = false;
+  const nuevas = anteriores.map(a => {
+    if(a.cuentaUID === cuentaOrigenUID && parseInt(a.cupoIdx) === parseInt(cupoOrigenIdx)){
+      reemplazoHecho = true;
+      return {
+        ...a,
+        cuentaUID: cuentaDestino.uid,
+        cuentaId: cuentaDestino.id || '',
+        correo: cuentaDestino.correo || '',
+        cupoIdx: idxDestino,
+        perfil: cupoOrigen?.perfil || a.perfil || ventaRel.perfil || '',
+        pin: cupoOrigen?.pin || a.pin || ventaRel.pin || '',
+        precio: parseFloat(a.precio) || precioTotal,
+        estado: ventaRel.estado,
+        fecha: ventaRel.fecha,
+        vence: ventaRel.vence
+      };
+    }
+    return a;
+  });
+  if(!reemplazoHecho){
+    nuevas.push({
+      cuentaUID: cuentaDestino.uid, cuentaId: cuentaDestino.id || '', correo: cuentaDestino.correo || '',
+      cupoIdx: idxDestino, perfil: cupoOrigen?.perfil || ventaRel.perfil || '',
+      pin: cupoOrigen?.pin || ventaRel.pin || '', precio: precioTotal,
+      estado: ventaRel.estado, fecha: ventaRel.fecha, vence: ventaRel.vence
+    });
+  }
+  ventaRel.cuposAsignados = nuevas;
+  ventaRel.cuentaUID = nuevas[0]?.cuentaUID || cuentaDestino.uid;
+  ventaRel.cupoIdx = nuevas[0]?.cupoIdx ?? idxDestino;
+  ventaRel.cupoIdxs = nuevas.filter(a => a.cuentaUID === ventaRel.cuentaUID).map(a => parseInt(a.cupoIdx));
+  ventaRel.correo = APP.cuentas.find(c => c.uid === ventaRel.cuentaUID)?.correo || cuentaDestino.correo || ventaRel.correo;
+
+  if(!Array.isArray(cuentaDestino.cupos)) cuentaDestino.cupos = [];
+  cuentaDestino.cupos[idxDestino] = {
+    ...(cuentaDestino.cupos[idxDestino] || {}),
+    estado: 'ocupado',
+    cliente: ventaRel.cliente || cupoOrigen?.cliente || '',
+    wa: ventaRel.wa || cupoOrigen?.wa || '',
+    perfil: cupoOrigen?.perfil || ventaRel.perfil || '',
+    pin: cupoOrigen?.pin || ventaRel.pin || '',
+    vence: ventaRel.vence || cupoOrigen?.vence || '',
+    plan: ventaRel.plan || cupoOrigen?.plan || '',
+    ventaUid: ventaRel.uid,
+    pendienteCobro: ventaRel.estado !== 'pagado',
+    periodoDesde: ventaRel.fecha || cupoOrigen?.periodoDesde || hoy(),
+    periodoHasta: ventaRel.vence || cupoOrigen?.periodoHasta || '',
+    montoVenta: precioTotal
+  };
+}
+
 function ccGuardar(){
   const cuentaUID = document.getElementById('cc-cuenta-uid').value;
   const c = obtenerCuentaInventarioOVirtual(cuentaUID);
@@ -6453,14 +6894,13 @@ function ccGuardar(){
       const cuentaRepo = APP.cuentas.find(x => x.uid === cuentaRepoUID);
       if(!cuentaRepo){ alert('Cuenta no encontrada'); return; }
       const cupoIdxNum = parseInt(cupoRepoIdx);
-      // Mover cliente al nuevo cupo
+      // Mover cliente al nuevo cupo conservando toda la relación con la venta.
       if(cupoAfectado){
-        cuentaRepo.cupos[cupoIdxNum] = { ...cuentaRepo.cupos[cupoIdxNum], estado: 'ocupado', cliente: cupoAfectado.cliente, wa: cupoAfectado.wa || '', perfil: cupoAfectado.perfil || '', pin: cupoAfectado.pin || '', vence: cupoAfectado.vence };
-        // Actualizar venta relacionada
         const ventaRel = cupoAfectado.ventaUid
           ? APP.ventas.find(v => v.uid === cupoAfectado.ventaUid && v.activa !== false)
           : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
-        if(ventaRel){ ventaRel.cuentaUID = cuentaRepoUID; ventaRel.cupoIdx = cupoIdxNum; ventaRel.correo = cuentaRepo.correo; }
+        if(ventaRel) ccAplicarReposicionVenta(ventaRel, cuentaUID, cupoAfectadoIdx, cuentaRepo, cupoIdxNum, cupoAfectado);
+        else cuentaRepo.cupos[cupoIdxNum] = { ...cuentaRepo.cupos[cupoIdxNum], ...cupoAfectado, estado:'ocupado' };
         // Liberar cupo original
         if(!c.esVirtual) c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
       }
@@ -6483,10 +6923,6 @@ function ccGuardar(){
       // Crear nueva cuenta
       const cuposArr = [];
       for(let i = 0; i < cuposNum; i++) cuposArr.push({ estado: 'libre' });
-      // Asignar el cliente afectado al primer cupo de la nueva cuenta
-      if(cupoAfectado && cuposArr.length > 0){
-        cuposArr[0] = { estado: 'ocupado', cliente: cupoAfectado.cliente, wa: cupoAfectado.wa || '', perfil: cupoAfectado.perfil || '', pin: cupoAfectado.pin || '', vence: cupoAfectado.vence };
-      }
       const nuevaCuenta = {
         uid: uid(), srvUid: c.srvUid, srvNom: srvNom,
         id: `${(srv?.nombre || 'SRV').toUpperCase().slice(0,3)}-R${Date.now().toString(36).slice(-3).toUpperCase()}`,
@@ -6499,7 +6935,8 @@ function ccGuardar(){
         const ventaRel = cupoAfectado.ventaUid
           ? APP.ventas.find(v => v.uid === cupoAfectado.ventaUid && v.activa !== false)
           : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
-        if(ventaRel){ ventaRel.cuentaUID = nuevaCuenta.uid; ventaRel.cupoIdx = 0; ventaRel.correo = correoNuevo; }
+        if(ventaRel) ccAplicarReposicionVenta(ventaRel, cuentaUID, cupoAfectadoIdx, nuevaCuenta, 0, cupoAfectado);
+        else nuevaCuenta.cupos[0] = { ...cupoAfectado, estado:'ocupado' };
         if(!c.esVirtual) c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
       }
       // Registrar costo
@@ -6519,8 +6956,200 @@ function ccGuardar(){
   renderInventario();
   renderCostos();
   renderDashboard();
+  crearNotificacionLocal('reposicion', 'Cuenta reemplazada', `${c.id} fue reemplazada y la venta quedó vinculada al nuevo acceso.`, `reposicion-${cuentaUID}-${hoyStr}`);
   sincronizarConSheets();
   alert('✅ Cuenta caída registrada correctamente');
+}
+
+// ══════════════════════════════════════
+// NOTIFICACIONES INTERNAS Y DEL DISPOSITIVO
+// ══════════════════════════════════════
+function actualizarBadgeNotificaciones(){
+  const pendientes = (APP.notificaciones||[]).filter(n=>!n.leida).length;
+  const badge = document.getElementById('notif-badge');
+  if(!badge) return;
+  badge.textContent = pendientes;
+  badge.style.display = pendientes ? 'flex' : 'none';
+}
+async function mostrarNotificacionSistema(titulo, cuerpo){
+  if(!APP.config.notifExterna || !('Notification' in window) || Notification.permission !== 'granted') return;
+  try{
+    const reg = await navigator.serviceWorker?.ready;
+    if(reg) await reg.showNotification(titulo,{body:cuerpo,icon:'icon.svg',badge:'icon.svg',tag:'yoritex-'+titulo,data:{url:'./'}});
+    else new Notification(titulo,{body:cuerpo});
+  }catch(e){}
+}
+function crearNotificacionLocal(tipo,titulo,cuerpo,clave){
+  if(!APP.notificaciones) APP.notificaciones=[];
+  const key = clave || `${tipo}-${titulo}-${hoy()}`;
+  if(APP.notificaciones.some(n=>n.clave===key)) return;
+  APP.notificaciones.unshift({uid:uid(),tipo,titulo,cuerpo,clave:key,fecha:hoy(),creado:new Date().toISOString(),leida:false});
+  APP.notificaciones = APP.notificaciones.slice(0,200);
+  actualizarBadgeNotificaciones();
+  const segmentos = {vencimiento:'Vencimiento',cuenta:'Cuenta',inventario:'Inventario',venta:'Venta nueva',pago:'Pago',renovacion:'Renovación',reposicion:'Cuenta reemplazada',proveedor:'Proveedor',saldo_proveedor:'Proveedor'};
+  mostrarNotificacionSistema(`YORI-TEX · ${segmentos[tipo] || 'Aviso'}`, `${titulo} · ${cuerpo}`);
+}
+function renderNotificaciones(){
+  const el=document.getElementById('notif-lista');
+  if(!el) return;
+  const lista=(APP.notificaciones||[]).sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
+  if(!lista.length){ el.innerHTML='<div class="empty"><div class="e-ico">🔔</div><div>Sin notificaciones</div></div>'; return; }
+  const grupos = [
+    {tipos:['vencimiento'], titulo:'Atención a clientes'},
+    {tipos:['cuenta','inventario'], titulo:'Cuentas e inventario'},
+    {tipos:['venta','pago','renovacion','reposicion'], titulo:'Ventas y renovaciones'},
+    {tipos:['proveedor','saldo_proveedor'], titulo:'Proveedores y finanzas'},
+    {tipos:[], titulo:'Otros avisos'}
+  ];
+  const usados = new Set();
+  el.innerHTML = grupos.map(grupo => {
+    const items = grupo.tipos.length ? lista.filter(n=>grupo.tipos.includes(n.tipo)) : lista.filter(n=>!usados.has(n.uid));
+    items.forEach(n=>usados.add(n.uid));
+    if(!items.length) return '';
+    return `<div class="notif-group-title"><span>${grupo.titulo}</span><span>${items.length}</span></div>` + items.map(n=>`<div class="hist-row" style="opacity:${n.leida?.72:1}"><div class="hist-left"><div class="hist-nombre">${esc(n.titulo)}</div><div class="hist-sub">${esc(n.cuerpo)} · ${esc(fmtFecha(n.fecha))}</div></div>${!n.leida?'<span class="chip amarillo">Nueva</span>':''}</div>`).join('');
+  }).join('');
+}
+function abrirCentroNotificaciones(){ renderNotificaciones(); abrirModal('modal-notificaciones'); }
+function marcarTodasNotificacionesLeidas(){ (APP.notificaciones||[]).forEach(n=>n.leida=true); actualizarBadgeNotificaciones(); renderNotificaciones(); sincronizarConSheets(); }
+async function activarNotificacionesDispositivo(){
+  const estado=document.getElementById('notif-estado');
+  if(!('Notification' in window)){ if(estado) estado.textContent='Este navegador no admite notificaciones.'; return; }
+  const permiso=await Notification.requestPermission();
+  APP.config.notifExterna=permiso==='granted';
+  if(estado) estado.textContent=permiso==='granted'?'Avisos activados en este dispositivo.':'Permiso no concedido.';
+  if(permiso==='granted') mostrarNotificacionSistema('YORI-TEX','Notificaciones activadas correctamente.');
+  sincronizarConSheets();
+}
+function generarAvisosVencimientos(){
+  if(!APP.config.notifVenc) return;
+  const diasCfg=Array.isArray(APP.config.notifDias)?APP.config.notifDias:[3,1,0];
+  (APP.ventas||[]).filter(v=>v.activa!==false&&!v.eliminadoRegistro).forEach(v=>{
+    const dias=diasHasta(v.vence);
+    if(!diasCfg.includes(dias)) return;
+    const cuando=dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
+    crearNotificacionLocal('vencimiento',`${v.srvNom||'Servicio'} ${cuando}`,`${v.cliente} · ${fmtFecha(v.vence)}`,`vence-${v.uid}-${v.vence}-${dias}`);
+  });
+  (APP.cuentas||[]).filter(c=>!c.archivada && c.hasta).forEach(c=>{
+    const dias=diasHasta(c.hasta);
+    if(!diasCfg.includes(dias)) return;
+    const cuando=dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
+    crearNotificacionLocal('cuenta',`Cuenta por renovar: ${c.srvNom||c.id||'Inventario'} ${cuando}`,`${c.id||'Cuenta'} · ${fmtFecha(c.hasta)}`,`cuenta-vence-${c.uid}-${c.hasta}-${dias}`);
+  });
+}
+function actualizarEstadoNotificaciones(){
+  const el=document.getElementById('notif-estado');
+  if(!el) return;
+  el.textContent=!('Notification' in window)?'No disponible en este navegador.':Notification.permission==='granted'?'Avisos permitidos en este dispositivo.':Notification.permission==='denied'?'Avisos bloqueados en el navegador.':'Todavía no activados.';
+}
+
+// ══════════════════════════════════════
+// PROVEEDORES Y PAGOS ADELANTADOS
+// ══════════════════════════════════════
+function saldoAdelanto(a){
+  const usado = (APP.asignacionesProveedor || []).filter(x => x.adelantoUID === a.uid).reduce((s,x) => s + (parseFloat(x.monto)||0), 0);
+  return Math.max(0, (parseFloat(a.monto)||0) - usado);
+}
+function proveedorDeAdelanto(a){ return (APP.proveedores || []).find(p => p.uid === a?.proveedorUID); }
+function adelantosDisponibles(){
+  return (APP.adelantosProveedor || []).filter(a => saldoAdelanto(a) > 0.0001).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+}
+function poblarSelectAdelantos(id){
+  const sel = document.getElementById(id);
+  if(!sel) return;
+  const actual = sel.value;
+  const primero = id === 'nc-adelanto' ? 'Pago independiente / no descontar adelanto' : 'No, es un pago independiente';
+  sel.innerHTML = `<option value="">${primero}</option>` + adelantosDisponibles().map(a => {
+    const p = proveedorDeAdelanto(a);
+    return `<option value="${esc(a.uid)}">${esc(p?.nombre || 'Proveedor')} · ${fmtFechaCorta(a.fecha)} · saldo ${saldoAdelanto(a).toFixed(2)}</option>`;
+  }).join('');
+  if([...sel.options].some(o => o.value === actual)) sel.value = actual;
+}
+function renderProveedores(){
+  const el = document.getElementById('proveedores-resumen');
+  if(!el) return;
+  poblarSelectAdelantos('nc-adelanto');
+  poblarSelectAdelantos('costo-adelanto');
+  const proveedores = APP.proveedores || [];
+  if(!proveedores.length){
+    el.innerHTML = '<div class="empty" style="padding:16px 0"><div>Sin proveedores registrados</div></div>';
+    return;
+  }
+  el.innerHTML = proveedores.map(p => {
+    const adelantos = (APP.adelantosProveedor || []).filter(a => a.proveedorUID === p.uid);
+    const total = adelantos.reduce((s,a) => s + (parseFloat(a.monto)||0), 0);
+    const saldo = adelantos.reduce((s,a) => s + saldoAdelanto(a), 0);
+    const ultimos = adelantos.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).slice(0,3).map(a => `<div class="catalog-sub">${fmtFechaCorta(a.fecha)} · ${esc(a.metodo)} · pagado ${parseFloat(a.monto).toFixed(2)} · saldo ${saldoAdelanto(a).toFixed(2)}</div>`).join('');
+    return `<div class="cuenta-card" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:10px"><div><div class="catalog-name">${esc(p.nombre)}</div><div class="catalog-sub">Pagado ${total.toFixed(2)} · Consumido ${(total-saldo).toFixed(2)}</div></div><div style="text-align:right"><div style="font-weight:800;color:${saldo < 5 ? 'var(--red)' : 'var(--green)'}">${saldo.toFixed(2)}</div><button class="btn-sm" onclick="abrirEditarProveedor('${esc(p.uid)}')">✏️</button></div></div>${ultimos}</div>`;
+  }).join('');
+}
+function abrirNuevoProveedor(){
+  document.getElementById('prov-edit-uid').value = '';
+  ['prov-nombre','prov-contacto','prov-productos','prov-notas'].forEach(id => document.getElementById(id).value = '');
+  abrirModal('modal-proveedor');
+}
+function abrirEditarProveedor(provUID){
+  const p = (APP.proveedores||[]).find(x => x.uid === provUID);
+  if(!p) return;
+  document.getElementById('prov-edit-uid').value = p.uid;
+  document.getElementById('prov-nombre').value = p.nombre || '';
+  document.getElementById('prov-contacto').value = p.contacto || '';
+  document.getElementById('prov-productos').value = p.productos || '';
+  document.getElementById('prov-notas').value = p.notas || '';
+  abrirModal('modal-proveedor');
+}
+function provGuardar(){
+  const nombre = sanitizarTexto(document.getElementById('prov-nombre').value,100);
+  if(!nombre){ alert('Ingresa el nombre del proveedor'); return; }
+  const datos = {nombre,contacto:sanitizarTexto(document.getElementById('prov-contacto').value,100),productos:sanitizarTexto(document.getElementById('prov-productos').value,300),notas:sanitizarTexto(document.getElementById('prov-notas').value,500)};
+  const editUID = document.getElementById('prov-edit-uid').value;
+  const i = (APP.proveedores||[]).findIndex(p => p.uid === editUID);
+  if(i > -1) APP.proveedores[i] = {...APP.proveedores[i],...datos};
+  else APP.proveedores.push({uid:uid(),...datos,creado:new Date().toISOString()});
+  cerrarModal('modal-proveedor');
+  renderProveedores();
+  sincronizarConSheets();
+}
+function abrirNuevoAdelanto(){
+  if(!(APP.proveedores||[]).length){ alert('Primero registra al proveedor'); abrirNuevoProveedor(); return; }
+  const sel = document.getElementById('adel-proveedor');
+  sel.innerHTML = APP.proveedores.map(p => `<option value="${esc(p.uid)}">${esc(p.nombre)}</option>`).join('');
+  document.getElementById('adel-fecha').value = hoy();
+  document.getElementById('adel-monto').value = '';
+  document.getElementById('adel-referencia').value = '';
+  abrirModal('modal-adelanto');
+}
+function adelGuardar(){
+  const proveedorUID = document.getElementById('adel-proveedor').value;
+  const monto = parseFloat(document.getElementById('adel-monto').value)||0;
+  const fecha = document.getElementById('adel-fecha').value || hoy();
+  const metodo = document.getElementById('adel-metodo').value;
+  const proveedor = APP.proveedores.find(p => p.uid === proveedorUID);
+  if(!proveedor || monto <= 0){ alert('Completa proveedor y monto'); return; }
+  if(metodo.toLowerCase().includes('binance')){
+    const ok = descontarUSDTBinance(monto, `Adelanto a proveedor — ${proveedor.nombre}`, null, null, fecha);
+    if(!ok) return;
+  }
+  APP.adelantosProveedor.push({uid:uid(),proveedorUID,fecha,monto,metodo,referencia:sanitizarTexto(document.getElementById('adel-referencia').value,300),creado:new Date().toISOString()});
+  cerrarModal('modal-adelanto');
+  renderProveedores();
+  renderBinance();
+  actualizarSaldoBinance();
+  crearNotificacionLocal('proveedor','Adelanto registrado',`${monto.toFixed(2)} para ${proveedor.nombre}.`,`adelanto-${proveedorUID}-${fecha}-${monto}`);
+  sincronizarConSheets();
+}
+function consumirAdelanto(adelantoUID, monto, meta={}){
+  if(!adelantoUID || monto <= 0) return true;
+  const a = (APP.adelantosProveedor||[]).find(x => x.uid === adelantoUID);
+  if(!a) return false;
+  const saldo = saldoAdelanto(a);
+  if(monto > saldo + 0.0001){ alert(`El adelanto seleccionado solo tiene ${saldo.toFixed(2)} disponible.`); return false; }
+  APP.asignacionesProveedor.push({uid:uid(),adelantoUID,proveedorUID:a.proveedorUID,fecha:meta.fecha||hoy(),monto,cuentaUID:meta.cuentaUID||'',costoUID:meta.costoUID||'',descripcion:meta.descripcion||'',creado:new Date().toISOString()});
+  const restante = saldo - monto;
+  if(restante < 5){
+    const p = proveedorDeAdelanto(a);
+    crearNotificacionLocal('saldo_proveedor','Saldo de proveedor bajo',`${p?.nombre || 'Proveedor'} tiene ${restante.toFixed(2)} disponible.`,`saldo-${a.uid}-${Math.floor(restante)}`);
+  }
+  return true;
 }
 
 // ══════════════════════════════════════
@@ -6580,6 +7209,8 @@ function limpiarCostoForm(){
   document.getElementById('costo-usdt').value = '';
   document.getElementById('costo-usd').value = '';
   document.getElementById('costo-notas').value = '';
+  poblarSelectAdelantos('costo-adelanto');
+  if(document.getElementById('costo-adelanto')) document.getElementById('costo-adelanto').value = '';
   const rows = document.getElementById('costo-fifo-rows');
   if(rows) rows.innerHTML = '';
   const preview = document.getElementById('costo-fifo-preview');
@@ -6595,10 +7226,13 @@ function abrirNuevoCosto(){
   abrirModal('modal-nuevo-costo');
 }
 function costoGuardar(){
-  const met = document.getElementById('costo-metodo').value;
+  let met = document.getElementById('costo-metodo').value;
   const desc = document.getElementById('costo-desc').value.trim();
   if(!desc){ alert('Agrega una descripción'); return; }
   const catUid = document.getElementById('costo-cat').value;
+  const editUID = document.getElementById('costo-edit-uid').value;
+  const adelantoUID = !editUID ? (document.getElementById('costo-adelanto')?.value || '') : '';
+  const metodoOriginal = met;
   let montoUSD = 0, usdtUsado = 0;
   if(met === 'binance'){
     const usdt = parseFloat(document.getElementById('costo-usdt').value) || 0;
@@ -6607,25 +7241,33 @@ function costoGuardar(){
     const fifo = calcFIFO(usdt);
     montoUSD = fifo.total || usdt; // fallback al valor USDT si no hay lotes
     usdtUsado = usdt;
-    // FIX: No cancelar el registro del costo aunque el usuario cancele el confirm de saldo
-    descontarUSDTBinance(usdt, desc, null, null,
-      document.getElementById('costo-fecha').value || hoy()
-    );
+    if(!adelantoUID){
+      descontarUSDTBinance(usdt, desc, null, null, document.getElementById('costo-fecha').value || hoy());
+    }
   } else {
     montoUSD = parseFloat(document.getElementById('costo-usd').value) || 0;
+  }
+  const costoUID = editUID || uid();
+  if(adelantoUID){
+    const montoConsumo = met === 'binance' ? usdtUsado : montoUSD;
+    const ok = consumirAdelanto(adelantoUID,montoConsumo,{fecha:document.getElementById('costo-fecha').value||hoy(),costoUID,descripcion:desc});
+    if(!ok) return;
+    met = 'saldo_proveedor';
+    usdtUsado = 0;
   }
   const datos = {
     fecha: document.getElementById('costo-fecha').value || hoy(),
     catUid, desc, metodo: met, montoUSD, usdtUsado,
+    metodoOrigen: adelantoUID ? metodoOriginal : '', adelantoUID,
+    proveedorUID: adelantoUID ? ((APP.adelantosProveedor||[]).find(a=>a.uid===adelantoUID)?.proveedorUID || '') : '',
     esCostoReal: true,  // FIX: marcar siempre para que no se filtre al recargar de Sheets
     notas: document.getElementById('costo-notas').value
   };
-  const editUID = document.getElementById('costo-edit-uid').value;
   if(editUID){
     const i = APP.costos.findIndex(g => g.uid === editUID);
     if(i > -1) APP.costos[i] = {...APP.costos[i], ...datos};
   } else {
-    APP.costos.push({ uid:uid(), ...datos });
+    APP.costos.push({ uid:costoUID, ...datos });
   }
   document.getElementById('costo-edit-uid').value = '';
   cerrarModal('modal-nuevo-costo');
@@ -6655,6 +7297,7 @@ function eliminarCosto(uid){
   if(!confirm('¿Eliminar este gasto?')) return;
   const g = APP.costos.find(x => x.uid === uid);
   APP.costos = APP.costos.filter(g => g.uid !== uid);
+  APP.asignacionesProveedor = (APP.asignacionesProveedor || []).filter(a => a.costoUID !== uid);
   if(g && metodoKeyCosto(g.metodo) === 'binance'){
     APP.movimientosBinance = (APP.movimientosBinance||[]).filter(m => {
       if(m.costoUID === uid) return false;
@@ -6672,6 +7315,7 @@ function eliminarCosto(uid){
 }
 function renderCostos(){
   normalizarFechasApp();
+  renderProveedores();
   // Poblar select de categorías de gasto dinámicamente
   const catSel = document.getElementById('costo-cat');
   if(catSel){
@@ -6756,7 +7400,7 @@ function renderCostos(){
   if(!costos.length){
     lista.innerHTML = headerFiltro + '<div class="empty"><div class="e-ico">💸</div><div>Sin gastos en esta categoría</div></div>';
   } else {
-    lista.innerHTML = headerFiltro + costos.map(g => {
+    lista.innerHTML = headerFiltro + historialPlegable(costos, g => {
       // ── Fila de gasto ──
       const cg = getCatGasto(g.catUid) || CATALOGO_CAT_GASTOS[CATALOGO_CAT_GASTOS.length-1];
       const mk = metodoKeyCosto(g.metodo);
@@ -6794,7 +7438,7 @@ function renderCostos(){
         </div>
         ${cuposHtml}
       </div>`;
-    }).join('');
+    }, 'mes');
   }
   actualizarSaldoBinance();
   renderBinance();
@@ -6937,7 +7581,7 @@ function renderBinance(){
   }
 
   const ordenados = [...APP.movimientosBinance].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'') || (b.uid||'').localeCompare(a.uid||''));
-  cont.innerHTML = resumenHtml + ordenados.map(m => {
+  cont.innerHTML = resumenHtml + historialPlegable(ordenados, m => {
     const esEntrada = m.tipo === 'entrada';
     const color = esEntrada ? 'var(--green)' : 'var(--red)';
     const ico = esEntrada ? '📥' : '📤';
@@ -6964,7 +7608,7 @@ function renderBinance(){
         </div>
       </div>
     </div>`;
-  }).join('');
+  }, 'mes');
 }
 
 function confirmarEliminarRecarga(ruid){
@@ -7136,6 +7780,12 @@ function renderConfig(){
   document.getElementById('cfg-nombre').value = APP.config.nombre;
   document.getElementById('cfg-slogan').value = APP.config.slogan || '';
   document.getElementById('cfg-wa').value = APP.config.wa || '';
+  if(document.getElementById('notif-venc')) document.getElementById('notif-venc').checked = APP.config.notifVenc !== false;
+  if(document.getElementById('notif-ventas')) document.getElementById('notif-ventas').checked = APP.config.notifVentas !== false;
+  if(document.getElementById('notif-dias')) document.getElementById('notif-dias').value = (APP.config.notifDias || [3,1,0]).join(', ');
+  if(document.getElementById('cfg-dominio')) document.getElementById('cfg-dominio').value = APP.config.dominio || 'yori-tex.com';
+  if(document.getElementById('cfg-correo-admin')) document.getElementById('cfg-correo-admin').value = APP.config.correoAdmin || '';
+  actualizarEstadoNotificaciones();
   const metas = APP.config.metas || {};
   ['ingresos','ganancia','ventas','renovaciones','roi'].forEach(k => {
     const el = document.getElementById('cfg-meta-' + k);
@@ -7305,6 +7955,11 @@ function guardarConfig(){
     fondoOpacidad: parseInt(document.getElementById('cfg-fondo-opacidad')?.value || APP.config.fondoOpacidad || 16),
     fondoImagen: APP.config.fondoImagen || null,
     notifVenc: document.getElementById('notif-venc').checked,
+    notifVentas: document.getElementById('notif-ventas')?.checked !== false,
+    notifDias: (document.getElementById('notif-dias')?.value || '3,1,0').split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>=0&&x<=30),
+    dominio: 'yori-tex.com',
+    appUrl: 'https://app.yori-tex.com',
+    correoAdmin: sanitizarTexto(document.getElementById('cfg-correo-admin')?.value || '',200),
     metas: {
       ingresos: parseFloat(document.getElementById('cfg-meta-ingresos')?.value) || 0,
       ganancia: parseFloat(document.getElementById('cfg-meta-ganancia')?.value) || 0,
@@ -7547,11 +8202,12 @@ function copiarPlantilla(puid){
   }
 }
 function renderPlantillas(){
+  poblarServiciosPlantilla();
   const lista = document.getElementById('plantillas-lista');
   lista.innerHTML = PLANTILLAS_WA.map(p =>
     `<div class="plantilla-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div><div class="plantilla-titulo">${esc(p.nombre)}</div><div style="font-size:10px;color:var(--orange);text-transform:uppercase;font-weight:700">${esc(p.contexto||'general')}</div></div>
+        <div><div class="plantilla-titulo">${esc(p.nombre)}</div><div style="font-size:10px;color:var(--orange);text-transform:uppercase;font-weight:700">${esc(contextoPlantillaNormalizado(p))} · ${esc(p.srvUid && p.srvUid !== 'todos' ? (getSrv(p.srvUid)?.nombre || p.srvUid) : 'Todos')}</div></div>
         <div style="display:flex;gap:4px">
           <button class="btn-sm" title="Copiar al portapapeles" onclick="copiarPlantilla('${esc(p.uid)}')">📋</button>
           <button class="btn-sm" onclick="abrirEditarPlantilla('${esc(p.uid)}')">✏️</button>
@@ -7561,6 +8217,23 @@ function renderPlantillas(){
       <div class="plantilla-txt">${esc(p.texto)}</div>
     </div>`
   ).join('');
+}
+function poblarServiciosPlantilla(){
+  const sel = document.getElementById('plt-servicio');
+  if(!sel) return;
+  const actual = sel.value || 'todos';
+  sel.innerHTML = '<option value="todos">Todos los productos</option>' + CATALOGO_SERVICIOS.map(s => `<option value="${esc(s.uid)}">${esc(s.emoji)} ${esc(s.nombre)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === actual) ? actual : 'todos';
+}
+function abrirNuevaPlantilla(){
+  document.getElementById('plt-edit-uid').value='';
+  document.getElementById('plt-nombre').value='';
+  document.getElementById('plt-texto').value='';
+  document.getElementById('plt-contexto').value='general';
+  document.getElementById('plt-modal-titulo').innerHTML='💬 Nueva plantilla <button class="modal-close" onclick="cerrarModal(\'modal-nueva-plantilla\')">×</button>';
+  poblarServiciosPlantilla();
+  document.getElementById('plt-servicio').value='todos';
+  abrirModal('modal-nueva-plantilla');
 }
 function insertVar(v){
   const ta = document.getElementById('plt-texto');
@@ -7576,9 +8249,10 @@ function pltGuardar(){
   const texto = document.getElementById('plt-texto').value.trim();
   if(!nombre || !texto){ alert('Completa nombre y texto'); return; }
   const contexto = document.getElementById('plt-contexto')?.value || 'general';
+  const srvUid = document.getElementById('plt-servicio')?.value || 'todos';
   const editUID = document.getElementById('plt-edit-uid').value;
-  if(editUID){ const i = PLANTILLAS_WA.findIndex(p=>p.uid===editUID); if(i>-1) PLANTILLAS_WA[i]={...PLANTILLAS_WA[i],nombre,texto,contexto}; }
-  else PLANTILLAS_WA.push({ uid:uid(), nombre, texto, contexto });
+  if(editUID){ const i = PLANTILLAS_WA.findIndex(p=>p.uid===editUID); if(i>-1) PLANTILLAS_WA[i]={...PLANTILLAS_WA[i],nombre,texto,contexto,srvUid}; }
+  else PLANTILLAS_WA.push({ uid:uid(), nombre, texto, contexto, srvUid });
   document.getElementById('plt-edit-uid').value = '';
   cerrarModal('modal-nueva-plantilla');
   renderPlantillas();
@@ -7591,8 +8265,23 @@ function abrirEditarPlantilla(puid){
   document.getElementById('plt-modal-titulo').innerHTML = '✏️ Editar plantilla <button class="modal-close" onclick="cerrarModal(\'modal-nueva-plantilla\')">×</button>';
   document.getElementById('plt-nombre').value = p.nombre;
   if(document.getElementById('plt-contexto')) document.getElementById('plt-contexto').value = p.contexto || 'general';
+  poblarServiciosPlantilla();
+  if(document.getElementById('plt-servicio')) document.getElementById('plt-servicio').value = p.srvUid || 'todos';
   document.getElementById('plt-texto').value = p.texto;
   abrirModal('modal-nueva-plantilla');
+}
+function guardarMensajeActualComoPlantilla(contexto, textareaId, srvUid){
+  const texto = document.getElementById(textareaId)?.value?.trim();
+  if(!texto){ alert('No hay mensaje para guardar'); return; }
+  const nombre = prompt('Nombre para esta subplantilla:');
+  if(!nombre) return;
+  let servicio = srvUid || '';
+  if(!servicio && contexto === 'venta_nueva') servicio = document.getElementById('mv-srv')?.value || 'todos';
+  if(!servicio && contexto === 'renovacion') servicio = document.getElementById('ren-srv')?.value || 'todos';
+  PLANTILLAS_WA.push({uid:uid(),nombre:sanitizarTexto(nombre,80),texto,contexto:contexto||'general',srvUid:servicio||'todos'});
+  renderPlantillas();
+  sincronizarConSheets();
+  alert('✅ Subplantilla guardada para este producto.');
 }
 function eliminarPlantilla(puid){
   if(!confirm('¿Eliminar esta plantilla?')) return;
@@ -7656,7 +8345,7 @@ function restaurarBackupJSON(input){
       if(!confirm('⚠️ Esto reemplazará TODOS tus datos actuales. ¿Continuar?')) return;
       // SECURITY: Only copy known safe keys, not arbitrary properties
       if(datos.APP && typeof datos.APP === 'object'){
-        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','movimientosBinance','ventasEliminadas','cuentasEliminadas','config'];
+        const safeAPPKeys = ['ventas','cuentas','costos','recargas','reembolsos','egresos','movimientosBinance','proveedores','adelantosProveedor','asignacionesProveedor','notificaciones','ventasEliminadas','cuentasEliminadas','config'];
         safeAPPKeys.forEach(k => { if(datos.APP[k] !== undefined) APP[k] = datos.APP[k]; });
         APP._ventaCounter = datos.APP._ventaCounter || 1;
       }
@@ -7846,6 +8535,10 @@ async function _verificarYActualizarDesdeSheets(){
       APP.movimientosBinance = Array.isArray(data.movimientosBinance)
         ? data.movimientosBinance.map(m => ({...m, usdt: parseFloat(m.usdt)||0, tasa: parseFloat(m.tasa)||0, montoUSD: parseFloat(m.montoUSD)||0, esCostoReal: true}))
         : APP.movimientosBinance;
+      APP.proveedores = Array.isArray(data.proveedores) ? data.proveedores : (APP.proveedores || []);
+      APP.adelantosProveedor = Array.isArray(data.adelantosProveedor) ? data.adelantosProveedor.map(a=>({...a,monto:parseFloat(a.monto)||0})) : (APP.adelantosProveedor || []);
+      APP.asignacionesProveedor = Array.isArray(data.asignacionesProveedor) ? data.asignacionesProveedor.map(a=>({...a,monto:parseFloat(a.monto)||0})) : (APP.asignacionesProveedor || []);
+      APP.notificaciones = Array.isArray(data.notificaciones) ? data.notificaciones : (APP.notificaciones || []);
 
       inyectarDatosPDF();
       if(Array.isArray(data.catalogoCategorias) && data.catalogoCategorias.length)
@@ -7856,6 +8549,7 @@ async function _verificarYActualizarDesdeSheets(){
         CATALOGO_CAT_GASTOS.splice(0, CATALOGO_CAT_GASTOS.length, ...data.catalogoCatGastos);
       if(Array.isArray(data.plantillasWA) && data.plantillasWA.length)
         PLANTILLAS_WA.splice(0, PLANTILLAS_WA.length, ...data.plantillasWA);
+      asegurarPlantillasBase();
       if(data.config) Object.assign(APP.config, data.config);
       sanearMojibakeDatos();
       aplicarFondoMarca();
@@ -7912,13 +8606,35 @@ async function apiCall(body, timeoutMs){
     throw err;
   }
 }
-async function sincronizarConSheets(){
-  if(!_pinVerificado) return false;
+function sincronizarConSheets(ahora=false){
+  if(!_pinVerificado) return Promise.resolve(false);
   const payload = construirPayload();
   _syncDirty = true;
-  setSyncStatus('Guardando...', 'warn');
+  _syncPendiente = payload;
   guardarLocal(payload);
-  return _sincronizarBackground(payload);
+  setSyncStatus(ahora ? 'Guardando...' : 'En cola...', 'warn');
+  const espera = new Promise(resolve => _syncEsperas.push(resolve));
+  if(_syncGuardarTimer) clearTimeout(_syncGuardarTimer);
+  if(ahora) procesarColaSync();
+  else _syncGuardarTimer = setTimeout(procesarColaSync, 850);
+  return espera;
+}
+async function procesarColaSync(){
+  if(_syncGuardando || !_pinVerificado) return;
+  if(_syncGuardarTimer){ clearTimeout(_syncGuardarTimer); _syncGuardarTimer=null; }
+  const payload = _syncPendiente;
+  if(!payload) return;
+  _syncPendiente = null;
+  _syncGuardando = true;
+  setSyncStatus('Guardando...', 'warn');
+  const ok = await _sincronizarBackground(payload);
+  _syncGuardando = false;
+  if(_syncPendiente){
+    procesarColaSync();
+    return;
+  }
+  const esperas = _syncEsperas.splice(0);
+  esperas.forEach(resolve => resolve(ok));
 }
 function configParaSync(){
   const cfg = { ...(APP.config || {}) };
@@ -7936,6 +8652,8 @@ function construirPayload(){
     ventas: ventasPayload, cuentas: APP.cuentas, costos: APP.costos,
     recargas: APP.recargas, reembolsos: APP.reembolsos, egresos: APP.egresos || [],
     movimientosBinance: APP.movimientosBinance || [],
+    proveedores: APP.proveedores || [], adelantosProveedor: APP.adelantosProveedor || [],
+    asignacionesProveedor: APP.asignacionesProveedor || [], notificaciones: APP.notificaciones || [],
     ventasEliminadas: APP.ventasEliminadas || [],  // lista negra de UIDs eliminados
     cuentasEliminadas: APP.cuentasEliminadas || [],
     catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
@@ -7967,8 +8685,8 @@ function textoHace(ts){
 }
 function iniciarAutoSync(){
   if(_syncTimer) clearInterval(_syncTimer);
-  _syncTimer = setInterval(verificarCambiosNube, 60000);
-  setTimeout(verificarCambiosNube, 12000);
+  _syncTimer = setInterval(verificarCambiosNube, 15000);
+  setTimeout(verificarCambiosNube, 3500);
 }
 function contarArr(x){ return Array.isArray(x) ? x.length : 0; }
 function firmaCambioDato(x){
@@ -8060,7 +8778,7 @@ function aplicarCambiosNube(){
   actualizarIndicadorCambiosNube();
 }
 async function verificarCambiosNube(){
-  if(!_pinVerificado || _syncChecking || _syncDirty) return;
+  if(!_pinVerificado || _syncChecking || _syncDirty || _syncGuardando || _syncPendiente) return;
   _syncChecking = true;
   try {
     setSyncStatus('Revisando...', 'warn');
@@ -8068,15 +8786,15 @@ async function verificarCambiosNube(){
     if(res && res.ok && res.data){
       const firma = firmaDatos(res.data);
       if(_firmaNube && firma && firma !== _firmaNube){
-        _cambiosPendientesNube = { data: res.data, firma };
-        setSyncStatus('Cambios nuevos', 'warn');
+        // Sin ediciones locales pendientes, el cambio viene de otro dispositivo y se puede aplicar al instante.
+        cargarDesdeSheets(res.data);
+        _firmaNube = firma;
+        _ultimaSync = Date.now();
+        _cambiosPendientesNube = null;
+        setSyncStatus('Actualizado ahora', 'ok');
         actualizarIndicadorCambiosNube();
-        const ahora = Date.now();
-        if(ahora - _ultimoAvisoCambio > 30000){
-          _ultimoAvisoCambio = ahora;
-          const ind = document.getElementById('sync-indicador');
-          if(ind){ ind.style.display='flex'; ind.textContent='☁'; }
-        }
+        const ind = document.getElementById('sync-indicador');
+        if(ind){ ind.style.display='flex'; ind.textContent='☁'; setTimeout(()=>{ ind.style.display='none'; }, 1800); }
       } else {
         _firmaNube = firma || _firmaNube;
         _ultimaSync = Date.now();
@@ -8096,7 +8814,7 @@ async function _sincronizarBackground(payload){
   if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
   try {
     await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 45000);
-    _syncDirty = false;
+    _syncDirty = !!_syncPendiente;
     _ultimaSync = Date.now();
     _firmaNube = firmaDatos(payload || construirPayload());
     setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
@@ -8310,6 +9028,10 @@ function cargarDesdeSheets(data){
     ? data.movimientosBinance
         .map(m => ({...m, usdt: parseFloat(m.usdt)||0, tasa: parseFloat(m.tasa)||0, montoUSD: parseFloat(m.montoUSD)||0, esCostoReal: true}))
     : [];
+  APP.proveedores = Array.isArray(data.proveedores) ? data.proveedores : [];
+  APP.adelantosProveedor = Array.isArray(data.adelantosProveedor) ? data.adelantosProveedor.map(a=>({...a,monto:parseFloat(a.monto)||0})) : [];
+  APP.asignacionesProveedor = Array.isArray(data.asignacionesProveedor) ? data.asignacionesProveedor.map(a=>({...a,monto:parseFloat(a.monto)||0})) : [];
+  APP.notificaciones = Array.isArray(data.notificaciones) ? data.notificaciones : [];
 
   // Deduplicar cuentas
   const dedupByUid = arr => {
@@ -8326,6 +9048,7 @@ function cargarDesdeSheets(data){
     CATALOGO_CAT_GASTOS.splice(0, CATALOGO_CAT_GASTOS.length, ...data.catalogoCatGastos);
   if(Array.isArray(data.plantillasWA) && data.plantillasWA.length)
     PLANTILLAS_WA.splice(0, PLANTILLAS_WA.length, ...data.plantillasWA);
+  asegurarPlantillasBase();
   if(data.config) Object.assign(APP.config, data.config);
   sanearMojibakeDatos();
   aplicarFondoMarca();
@@ -8399,6 +9122,10 @@ function inyectarHistorico(){
   if(!APP.cuentas) APP.cuentas = [];
   if(!APP.costos) APP.costos = [];
   if(!APP.movimientosBinance) APP.movimientosBinance = [];
+  if(!APP.proveedores) APP.proveedores = [];
+  if(!APP.adelantosProveedor) APP.adelantosProveedor = [];
+  if(!APP.asignacionesProveedor) APP.asignacionesProveedor = [];
+  if(!APP.notificaciones) APP.notificaciones = [];
   inyectarDatosPDF();
   inicializarUI();
   // Guardar en Sheets automáticamente
@@ -8416,7 +9143,7 @@ function ocultarSync(){ document.getElementById('sync-overlay').style.display = 
 
 async function sincronizarManual(){
   mostrarSync('🔄', 'Sincronizando con la nube...', 'Guardando en Google Sheets');
-  const ok = await sincronizarConSheets();
+  const ok = await sincronizarConSheets(true);
   ocultarSync();
   alert(ok ? '✅ Sincronizado con Google Sheets.' : '⚠️ No se pudo sincronizar con Google Sheets. Tus cambios quedaron guardados solo en este navegador.');
 }
@@ -8433,6 +9160,10 @@ function cerrarSesion(){
   APP.reembolsos = [];
   APP.egresos = [];
   APP.movimientosBinance = [];
+  APP.proveedores = [];
+  APP.adelantosProveedor = [];
+  APP.asignacionesProveedor = [];
+  APP.notificaciones = [];
   // SECURITY: Remove local cache so it isn't accessible without PIN
   localStorage.removeItem('yoritex_local');
   pinActualizarDots();
@@ -8447,7 +9178,7 @@ function inicializarUI(){
   sanearMojibakeDatos();
   normalizarFechasApp();
   document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
-  ['mv-fecha','costo-fecha','bin-fecha','rem-fecha'].forEach(id => {
+  ['mv-fecha','costo-fecha','bin-fecha','rem-fecha','adel-fecha'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = hoy();
   });
   // Migrar Binance legacy si es necesario
@@ -8466,6 +9197,9 @@ function inicializarUI(){
   poblarSrvCatSelect();
   renderRegistro();
   renderBadgeVencimientos();
+  generarAvisosVencimientos();
+  actualizarBadgeNotificaciones();
+  renderProveedores();
   actualizarSaldoBinance();
   document.getElementById('mv-id').textContent = numVenta();
   document.getElementById('cfg-firma').value = APP.config.firma;
