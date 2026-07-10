@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v6-20260710';
+const CACHE_NAME = 'yoritex-v7-20260710';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', event => {
@@ -46,6 +46,7 @@ self.addEventListener('notificationclick', event => {
   const url = event.notification.data?.url || './';
   event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
     const abierta = list.find(client => 'focus' in client);
-    return abierta ? abierta.focus() : clients.openWindow(url);
+    const destino = new URL(url, self.registration.scope).href;
+    return abierta ? abierta.navigate(destino).then(() => abierta.focus()) : clients.openWindow(destino);
   }));
 });

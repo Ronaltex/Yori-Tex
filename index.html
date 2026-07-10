@@ -191,6 +191,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .periodo-items .hist-row,.periodo-items .cost-row{padding-left:4px;padding-right:4px}
 .notif-group-title{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 2px 7px;color:var(--text2);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
 .notif-group-title:first-child{padding-top:0}
+.hist-row.notificacion-clickable{cursor:pointer}
+.hist-row.notificacion-clickable:active{background:rgba(245,166,35,.08)}
+.notificacion-destino{animation:destelloNotificacion 1.8s ease both;outline:2px solid var(--orange);outline-offset:2px}
+@keyframes destelloNotificacion{0%,100%{outline-color:transparent;background:transparent}25%,75%{outline-color:var(--orange);background:rgba(245,166,35,.1)}}
 .rank-row{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);gap:10px}
 .rank-row:last-child{border-bottom:none}
 .rank-num{font-size:12px;font-weight:700;color:var(--text3);min-width:20px}
@@ -3152,7 +3156,8 @@ function navIr(id, btn){
   screen.classList.add('active');
   void screen.offsetWidth;
   screen.classList.add('screen-enter');
-  btn.classList.add('active');
+  const boton = btn || [...document.querySelectorAll('.nav-item')].find(x => (x.getAttribute('onclick') || '').includes(`'${id}'`));
+  if(boton) boton.classList.add('active');
   if(id === 'inventario') renderInventario();
   if(id === 'vencimientos') renderVencimientos();
   if(id === 'dashboard') renderDashboard();
@@ -3562,7 +3567,7 @@ function renderRegistro(){
   const chips = {pagado:'verde',por_cobrar:'rojo',parcial:'amarillo',pendiente:'rojo'};
   const chipLbl = {pagado:'Pagado ✅',por_cobrar:'Por cobrar 🕐',parcial:'Parcial ⚠️',pendiente:'Pendiente 🔴'};
   cont.innerHTML = ventas.map(v => `
-    <div class="hist-row">
+    <div class="hist-row" id="reg-${esc(v.uid)}">
       <div class="hist-left">
         <div class="hist-nombre">${esc(v.srvNom)} — ${esc(v.cliente)}</div>
         <div class="hist-sub">${esc(fmtFecha(v.fecha))} · Vence ${esc(fmtFecha(v.vence))} · ${esc(v.metodo)}</div>
@@ -3597,7 +3602,7 @@ function marcarVentaPagada(ventaUid){
     cupo.montoVenta = parseFloat(a.precio) || parseFloat(v.precio) || 0;
   });
   if(Array.isArray(v.cuposAsignados)) v.cuposAsignados.forEach(a => { a.estado = 'pagado'; });
-  crearNotificacionLocal('pago', 'Pago confirmado', `${v.cliente} pagó $${(parseFloat(v.precio)||0).toFixed(2)} por ${v.srvNom || 'su servicio'}.`, `pago-${v.uid}`);
+  crearNotificacionLocal('pago', 'Pago confirmado', `${v.cliente} pagó $${(parseFloat(v.precio)||0).toFixed(2)} por ${v.srvNom || 'su servicio'}.`, `pago-${v.uid}`, {pantalla:'registro',ventaUid:v.uid});
   renderRegistro();
   renderInventario();
   renderDashboard();
@@ -4564,7 +4569,7 @@ function mvGuardar(){
   renderRegistro();
   renderBadgeVencimientos();
   alert(`✅ Venta ${venta.id} guardada`);
-  if(APP.config.notifVentas) crearNotificacionLocal('venta','Nueva venta registrada',`${venta.cliente} · ${venta.srvNom} · $${venta.precio.toFixed(2)}`,`venta-${venta.uid}`);
+  if(APP.config.notifVentas) crearNotificacionLocal('venta','Nueva venta registrada',`${venta.cliente} · ${venta.srvNom} · $${venta.precio.toFixed(2)}`,`venta-${venta.uid}`, {pantalla:'registro',ventaUid:venta.uid});
   sincronizarConSheets();
 }
 
@@ -4790,7 +4795,7 @@ function renderInventario(){
     }).join('');
     const cuentaEstado = c.esVirtual ? 'auto' : (lib > 0 ? 'disp' : (ocu > 0 ? 'llena' : 'vacia'));
     const cuentaEstadoTxt = c.esVirtual ? 'Auto' : (lib > 0 ? 'Disponible' : (ocu > 0 ? 'Llena' : 'Sin uso'));
-    return `<div class="cuenta-card ${cuentaEstado}">
+    return `<div class="cuenta-card ${cuentaEstado}" id="cuenta-${esc(c.uid)}">
       <div class="cuenta-hdr" style="display:block" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%">
           <div style="flex:1;min-width:0">
@@ -6048,7 +6053,7 @@ function renGuardar(){
   actualizarSaldoBinance();
   renderBinance();
   alert(`✅ Renovación ${nuevaVenta.id} guardada`);
-  crearNotificacionLocal('renovacion', 'Servicio renovado', `${nuevaVenta.cliente} renovó ${nuevaVenta.srvNom || 'su servicio'} hasta ${fmtFecha(nuevaVenta.vence)}.`, `renovacion-${nuevaVenta.uid}`);
+  crearNotificacionLocal('renovacion', 'Servicio renovado', `${nuevaVenta.cliente} renovó ${nuevaVenta.srvNom || 'su servicio'} hasta ${fmtFecha(nuevaVenta.vence)}.`, `renovacion-${nuevaVenta.uid}`, {pantalla:'registro',ventaUid:nuevaVenta.uid});
   sincronizarConSheetsSilencioso();
   mostrarMensajePostVenta(nuevaVenta, 'renovacion');
   if(mensajeRenPreparado) document.getElementById('post-wa-texto').value = mensajeRenPreparado;
@@ -6956,7 +6961,7 @@ function ccGuardar(){
   renderInventario();
   renderCostos();
   renderDashboard();
-  crearNotificacionLocal('reposicion', 'Cuenta reemplazada', `${c.id} fue reemplazada y la venta quedó vinculada al nuevo acceso.`, `reposicion-${cuentaUID}-${hoyStr}`);
+  crearNotificacionLocal('reposicion', 'Cuenta reemplazada', `${c.id} fue reemplazada y la venta quedó vinculada al nuevo acceso.`, `reposicion-${cuentaUID}-${hoyStr}`, {pantalla:'inventario',cuentaUid:cuentaUID});
   sincronizarConSheets();
   alert('✅ Cuenta caída registrada correctamente');
 }
@@ -6971,23 +6976,74 @@ function actualizarBadgeNotificaciones(){
   badge.textContent = pendientes;
   badge.style.display = pendientes ? 'flex' : 'none';
 }
-async function mostrarNotificacionSistema(titulo, cuerpo){
+async function mostrarNotificacionSistema(titulo, cuerpo, notificacionUid){
   if(!APP.config.notifExterna || !('Notification' in window) || Notification.permission !== 'granted') return;
   try{
     const reg = await navigator.serviceWorker?.ready;
-    if(reg) await reg.showNotification(titulo,{body:cuerpo,icon:'icon.svg',badge:'icon.svg',tag:'yoritex-'+titulo,data:{url:'./'}});
+    const url = notificacionUid ? `./?notificacion=${encodeURIComponent(notificacionUid)}` : './';
+    if(reg) await reg.showNotification(titulo,{body:cuerpo,icon:'icon.svg',badge:'icon.svg',tag:'yoritex-'+titulo,data:{url}});
     else new Notification(titulo,{body:cuerpo});
   }catch(e){}
 }
-function crearNotificacionLocal(tipo,titulo,cuerpo,clave){
+function crearNotificacionLocal(tipo,titulo,cuerpo,clave,destino){
   if(!APP.notificaciones) APP.notificaciones=[];
   const key = clave || `${tipo}-${titulo}-${hoy()}`;
   if(APP.notificaciones.some(n=>n.clave===key)) return;
-  APP.notificaciones.unshift({uid:uid(),tipo,titulo,cuerpo,clave:key,fecha:hoy(),creado:new Date().toISOString(),leida:false});
+  const aviso = {uid:uid(),tipo,titulo,cuerpo,clave:key,destino:destino || null,fecha:hoy(),creado:new Date().toISOString(),leida:false};
+  APP.notificaciones.unshift(aviso);
   APP.notificaciones = APP.notificaciones.slice(0,200);
   actualizarBadgeNotificaciones();
   const segmentos = {vencimiento:'Vencimiento',cuenta:'Cuenta',inventario:'Inventario',venta:'Venta nueva',pago:'Pago',renovacion:'Renovación',reposicion:'Cuenta reemplazada',proveedor:'Proveedor',saldo_proveedor:'Proveedor'};
-  mostrarNotificacionSistema(`YORI-TEX · ${segmentos[tipo] || 'Aviso'}`, `${titulo} · ${cuerpo}`);
+  mostrarNotificacionSistema(`YORI-TEX · ${segmentos[tipo] || 'Aviso'}`, `${titulo} · ${cuerpo}`, aviso.uid);
+}
+function destinoDeNotificacion(n){
+  if(n?.destino) return n.destino;
+  const key = String(n?.clave || '');
+  const partes = key.split('-');
+  if(n?.tipo === 'vencimiento') return {pantalla:'vencimientos', ventaUid:partes[1]};
+  if(n?.tipo === 'cuenta') return {pantalla:'inventario', cuentaUid:partes[2] || partes[1]};
+  if(['venta','pago','renovacion'].includes(n?.tipo)) return {pantalla:'registro', ventaUid:partes[1]};
+  if(n?.tipo === 'reposicion') return {pantalla:'inventario', cuentaUid:partes[1]};
+  if(['proveedor','saldo_proveedor'].includes(n?.tipo)) return {pantalla:'costos'};
+  return {pantalla:'dashboard'};
+}
+function resaltarDestino(selector){
+  const el = document.querySelector(selector);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+  el.classList.remove('notificacion-destino');
+  void el.offsetWidth;
+  el.classList.add('notificacion-destino');
+  setTimeout(()=>el.classList.remove('notificacion-destino'),2000);
+}
+function irANotificacion(notificacionUid, desdeEnlace=false){
+  const aviso = (APP.notificaciones || []).find(n=>n.uid===notificacionUid);
+  if(!aviso) return;
+  aviso.leida = true;
+  actualizarBadgeNotificaciones();
+  const destino = destinoDeNotificacion(aviso);
+  cerrarModal('modal-notificaciones');
+  if(destino.pantalla === 'vencimientos'){
+    APP._filtroVen = 'todos'; _venBusq = '';
+    navIr('vencimientos');
+    setTimeout(()=>resaltarDestino(`#vcard-${CSS.escape(destino.ventaUid || '')}`),120);
+  } else if(destino.pantalla === 'registro'){
+    APP._filtroReg = 'todos'; _regBusq = '';
+    navIr('registro');
+    setTimeout(()=>resaltarDestino(`#reg-${CSS.escape(destino.ventaUid || '')}`),120);
+  } else if(destino.pantalla === 'inventario'){
+    navIr('inventario');
+    setTimeout(()=>resaltarDestino(`#cuenta-${CSS.escape(destino.cuentaUid || '')}`),120);
+  } else {
+    navIr(destino.pantalla || 'dashboard');
+  }
+  if(!desdeEnlace) sincronizarConSheets();
+}
+function abrirNotificacionPendiente(){
+  const uidAviso = new URLSearchParams(location.search).get('notificacion');
+  if(!uidAviso || !(APP.notificaciones || []).some(n => n.uid === uidAviso)) return;
+  irANotificacion(uidAviso, true);
+  history.replaceState(null, '', location.pathname);
 }
 function renderNotificaciones(){
   const el=document.getElementById('notif-lista');
@@ -7006,7 +7062,7 @@ function renderNotificaciones(){
     const items = grupo.tipos.length ? lista.filter(n=>grupo.tipos.includes(n.tipo)) : lista.filter(n=>!usados.has(n.uid));
     items.forEach(n=>usados.add(n.uid));
     if(!items.length) return '';
-    return `<div class="notif-group-title"><span>${grupo.titulo}</span><span>${items.length}</span></div>` + items.map(n=>`<div class="hist-row" style="opacity:${n.leida?.72:1}"><div class="hist-left"><div class="hist-nombre">${esc(n.titulo)}</div><div class="hist-sub">${esc(n.cuerpo)} · ${esc(fmtFecha(n.fecha))}</div></div>${!n.leida?'<span class="chip amarillo">Nueva</span>':''}</div>`).join('');
+    return `<div class="notif-group-title"><span>${grupo.titulo}</span><span>${items.length}</span></div>` + items.map(n=>`<div class="hist-row notificacion-clickable" role="button" tabindex="0" onclick="irANotificacion('${esc(n.uid)}')" style="opacity:${n.leida?.72:1}"><div class="hist-left"><div class="hist-nombre">${esc(n.titulo)}</div><div class="hist-sub">${esc(n.cuerpo)} · ${esc(fmtFecha(n.fecha))}</div></div>${!n.leida?'<span class="chip amarillo">Nueva</span>':''}</div>`).join('');
   }).join('');
 }
 function abrirCentroNotificaciones(){ renderNotificaciones(); abrirModal('modal-notificaciones'); }
@@ -7027,13 +7083,13 @@ function generarAvisosVencimientos(){
     const dias=diasHasta(v.vence);
     if(!diasCfg.includes(dias)) return;
     const cuando=dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
-    crearNotificacionLocal('vencimiento',`${v.srvNom||'Servicio'} ${cuando}`,`${v.cliente} · ${fmtFecha(v.vence)}`,`vence-${v.uid}-${v.vence}-${dias}`);
+    crearNotificacionLocal('vencimiento',`${v.srvNom||'Servicio'} ${cuando}`,`${v.cliente} · ${fmtFecha(v.vence)}`,`vence-${v.uid}-${v.vence}-${dias}`, {pantalla:'vencimientos',ventaUid:v.uid});
   });
   (APP.cuentas||[]).filter(c=>!c.archivada && c.hasta).forEach(c=>{
     const dias=diasHasta(c.hasta);
     if(!diasCfg.includes(dias)) return;
     const cuando=dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
-    crearNotificacionLocal('cuenta',`Cuenta por renovar: ${c.srvNom||c.id||'Inventario'} ${cuando}`,`${c.id||'Cuenta'} · ${fmtFecha(c.hasta)}`,`cuenta-vence-${c.uid}-${c.hasta}-${dias}`);
+    crearNotificacionLocal('cuenta',`Cuenta por renovar: ${c.srvNom||c.id||'Inventario'} ${cuando}`,`${c.id||'Cuenta'} · ${fmtFecha(c.hasta)}`,`cuenta-vence-${c.uid}-${c.hasta}-${dias}`, {pantalla:'inventario',cuentaUid:c.uid});
   });
 }
 function actualizarEstadoNotificaciones(){
@@ -9217,6 +9273,7 @@ function inicializarUI(){
   if(dashScreen && dashScreen.classList.contains('active')){
     renderDashboard();
   }
+  setTimeout(abrirNotificacionPendiente, 120);
 }
 
 function repararMojibakeManual(txt){
