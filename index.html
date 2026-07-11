@@ -1755,16 +1755,6 @@ body::after{
   </div>
   <div id="mv-vence-box" class="vence-box" style="display:none"><span>📅 Vence el</span><span id="mv-vence-val">—</span></div>
   <div class="field" style="margin-top:10px"><label>Notas</label><textarea id="mv-notas" placeholder="Observaciones..."></textarea></div>
-  <div class="divider"></div>
-  <button class="btn btn-wa" onclick="mvGenWA()" style="margin-bottom:8px">📱 Preparar mensaje WhatsApp</button>
-  <div id="mv-wa-preview-wrap" style="display:none;margin-bottom:10px">
-    <div class="field"><label>Plantilla</label><select id="mv-plantilla" onchange="mvActualizarMensajePlantilla()"></select></div>
-    <div class="field"><label>Mensaje editable</label><textarea id="mv-wa-texto" style="height:190px"></textarea></div>
-    <div class="row2">
-      <button class="btn btn-wa" onclick="mvEnviarWAPreview()">Enviar</button>
-      <button class="btn btn-navy" onclick="guardarMensajeActualComoPlantilla('venta_nueva','mv-wa-texto')">Guardar plantilla</button>
-    </div>
-  </div>
   <button class="btn btn-primary" onclick="mvGuardar()">💾 Guardar venta</button>
 </div>
 </div>
@@ -1990,7 +1980,10 @@ body::after{
     </div>
     <div id="ev-costo-nota" style="font-size:11px;color:var(--text3);margin-top:6px">Solo modifica si el costo cambió.</div>
   </div>
-  <button class="btn btn-green" onclick="editarVentaGuardar()">💾 Guardar cambios</button>
+  <div class="row2">
+    <button class="btn btn-green" onclick="editarVentaGuardar()">💾 Guardar cambios</button>
+    <button class="btn btn-wa" onclick="editarVentaGuardar(true)">💬 Guardar y mensaje</button>
+  </div>
 </div>
 </div>
 
@@ -2760,7 +2753,7 @@ let APP = {
 // ══════════════════════════════════════
 function sanitizarTexto(str, maxLen=200){
   if(!str) return '';
-  return String(str).trim().slice(0, maxLen);
+  return repararMojibakeTexto(String(str).normalize('NFC')).trim().slice(0, maxLen);
 }
 function sanitizarNumero(val, min=0, max=999999){
   const n = parseFloat(val);
@@ -3818,6 +3811,7 @@ function renderRegistro(){
         <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
         <div style="display:flex;gap:4px;align-items:center">
           ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 8px;color:var(--green);border-color:var(--green-border)" title="Marcar como pagada">Pagó</button>` : ''}
+          <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.85;line-height:1" title="Preparar mensaje para el cliente">💬</button>
           <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
           <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
           <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
@@ -4158,7 +4152,7 @@ function abrirEditarVenta(ventaUid){
   abrirModal('modal-editar-venta');
 }
 
-function editarVentaGuardar(){
+function editarVentaGuardar(abrirMensaje=false){
   const ventaUid = document.getElementById('ev-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
@@ -4261,6 +4255,7 @@ function editarVentaGuardar(){
   actualizarSaldoBinance();
   renderBinance();
   sincronizarConSheets();
+  if(abrirMensaje) mostrarMensajePostVenta(v, 'venta_nueva');
 }
 
 // ══════════════════════════════════════
@@ -4574,9 +4569,12 @@ function mvCalcVence(){
 function enviarWA(numero, msg){
   const wa = String(numero).replace(/\D/g,'');
   if(!wa){ alert('Número de WhatsApp no disponible'); return; }
-  // Un emoji que ya llegó corrupto desde datos antiguos no se puede reconstruir,
-  // pero tampoco debe bloquear el trabajo ni llegar como un símbolo extraño.
-  const texto = repararMojibakeTexto(String(msg || '')).replace(/\uFFFD/g, '');
+  const mensajeOriginal = String(msg || '');
+  if(mensajeOriginal.includes('\uFFFD')){
+    alert('Este mensaje contiene un carácter dañado. Corrige el nombre o dato del cliente en Editar venta antes de enviarlo.');
+    return;
+  }
+  const texto = repararMojibakeTexto(mensajeOriginal).normalize('NFC');
   const enlace = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texto);
   const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(esMovil){ window.open(enlace, '_blank'); return; }
@@ -4825,6 +4823,7 @@ function mvGuardar(){
   alert(`✅ Venta ${venta.id} guardada`);
   if(APP.config.notifVentas) crearNotificacionLocal('venta','Nueva venta registrada',`${venta.cliente} · ${venta.srvNom} · $${venta.precio.toFixed(2)}`,`venta-${venta.uid}`, {pantalla:'registro',ventaUid:venta.uid});
   sincronizarConSheets();
+  mostrarMensajePostVenta(venta, 'venta_nueva');
 }
 
 // ══════════════════════════════════════
@@ -5842,15 +5841,16 @@ function venBulkEliminarConfirmar(){
 }
 
 function seccionVencimiento(venta, dias){
-  if(venta.activa === false) return {orden:90, titulo:'Servicios inactivos'};
-  if(dias === null) return {orden:80, titulo:'Sin fecha de vencimiento'};
-  if(dias < 0) return {orden:0, titulo:'Vencidos · ordenar por los más antiguos'};
-  if(dias === 0) return {orden:1, titulo:'Vencen hoy'};
-  if(dias === 1) return {orden:2, titulo:'Vencen mañana'};
-  const fecha = fmtFecha(venta.vence);
-  if(dias <= 7) return {orden:3 + dias / 100, titulo:'Por vencer en ' + dias + ' días · ' + fecha};
-  if(dias <= 14) return {orden:4 + dias / 100, titulo:'Próxima semana · ' + fecha};
-  return {orden:5, titulo:'Más adelante · ' + fecha};
+  if(venta.activa === false) return {orden:90, clave:'inactivos', titulo:'Servicios inactivos'};
+  if(dias === null) return {orden:80, clave:'sin-fecha', titulo:'Sin fecha de vencimiento'};
+  if(dias < 0) return {orden:0, clave:'vencidos', titulo:'Vencidos · los más antiguos primero'};
+  if(dias === 0) return {orden:1, clave:'hoy', titulo:'Vencen hoy · ' + fmtFecha(hoy())};
+  if(dias === 1) return {orden:2, clave:'manana', titulo:'Vencen mañana · ' + fmtFecha(sumarDias(hoy(),1))};
+  if(dias <= 7) return {orden:3, clave:'esta-semana', titulo:'Próximos 7 días · hasta ' + fmtFecha(sumarDias(hoy(),7))};
+  if(dias <= 14) return {orden:4, clave:'proxima-semana', titulo:'Próxima semana · del ' + fmtFecha(sumarDias(hoy(),8)) + ' al ' + fmtFecha(sumarDias(hoy(),14))};
+  const fecha = normalizarFechaValor(venta.vence);
+  const mes = fecha ? fecha.slice(0,7) : 'sin-fecha';
+  return {orden:5, clave:'mes-' + mes, titulo:'Más adelante · ' + etiquetaMes(mes)};
 }
 function renderVencimientos(){
   let ventas = APP._filtroVen === 'inactivo'
@@ -5886,7 +5886,7 @@ function renderVencimientos(){
   const grupos = [];
   ventas.forEach(v => {
     const datosSeccion = seccionVencimiento(v, diasHasta(v.vence));
-    const grupoId = 'ven-' + datosSeccion.orden + '-' + String(v.vence || 'sin-fecha').replace(/[^a-zA-Z0-9_-]/g, '');
+    const grupoId = 'ven-' + datosSeccion.clave;
     let grupo = grupos.find(g => g.id === grupoId);
     if(!grupo){
       grupo = {id:grupoId, titulo:datosSeccion.titulo, ventas:[]};
@@ -6167,6 +6167,15 @@ function renPrevisualizarWA(){
 function renActualizarMensajePlantilla(){
   const v = renVentaFormulario();
   document.getElementById('ren-wa-texto').value = resolverMensajeSeleccionado('renovacion',v.srvUid,'ren-plantilla',ctxMensajeVenta(v));
+}
+function abrirMensajeEntregaVenta(ventaUid){
+  const venta = APP.ventas.find(v => v.uid === ventaUid);
+  if(!venta) return;
+  if(!venta.wa){
+    alert('Agrega el WhatsApp del cliente en Editar venta antes de preparar el mensaje.');
+    return;
+  }
+  mostrarMensajePostVenta(venta, 'venta_nueva');
 }
 function mostrarMensajePostVenta(v, contexto){
   if(!v) return;
@@ -9712,6 +9721,7 @@ function repararMojibakeManual(txt){
 
 function repararMojibakeTexto(txt){
   if(typeof txt !== 'string') return txt;
+  txt = txt.normalize('NFC');
   if(!new RegExp('[\\u00c3\\u00c2\\u00e2\\u00f0\\u00ef]').test(txt)) return txt;
   try {
     const cp1252 = {
@@ -9733,7 +9743,7 @@ function repararMojibakeTexto(txt){
     if(!bytes.length) return txt;
     const dec = new TextDecoder('utf-8').decode(new Uint8Array(bytes));
     const score = s => ((s.match(new RegExp('[\\u00c3\\u00c2\\u00e2\\u00f0\\ufffd]', 'g')) || []).length);
-    return score(dec) < score(txt) ? dec : txt;
+    return score(dec) < score(txt) ? dec.normalize('NFC') : txt;
   } catch(e){
     return txt;
   }
