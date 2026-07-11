@@ -7399,11 +7399,11 @@ async function registrarDispositivoFirebase(){
     const registro = await navigator.serviceWorker.ready;
     const token = await _firebaseMessaging.getToken({vapidKey:FIREBASE_VAPID_KEY,serviceWorkerRegistration:registro});
     if(!token) return false;
-    const dispositivos = Array.isArray(APP.config.dispositivosFcm) ? APP.config.dispositivosFcm : [];
+    let dispositivos = Array.isArray(APP.config.dispositivosFcm) ? APP.config.dispositivosFcm : [];
     const actual = {token,nombre:nombreDispositivoFcm(),actualizado:new Date().toISOString()};
-    const indice = dispositivos.findIndex(d=>d && d.token===token);
-    if(indice >= 0) dispositivos[indice] = {...dispositivos[indice],...actual};
-    else dispositivos.push(actual);
+    // Firebase emite otro token cuando la PWA se reinstala. El anterior queda inválido.
+    dispositivos = dispositivos.filter(d => d && d.token !== token && d.nombre !== actual.nombre);
+    dispositivos.push(actual);
     APP.config.dispositivosFcm = dispositivos.slice(-12);
     guardarLocal(construirPayload());
     return true;
