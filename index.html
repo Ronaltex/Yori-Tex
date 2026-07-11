@@ -5844,10 +5844,13 @@ function venBulkEliminarConfirmar(){
 function seccionVencimiento(venta, dias){
   if(venta.activa === false) return {orden:90, titulo:'Servicios inactivos'};
   if(dias === null) return {orden:80, titulo:'Sin fecha de vencimiento'};
-  if(dias < 0) return {orden:0, titulo:'Venció el ' + fmtFecha(venta.vence)};
+  if(dias < 0) return {orden:0, titulo:'Vencidos · ordenar por los más antiguos'};
   if(dias === 0) return {orden:1, titulo:'Vencen hoy'};
   if(dias === 1) return {orden:2, titulo:'Vencen mañana'};
-  return {orden:3, titulo:'Vencen el ' + fmtFecha(venta.vence)};
+  const fecha = fmtFecha(venta.vence);
+  if(dias <= 7) return {orden:3 + dias / 100, titulo:'Por vencer en ' + dias + ' días · ' + fecha};
+  if(dias <= 14) return {orden:4 + dias / 100, titulo:'Próxima semana · ' + fecha};
+  return {orden:5, titulo:'Más adelante · ' + fecha};
 }
 function renderVencimientos(){
   let ventas = APP._filtroVen === 'inactivo'
@@ -7266,6 +7269,21 @@ async function mostrarNotificacionSistema(titulo, cuerpo, notificacionUid, urlDi
     else new Notification(titulo,{body:cuerpo});
   }catch(e){}
 }
+async function enviarAvisoExternoDesdeComputadora(aviso){
+  const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(esMovil || !APP.config.notifExterna || !_pinVerificado) return;
+  const url = new URL('./', location.href);
+  url.searchParams.set('notificacion', aviso.uid);
+  try{
+    await apiCall({
+      accion:'enviarAvisoExterno',
+      titulo:'YORI-TEX · ' + ({venta:'Nueva venta',pago:'Pago confirmado',renovacion:'Servicio renovado',reposicion:'Cuenta reemplazada',proveedor:'Proveedor',saldo_proveedor:'Proveedor'}[aviso.tipo] || 'Actividad'),
+      cuerpo:aviso.titulo + ' · ' + aviso.cuerpo,
+      url:url.href,
+      tag:'actividad-' + aviso.uid
+    }, 60000);
+  }catch(e){ console.warn('[YORITEX] No se pudo enviar el aviso externo:', e.message); }
+}
 function crearNotificacionLocal(tipo,titulo,cuerpo,clave,destino){
   if(!APP.notificaciones) APP.notificaciones=[];
   const key = clave || `${tipo}-${titulo}-${hoy()}`;
@@ -7276,6 +7294,7 @@ function crearNotificacionLocal(tipo,titulo,cuerpo,clave,destino){
   actualizarBadgeNotificaciones();
   const segmentos = {vencimiento:'Vencimiento',cuenta:'Cuenta',inventario:'Inventario',venta:'Venta nueva',pago:'Pago',renovacion:'Renovación',reposicion:'Cuenta reemplazada',proveedor:'Proveedor',saldo_proveedor:'Proveedor'};
   mostrarNotificacionSistema(`YORI-TEX · ${segmentos[tipo] || 'Aviso'}`, `${titulo} · ${cuerpo}`, aviso.uid);
+  if(['venta','pago','renovacion','reposicion','proveedor','saldo_proveedor'].includes(tipo)) enviarAvisoExternoDesdeComputadora(aviso);
 }
 function destinoDeNotificacion(n){
   if(n?.destino) return n.destino;
