@@ -5874,28 +5874,39 @@ function renderVencimientos(){
   }
   venMsgWA = {};
   ventas.sort((a,b) => {
-    const ga = seccionVencimiento(a, diasHasta(a.vence));
-    const gb = seccionVencimiento(b, diasHasta(b.vence));
-    return ga.orden - gb.orden || String(a.vence||'9999-99-99').localeCompare(String(b.vence||'9999-99-99')) || String(a.cliente||'').localeCompare(String(b.cliente||''));
+    return String(a.vence||'9999-99-99').localeCompare(String(b.vence||'9999-99-99')) || String(a.cliente||'').localeCompare(String(b.cliente||''));
   });
   const lista = document.getElementById('ven-lista');
   if(!ventas.length){
     lista.innerHTML = '<div class="empty"><div class="e-ico">⏰</div><div>Sin vencimientos para mostrar.</div></div>';
     return;
   }
-  const grupos = [];
+  const productos = [];
   ventas.forEach(v => {
-    const datosSeccion = seccionVencimiento(v, diasHasta(v.vence));
-    const grupoId = 'ven-' + datosSeccion.clave;
-    let grupo = grupos.find(g => g.id === grupoId);
-    if(!grupo){
-      grupo = {id:grupoId, titulo:datosSeccion.titulo, ventas:[]};
-      grupos.push(grupo);
+    const servicio = getSrv(v.srvUid);
+    const producto = servicio ? `${servicio.emoji || ''} ${servicio.nombre || v.srvNom || 'Servicio'}`.trim() : (v.srvNom || 'Servicio sin nombre');
+    const productoClave = String(v.srvUid || producto).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'sin-servicio';
+    let productoGrupo = productos.find(p => p.id === 'ven-prod-' + productoClave);
+    if(!productoGrupo){
+      productoGrupo = {id:'ven-prod-' + productoClave, titulo:producto, ventas:[], secciones:[], urgencia:999999};
+      productos.push(productoGrupo);
     }
-    grupo.ventas.push(v);
+    const datosSeccion = seccionVencimiento(v, diasHasta(v.vence));
+    const seccionId = productoGrupo.id + '-' + datosSeccion.clave;
+    let seccion = productoGrupo.secciones.find(g => g.id === seccionId);
+    if(!seccion){
+      seccion = {id:seccionId, orden:datosSeccion.orden, titulo:datosSeccion.titulo, ventas:[]};
+      productoGrupo.secciones.push(seccion);
+    }
+    seccion.ventas.push(v);
+    productoGrupo.ventas.push(v);
+    const dias = diasHasta(v.vence);
+    productoGrupo.urgencia = Math.min(productoGrupo.urgencia, dias === null ? 999999 : dias);
   });
+  productos.forEach(p => p.secciones.sort((a,b) => a.orden - b.orden));
+  productos.sort((a,b) => a.urgencia - b.urgencia || a.titulo.localeCompare(b.titulo, 'es'));
   if(!_venGruposInicializados){
-    _venGruposAbiertos = new Set(grupos.length ? [grupos[0].id] : []);
+    _venGruposAbiertos = new Set(productos.length ? [productos[0].id] : []);
     _venGruposInicializados = true;
   }
   const renderTarjeta = v => {
@@ -5939,14 +5950,15 @@ function renderVencimientos(){
       ${_venSelMode ? '' : btns}
     </div>`;
   };
-  lista.innerHTML = grupos.map(grupo => {
-    const abierto = _venGruposAbiertos.has(grupo.id);
+  lista.innerHTML = productos.map(producto => {
+    const abierto = _venGruposAbiertos.has(producto.id);
+    const resumen = producto.secciones.map(seccion => `${seccion.ventas.length} ${seccion.titulo.split('·')[0].trim().toLowerCase()}`).join(' · ');
     return `<section style="margin:14px 0 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2)">
-      <button type="button" onclick="venToggleSeccion('${grupo.id}')" style="width:100%;border:0;background:transparent;color:var(--white);display:flex;align-items:center;justify-content:space-between;padding:12px 13px;text-align:left;cursor:pointer">
-        <span style="font-size:12px;font-weight:700;letter-spacing:0">${esc(grupo.titulo)}</span>
-        <span style="display:flex;align-items:center;gap:8px;color:var(--text2);font-size:11px"><span>${grupo.ventas.length}</span><span style="font-size:16px;color:var(--orange)">${abierto ? '⌃' : '⌄'}</span></span>
+      <button type="button" onclick="venToggleSeccion('${producto.id}')" style="width:100%;border:0;background:transparent;color:var(--white);display:flex;align-items:center;justify-content:space-between;padding:12px 13px;text-align:left;cursor:pointer">
+        <span style="min-width:0"><span style="display:block;font-size:13px;font-weight:800;letter-spacing:0">${esc(producto.titulo)}</span><span style="display:block;color:var(--text3);font-size:10px;font-weight:500;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(resumen)}</span></span>
+        <span style="display:flex;align-items:center;gap:8px;color:var(--text2);font-size:11px;flex-shrink:0"><span>${producto.ventas.length}</span><span style="font-size:16px;color:var(--orange)">${abierto ? '⌃' : '⌄'}</span></span>
       </button>
-      <div style="display:${abierto ? 'block' : 'none'};padding:0 10px 2px">${grupo.ventas.map(renderTarjeta).join('')}</div>
+      <div style="display:${abierto ? 'block' : 'none'};padding:0 10px 2px">${producto.secciones.map(seccion => `<div style="padding:10px 2px 1px"><div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 7px;color:var(--text2);font-size:11px;font-weight:800"><span>${esc(seccion.titulo)}</span><span style="color:var(--text3)">${seccion.ventas.length}</span></div>${seccion.ventas.map(renderTarjeta).join('')}</div>`).join('')}</div>
     </section>`;
   }).join('');
 }
