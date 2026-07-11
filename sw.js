@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v8-20260710';
+const CACHE_NAME = 'yoritex-v9-20260710-sync';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',

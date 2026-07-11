@@ -2513,6 +2513,7 @@ let _syncGuardarTimer = null;
 let _syncGuardando = false;
 let _syncPendiente = null;
 let _syncEsperas = [];
+let _ultimoErrorSync = '';
 
 // SECURITY: PIN brute-force lockout — max 5 intentos, luego bloqueo de 60 s
 let _pinIntentos = 0;
@@ -2865,6 +2866,23 @@ const PLANTILLAS_BASE_WA = PLANTILLAS_WA.map(p => ({...p}));
 function asegurarPlantillasBase(){
   PLANTILLAS_BASE_WA.forEach(base => {
     if(!PLANTILLAS_WA.some(p => p.uid === base.uid)) PLANTILLAS_WA.push({...base});
+  });
+}
+function normalizarPlantillasDanadas(){
+  PLANTILLAS_WA.forEach(p => {
+    const base = PLANTILLAS_BASE_WA.find(x => x.uid === p.uid);
+    const tieneDanio = /\uFFFD/.test(String(p.nombre || '') + String(p.texto || ''));
+    if(base && tieneDanio){
+      // Las plantillas oficiales se pueden reconstruir completas sin perder el flujo.
+      p.nombre = base.nombre;
+      p.texto = base.texto;
+      p.contexto = base.contexto;
+      p.srvUid = base.srvUid;
+    } else if(tieneDanio){
+      // En una plantilla creada por el usuario no se puede adivinar el emoji perdido.
+      p.nombre = String(p.nombre || '').replace(/\uFFFD/g, '');
+      p.texto = String(p.texto || '').replace(/\uFFFD/g, '');
+    }
   });
 }
 
@@ -4466,11 +4484,9 @@ function mvCalcVence(){
 function enviarWA(numero, msg){
   const wa = String(numero).replace(/\D/g,'');
   if(!wa){ alert('Número de WhatsApp no disponible'); return; }
-  const texto = String(msg || '');
-  if(texto.includes('\uFFFD')){
-    alert('Este mensaje tiene caracteres dañados. Corrige la plantilla antes de enviarlo para que el cliente no reciba símbolos extraños.');
-    return;
-  }
+  // Un emoji que ya llegó corrupto desde datos antiguos no se puede reconstruir,
+  // pero tampoco debe bloquear el trabajo ni llegar como un símbolo extraño.
+  const texto = repararMojibakeTexto(String(msg || '')).replace(/\uFFFD/g, '');
   const enlace = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texto);
   const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(esMovil){ window.open(enlace, '_blank'); return; }
@@ -5714,12 +5730,10 @@ function venBulkEliminarConfirmar(){
 function seccionVencimiento(venta, dias){
   if(venta.activa === false) return {orden:90, titulo:'Servicios inactivos'};
   if(dias === null) return {orden:80, titulo:'Sin fecha de vencimiento'};
-  if(dias < 0) return {orden:0, titulo:'Vencidos'};
+  if(dias < 0) return {orden:0, titulo:'Venció el ' + fmtFecha(venta.vence)};
   if(dias === 0) return {orden:1, titulo:'Vencen hoy'};
   if(dias === 1) return {orden:2, titulo:'Vencen mañana'};
-  if(dias <= 3) return {orden:3, titulo:'Próximos 3 días'};
-  if(dias <= 7) return {orden:4, titulo:'Esta semana'};
-  return {orden:5, titulo:'Más adelante'};
+  return {orden:3, titulo:'Vencen el ' + fmtFecha(venta.vence)};
 }
 function renderVencimientos(){
   let ventas = APP._filtroVen === 'inactivo'
@@ -7222,21 +7236,24 @@ async function activarNotificacionesDispositivo(){
   APP.config.notifExterna=permiso==='granted';
   if(permiso==='granted'){
     const ok = await registrarDispositivoFirebase();
-    if(estado) estado.textContent=ok?'Avisos activados en este dispositivo.':'El permiso fue aceptado, pero no se pudo registrar este dispositivo. Vuelve a intentar con internet.';
-    mostrarNotificacionSistema('YORI-TEX','Notificaciones activadas correctamente.');
+    const guardado = ok && await sincronizarConSheets(true);
+    if(estado) estado.textContent=guardado?'Avisos activados en este dispositivo.':'El permiso fue aceptado, pero no se pudo guardar este dispositivo en la nube. Revisa el indicador de sincronizacion e intenta otra vez.';
+    if(guardado) mostrarNotificacionSistema('YORI-TEX','Notificaciones activadas correctamente.');
   } else if(estado) estado.textContent='Permiso no concedido.';
-  sincronizarConSheets();
+  if(permiso!=='granted') sincronizarConSheets();
 }
 async function probarNotificacionFirebase(){
   const estado=document.getElementById('notif-estado');
   if(!_pinVerificado){ if(estado) estado.textContent='Ingresa primero con tu PIN.'; return; }
   if(estado) estado.textContent='Enviando prueba al dispositivo...';
   try{
-    await sincronizarConSheets(true);
-    await apiCall({accion:'probarPush',pin:_pinGuardado},60000);
+    const sincronizado = await sincronizarConSheets(true);
+    if(!sincronizado) throw new Error(_ultimoErrorSync || 'No se pudo guardar el telefono registrado en Google Sheets.');
+    const respuesta = await apiCall({accion:'probarPush',pin:_pinGuardado},60000);
+    if(!respuesta?.data?.enviado) throw new Error('Firebase no encontro un telefono registrado.');
     if(estado) estado.textContent='Prueba enviada. Cierra YORI-TEX y revisa la notificación.';
   }catch(e){
-    if(estado) estado.textContent='No se pudo enviar. Revisa que el servicio privado de Firebase esté configurado.';
+    if(estado) estado.textContent='No se pudo enviar: ' + (e?.message || 'revisa Firebase y la sincronizacion.');
   }
 }
 function nombreDispositivoFcm(){
@@ -8674,9 +8691,10 @@ async function pinVerificar(){
     _pinIngresado = ''; pinActualizarDots(); return;
   }
 
-  // Intentar caché local primero para entrada rápida
+  // La caché solo permite entrar sin red. Con conexión, el PIN siempre se valida
+  // en el servidor para no trabajar con un PIN local que ya no coincide.
   const local = localStorage.getItem('yoritex_local');
-  if(local){
+  if(local && !navigator.onLine){
     try {
       const d = JSON.parse(local);
       if(d._pin === _pinIngresado){
@@ -9096,6 +9114,7 @@ async function _sincronizarBackground(payload){
     }
     return true;
   } catch(err){
+    _ultimoErrorSync = err?.message || 'No se pudo sincronizar con Google Sheets.';
     console.error('[YORITEX] Error al guardar en Google Sheets:', err);
     setSyncStatus('Error al guardar', 'err');
     if(ind){
@@ -9416,7 +9435,7 @@ async function sincronizarManual(){
   mostrarSync('🔄', 'Sincronizando con la nube...', 'Guardando en Google Sheets');
   const ok = await sincronizarConSheets(true);
   ocultarSync();
-  alert(ok ? '✅ Sincronizado con Google Sheets.' : '⚠️ No se pudo sincronizar con Google Sheets. Tus cambios quedaron guardados solo en este navegador.');
+  alert(ok ? '✅ Sincronizado con Google Sheets.' : '⚠️ ' + (_ultimoErrorSync || 'No se pudo sincronizar con Google Sheets. Tus cambios quedaron guardados solo en este navegador.'));
 }
 async function cerrarSesion(){
   if(!confirm('¿Cerrar sesión? Tendrás que ingresar correo, contraseña y PIN nuevamente.')) return;
@@ -9574,6 +9593,7 @@ function sanearMojibakeDatos(){
   sanearMojibakeEnObjeto(CATALOGO_SERVICIOS);
   sanearMojibakeEnObjeto(CATALOGO_CAT_GASTOS);
   sanearMojibakeEnObjeto(PLANTILLAS_WA);
+  normalizarPlantillasDanadas();
   normalizarEmojisCatalogo();
 }
 function repararMojibakeDOM(root){
