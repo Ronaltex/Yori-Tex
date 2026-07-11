@@ -5635,11 +5635,19 @@ function ncGuardar(){
 // VENCIMIENTOS
 // ══════════════════════════════════════
 let _venBusq = '';
-function venBuscar(v){ _venBusq = v; actualizarSearchClear(document.getElementById('ven-search') || document.querySelector('#s-vencimientos .search-wrap input')); renderVencimientos(); }
+let _venGruposAbiertos = new Set();
+let _venGruposInicializados = false;
+function venBuscar(v){ _venBusq = v; _venGruposInicializados = false; actualizarSearchClear(document.getElementById('ven-search') || document.querySelector('#s-vencimientos .search-wrap input')); renderVencimientos(); }
 function venFiltrar(f, btn){
   APP._filtroVen = f;
+  _venGruposInicializados = false;
   document.querySelectorAll('#ven-filtros .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  renderVencimientos();
+}
+function venToggleSeccion(grupoId){
+  if(_venGruposAbiertos.has(grupoId)) _venGruposAbiertos.delete(grupoId);
+  else _venGruposAbiertos.add(grupoId);
   renderVencimientos();
 }
 
@@ -5861,14 +5869,25 @@ function renderVencimientos(){
     lista.innerHTML = '<div class="empty"><div class="e-ico">⏰</div><div>Sin vencimientos para mostrar.</div></div>';
     return;
   }
-  let seccionAnterior = '';
-  lista.innerHTML = ventas.map(v => {
+  const grupos = [];
+  ventas.forEach(v => {
+    const datosSeccion = seccionVencimiento(v, diasHasta(v.vence));
+    const grupoId = 'ven-' + datosSeccion.orden + '-' + String(v.vence || 'sin-fecha').replace(/[^a-zA-Z0-9_-]/g, '');
+    let grupo = grupos.find(g => g.id === grupoId);
+    if(!grupo){
+      grupo = {id:grupoId, titulo:datosSeccion.titulo, ventas:[]};
+      grupos.push(grupo);
+    }
+    grupo.ventas.push(v);
+  });
+  if(!_venGruposInicializados){
+    _venGruposAbiertos = new Set(grupos.length ? [grupos[0].id] : []);
+    _venGruposInicializados = true;
+  }
+  const renderTarjeta = v => {
     const st = estadoVen(v.vence);
     const wa = v.wa ? v.wa.replace(/\D/g,'') : '';
     const d = diasHasta(v.vence);
-    const seccion = seccionVencimiento(v, d).titulo;
-    const encabezado = seccion !== seccionAnterior ? `<div class="sec" style="margin:16px 2px 8px">${esc(seccion)}</div>` : '';
-    seccionAnterior = seccion;
     const isInactivo = v.activa === false;
     const isSel = _venSeleccionados.has(v.uid);
     let msgWA = '';
@@ -5893,7 +5912,7 @@ function renderVencimientos(){
       : '';
     const cardClick  = _venSelMode ? `onclick="venToggleItem('${esc(v.uid)}')"` : '';
     const extraClass = _venSelMode ? (' ven-selmode' + (isSel ? ' ven-seleccionada' : '')) : '';
-    return encabezado + `<div id="vcard-${esc(v.uid)}" class="ven-card ${isInactivo?'inactivo':st}${extraClass}" ${cardClick}>
+    return `<div id="vcard-${esc(v.uid)}" class="ven-card ${isInactivo?'inactivo':st}${extraClass}" ${cardClick}>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div style="display:flex;align-items:flex-start;gap:10px;flex:1">
           ${chkHtml}
@@ -5905,6 +5924,16 @@ function renderVencimientos(){
       ${(!isInactivo && d !== null && d < -2) ? `<div style="font-size:11px;color:var(--red);background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:6px;padding:5px 9px;margin-top:6px">⚠️ Período de gracia vencido — servicio por cortar</div>` : ''}
       ${_venSelMode ? '' : btns}
     </div>`;
+  };
+  lista.innerHTML = grupos.map(grupo => {
+    const abierto = _venGruposAbiertos.has(grupo.id);
+    return `<section style="margin:14px 0 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2)">
+      <button type="button" onclick="venToggleSeccion('${grupo.id}')" style="width:100%;border:0;background:transparent;color:var(--white);display:flex;align-items:center;justify-content:space-between;padding:12px 13px;text-align:left;cursor:pointer">
+        <span style="font-size:12px;font-weight:700;letter-spacing:0">${esc(grupo.titulo)}</span>
+        <span style="display:flex;align-items:center;gap:8px;color:var(--text2);font-size:11px"><span>${grupo.ventas.length}</span><span style="font-size:16px;color:var(--orange)">${abierto ? '⌃' : '⌄'}</span></span>
+      </button>
+      <div style="display:${abierto ? 'block' : 'none'};padding:0 10px 2px">${grupo.ventas.map(renderTarjeta).join('')}</div>
+    </section>`;
   }).join('');
 }
 
