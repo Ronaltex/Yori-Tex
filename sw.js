@@ -1,5 +1,5 @@
-const CACHE_NAME = 'yoritex-v11-20260711-logo-oficial';
-const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex.png'];
+const CACHE_NAME = 'yoritex-v12-20260711-logo-plano';
+const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
   authDomain: 'yori-tex.firebaseapp.com',
@@ -50,7 +50,7 @@ self.addEventListener('push', event => {
   try { data = event.data ? event.data.json() : {}; } catch(e) { data = {body:event.data?.text() || ''}; }
   event.waitUntil(self.registration.showNotification(data.title || 'YORI-TEX', {
     body: data.body || 'Tienes una nueva notificación.',
-    icon: './logo-yori-tex.png', badge: './logo-yori-tex.png', tag: data.tag || 'yoritex-push',
+    icon: './logo-yori-tex-plano.png', badge: './logo-yori-tex-plano.png', tag: data.tag || 'yoritex-push',
     data: {url: data.url || './'}
   }));
 });
@@ -60,7 +60,7 @@ messaging.onBackgroundMessage(payload => {
   const data = payload.data || {};
   return self.registration.showNotification(data.title || 'YORI-TEX', {
     body: data.body || 'Tienes una nueva notificacion.',
-    icon: './logo-yori-tex.png', badge: './logo-yori-tex.png', tag: data.tag || 'yoritex-fcm',
+    icon: './logo-yori-tex-plano.png', badge: './logo-yori-tex-plano.png', tag: data.tag || 'yoritex-fcm',
     data: {url: data.url || './'}
   });
 });

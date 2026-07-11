@@ -9,6 +9,6 @@
   "theme_color": "#f5a623",
   "lang": "es-EC",
   "icons": [
-    {"src": "logo-yori-tex.png", "sizes": "1254x1260", "type": "image/png", "purpose": "any"}
+    {"src": "logo-yori-tex-plano.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable"}
   ]
 }

@@ -1178,7 +1178,7 @@ body::after{
 
 <div class="app-header">
   <div class="header-logo">
-    <div class="logo-hex" id="logo-hex"><img src="logo-yori-tex.png" alt="YORI-TEX"></div>
+    <div class="logo-hex" id="logo-hex"><img src="logo-yori-tex-plano.png" alt="YORI-TEX"></div>
     <div><div class="logo-text" id="logo-brand">YORI<span>-TEX</span></div></div>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
@@ -7251,7 +7251,7 @@ async function mostrarNotificacionSistema(titulo, cuerpo, notificacionUid, urlDi
   try{
     const reg = await navigator.serviceWorker?.ready;
     const url = urlDirecta || (notificacionUid ? `./?notificacion=${encodeURIComponent(notificacionUid)}` : './');
-    if(reg) await reg.showNotification(titulo,{body:cuerpo,icon:'logo-yori-tex.png',badge:'logo-yori-tex.png',tag:'yoritex-'+titulo,data:{url}});
+    if(reg) await reg.showNotification(titulo,{body:cuerpo,icon:'logo-yori-tex-plano.png',badge:'logo-yori-tex-plano.png',tag:'yoritex-'+titulo,data:{url}});
     else new Notification(titulo,{body:cuerpo});
   }catch(e){}
 }
@@ -8208,7 +8208,7 @@ function actualizarMarca(){
   APP.config.nombre = n;
   const p = n.split('-');
   document.getElementById('logo-brand').innerHTML = p.length > 1 ? p[0]+'<span>-'+p.slice(1).join('-')+'</span>' : '<span>'+n+'</span>';
-  if(!APP.config.logo) document.getElementById('logo-hex').innerHTML = '<img src="logo-yori-tex.png" alt="YORI-TEX">';
+  if(!APP.config.logo) document.getElementById('logo-hex').innerHTML = '<img src="logo-yori-tex-plano.png" alt="YORI-TEX">';
 }
 function actualizarFirmaPreview(){
   const f = document.getElementById('cfg-firma').value;
