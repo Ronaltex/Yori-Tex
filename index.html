@@ -1141,7 +1141,7 @@ body::after{
 </div>
 
 <!-- PANTALLA DE PIN -->
-<div id="pin-screen" style="position:fixed;inset:0;background:#0d1b2a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;padding:24px">
+<div id="pin-screen" style="position:fixed;inset:0;background:#0d1b2a;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:999;padding:24px">
   <div style="font-size:40px;margin-bottom:8px">🔐</div>
   <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:4px" id="pin-brand">YORI-TEX</div>
   <div style="font-size:12px;color:#8fa8c8;margin-bottom:32px">Ingresa tu PIN para continuar</div>
@@ -1431,7 +1431,7 @@ body::after{
 
   <!-- MARCA -->
   <div id="cfg-tab-marca">
-    <div class="cfg-section">
+    <div class="cfg-section" style="display:none">
       <div class="cfg-section-title">🎨 Identidad de marca</div>
       <div style="padding:14px">
         <div class="logo-upload-area" onclick="document.getElementById('logo-input').click()">
@@ -1508,10 +1508,10 @@ body::after{
       <div style="padding:14px">
         <div class="field"><label>Dominio oficial</label><input type="text" id="cfg-dominio" value="yori-tex.com" readonly/></div>
         <div class="field"><label>Correo administrador</label><input type="email" id="cfg-correo-admin" placeholder="admin@yori-tex.com"/></div>
-        <div class="aviso">El inicio por correo se activará al conectar Firebase. El PIN actual seguirá funcionando durante la transición.</div>
+        <div class="aviso">El acceso de YORI-TEX se realiza con tu correo y contraseña.</div>
       </div>
     </div>
-    <div class="cfg-section">
+    <div class="cfg-section" style="display:none">
       <div class="cfg-section-title">Seguridad adicional</div>
       <div style="padding:0 14px 14px">
         <div class="toggle-row"><div class="toggle-info"><div class="tl">Pedir PIN después del correo</div><div class="ts">Actívalo si quieres correo, contraseña y PIN cada vez que abras YORI-TEX.</div></div><label class="toggle"><input type="checkbox" id="cfg-pin-segundo" checked><span class="toggle-slider"></span></label></div>
@@ -2551,25 +2551,23 @@ function mostrarPantallaAuth(mostrar){
   if(mostrar && pin) pin.style.display = 'none';
 }
 function requierePinSegundoFactor(){
-  try{
-    const local = JSON.parse(localStorage.getItem('yoritex_local') || '{}');
-    if(local?.data?.config?.pinSegundoFactor === false) return false;
-  }catch(e){}
-  return APP.config?.pinSegundoFactor !== false;
+  return false;
 }
 function continuarDespuesCorreo(){
   const pin = document.getElementById('pin-screen');
   let pinGuardado = '';
   try { pinGuardado = JSON.parse(localStorage.getItem('yoritex_local') || '{}')._pin || ''; } catch(e){}
-  if(!requierePinSegundoFactor() && pinGuardado){
+  if(pinGuardado){
     _pinIngresado = pinGuardado;
-    if(pin) pin.style.display = 'flex';
+    if(pin) pin.style.display = 'none';
     pinVerificar();
     return;
   }
+  // El PIN deja de ser una pantalla de acceso. En instalaciones antiguas se
+  // conserva internamente para no cortar la sincronización existente.
+  _pinVerificado = true;
   _pinIngresado = '';
-  pinActualizarDots();
-  if(pin) pin.style.display = 'flex';
+  if(pin) pin.style.display = 'none';
 }
 function detenerTiempoInactividad(){
   if(_authTimerInactividad) clearTimeout(_authTimerInactividad);
@@ -8353,7 +8351,7 @@ function guardarConfig(){
     dominio: 'yori-tex.com',
     appUrl: urlPublicaActual(),
     correoAdmin: sanitizarTexto(document.getElementById('cfg-correo-admin')?.value || '',200),
-    pinSegundoFactor: document.getElementById('cfg-pin-segundo')?.checked !== false,
+    pinSegundoFactor: false,
     metas: {
       ingresos: parseFloat(document.getElementById('cfg-meta-ingresos')?.value) || 0,
       ganancia: parseFloat(document.getElementById('cfg-meta-ganancia')?.value) || 0,
