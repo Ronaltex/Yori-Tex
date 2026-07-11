@@ -2431,7 +2431,7 @@ body::after{
   <div class="modal-title" id="plt-modal-titulo">💬 Nueva plantilla <button class="modal-close" onclick="cerrarModal('modal-nueva-plantilla')">×</button></div>
   <input type="hidden" id="plt-edit-uid"/>
   <div class="field"><label>Se usará en</label>
-    <select id="plt-contexto">
+    <select id="plt-contexto" onchange="actualizarBorradorPlantillaBase()">
       <option value="general">General</option>
       <option value="venta_nueva">Venta nueva</option>
       <option value="cobro_pendiente">Cobro pendiente</option>
@@ -2442,10 +2442,10 @@ body::after{
       <option value="reembolso">Reembolso</option>
     </select>
   </div>
-  <div class="field"><label>Producto / servicio</label><select id="plt-servicio"><option value="todos">Todos los productos</option></select></div>
+  <div class="field"><label>Producto / servicio</label><select id="plt-servicio" onchange="actualizarBorradorPlantillaBase()"><option value="todos">Todos los productos</option></select></div>
   <div class="field"><label>Nombre de la plantilla</label><input type="text" id="plt-nombre" placeholder="Ej: Bienvenida, Recordatorio..."/></div>
-  <div class="aviso" style="margin-top:4px">Variables disponibles: <span class="var-tag" onclick="insertVar('[CLIENTE]')"><b>[CLIENTE]</b></span> <span class="var-tag" onclick="insertVar('[SERVICIO]')"><b>[SERVICIO]</b></span> <span class="var-tag" onclick="insertVar('[VENCE]')"><b>[VENCE]</b></span> <span class="var-tag" onclick="insertVar('[PRECIO]')"><b>[PRECIO]</b></span> <span class="var-tag" onclick="insertVar('[CUENTA]')"><b>[CUENTA]</b></span> <span class="var-tag" onclick="insertVar('[CORREO]')"><b>[CORREO]</b></span> <span class="var-tag" onclick="insertVar('[PASS]')"><b>[PASS]</b></span> <span class="var-tag" onclick="insertVar('[PERFIL]')"><b>[PERFIL]</b></span> <span class="var-tag" onclick="insertVar('[PIN]')"><b>[PIN]</b></span> <span class="var-tag" onclick="insertVar('[ACCESOS]')"><b>[ACCESOS]</b></span></div>
-  <div class="field"><label>Texto del mensaje</label><textarea id="plt-texto" style="height:140px" placeholder="Hola [CLIENTE]! Tu servicio [SERVICIO] vence el [VENCE]..."></textarea></div>
+  <div class="aviso" style="margin-top:4px">Variables disponibles: <span class="var-tag" onclick="insertVar('[CLIENTE]')"><b>[CLIENTE]</b></span> <span class="var-tag" onclick="insertVar('[SERVICIO]')"><b>[SERVICIO]</b></span> <span class="var-tag" onclick="insertVar('[VENCE]')"><b>[VENCE]</b></span> <span class="var-tag" onclick="insertVar('[PRECIO]')"><b>[PRECIO]</b></span> <span class="var-tag" onclick="insertVar('[CUENTA]')"><b>[CUENTA]</b></span> <span class="var-tag" onclick="insertVar('[CORREO]')"><b>[CORREO]</b></span> <span class="var-tag" onclick="insertVar('[PASS]')"><b>[PASS]</b></span> <span class="var-tag" onclick="insertVar('[PERFIL]')"><b>[PERFIL]</b></span> <span class="var-tag" onclick="insertVar('[PIN]')"><b>[PIN]</b></span> <span class="var-tag" onclick="insertVar('[INVITACION]')"><b>[INVITACION]</b></span> <span class="var-tag" onclick="insertVar('[ACCESOS]')"><b>[ACCESOS]</b></span></div>
+  <div class="field"><label>Texto del mensaje</label><textarea id="plt-texto" oninput="this.dataset.borradorBase=''" style="height:140px" placeholder="Hola [CLIENTE]! Tu servicio [SERVICIO] vence el [VENCE]..."></textarea></div>
   <button class="btn btn-primary" onclick="pltGuardar()">💾 Guardar plantilla</button>
 </div>
 </div>
@@ -2515,6 +2515,15 @@ let _syncPendiente = null;
 let _syncEsperas = [];
 let _ultimoErrorSync = '';
 
+// La sesión es temporal: se pide nuevamente al abrir la app o tras 15 minutos sin actividad.
+const AUTH_INACTIVIDAD_MS = 15 * 60 * 1000;
+const AUTH_MARCADOR_SESION = 'yoritex_auth_activa';
+let _authTimerInactividad = null;
+let _authUltimaActividad = 0;
+let _authVigilanciaIniciada = false;
+let _authBloqueando = false;
+let _authObservadorIniciado = false;
+
 // SECURITY: PIN brute-force lockout — max 5 intentos, luego bloqueo de 60 s
 let _pinIntentos = 0;
 const PIN_MAX_INTENTOS = 5;
@@ -2562,21 +2571,80 @@ function continuarDespuesCorreo(){
   pinActualizarDots();
   if(pin) pin.style.display = 'flex';
 }
-function inicializarAuthFirebase(){
+function detenerTiempoInactividad(){
+  if(_authTimerInactividad) clearTimeout(_authTimerInactividad);
+  _authTimerInactividad = null;
+}
+function reiniciarTiempoInactividad(){
+  if(!_firebaseUsuario || _authBloqueando) return;
+  _authUltimaActividad = Date.now();
+  detenerTiempoInactividad();
+  _authTimerInactividad = setTimeout(bloquearPorInactividad, AUTH_INACTIVIDAD_MS);
+}
+function limpiarAccesoEnMemoria(){
+  _pinVerificado = false;
+  _pinGuardado = '';
+  _pinIngresado = '';
+  pinActualizarDots();
+  const pinError = document.getElementById('pin-error');
+  if(pinError) pinError.textContent = '';
+}
+async function bloquearPorInactividad(){
+  if(_authBloqueando || !_firebaseUsuario) return;
+  if(Date.now() - _authUltimaActividad < AUTH_INACTIVIDAD_MS - 1000){
+    reiniciarTiempoInactividad();
+    return;
+  }
+  _authBloqueando = true;
+  detenerTiempoInactividad();
+  sessionStorage.removeItem(AUTH_MARCADOR_SESION);
+  limpiarAccesoEnMemoria();
+  const error = document.getElementById('auth-error');
+  if(error) error.textContent = 'Sesión cerrada por inactividad. Ingresa nuevamente.';
+  try{ if(_firebaseAuth) await _firebaseAuth.signOut(); }catch(e){ console.warn('No se pudo cerrar la sesión inactiva', e); }
+  mostrarPantallaAuth(true);
+  _authBloqueando = false;
+}
+function iniciarVigilanciaInactividad(){
+  if(_authVigilanciaIniciada) return;
+  _authVigilanciaIniciada = true;
+  ['pointerdown','keydown','touchstart'].forEach(evento => {
+    window.addEventListener(evento, reiniciarTiempoInactividad, {passive:true});
+  });
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible' || !_firebaseUsuario) return;
+    if(Date.now() - _authUltimaActividad >= AUTH_INACTIVIDAD_MS) bloquearPorInactividad();
+    else reiniciarTiempoInactividad();
+  });
+}
+async function inicializarAuthFirebase(){
   const error = document.getElementById('auth-error');
   try{
     if(!window.firebase) throw new Error('No se pudo cargar Firebase. Revisa tu conexión e intenta de nuevo.');
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseAuth = firebase.auth();
-    _firebaseAuth.onAuthStateChanged(usuario => {
+    await _firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    if(_authObservadorIniciado) return;
+    _authObservadorIniciado = true;
+    iniciarVigilanciaInactividad();
+    _firebaseAuth.onAuthStateChanged(async usuario => {
       _firebaseUsuario = usuario || null;
-      mostrarPantallaAuth(!usuario);
-      if(usuario){
-        continuarDespuesCorreo();
-        if(error) error.textContent = '';
-        const email = document.getElementById('auth-email');
-        if(email) email.value = usuario.email || '';
+      if(!usuario){
+        detenerTiempoInactividad();
+        mostrarPantallaAuth(true);
+        return;
       }
+      // No se reutiliza una sesión que Firebase hubiese guardado de una apertura anterior.
+      if(sessionStorage.getItem(AUTH_MARCADOR_SESION) !== '1'){
+        await _firebaseAuth.signOut();
+        return;
+      }
+      mostrarPantallaAuth(false);
+      continuarDespuesCorreo();
+      reiniciarTiempoInactividad();
+      if(error) error.textContent = '';
+      const email = document.getElementById('auth-email');
+      if(email) email.value = usuario.email || '';
     });
   }catch(e){
     if(error) error.textContent = e.message || 'No se pudo iniciar el acceso con correo.';
@@ -2589,14 +2657,16 @@ async function authIniciarSesion(){
   const error = document.getElementById('auth-error');
   const boton = document.getElementById('auth-login-btn');
   if(!email || !password){ if(error) error.textContent='Ingresa tu correo y contraseña.'; return; }
-  if(!_firebaseAuth){ inicializarAuthFirebase(); }
+  if(!_firebaseAuth) await inicializarAuthFirebase();
   if(!_firebaseAuth){ if(error) error.textContent='Firebase no está listo. Revisa tu conexión.'; return; }
   if(error) error.textContent='';
   if(boton){ boton.disabled=true; boton.textContent='Ingresando...'; }
   try{
+    sessionStorage.setItem(AUTH_MARCADOR_SESION, '1');
     await _firebaseAuth.signInWithEmailAndPassword(email,password);
     document.getElementById('auth-password').value='';
   }catch(e){
+    sessionStorage.removeItem(AUTH_MARCADOR_SESION);
     const mensajes = {
       'auth/invalid-email':'El correo no es válido.',
       'auth/invalid-credential':'Correo o contraseña incorrectos.',
@@ -2858,7 +2928,7 @@ let CATALOGO_CAT_GASTOS = [
 let PLANTILLAS_WA = [
   { uid: 'plt-bienvenida', nombre: '🎉 Bienvenida', contexto:'venta_nueva', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTu acceso está listo:\n\n✨ *[SERVICIO]*\n[ACCESOS]\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n⚠️ _No compartas ni modifiques los datos._\n_Ante cualquier problema escríbeme_ 😊\n\n[FIRMA]' },
   { uid: 'plt-renovacion', nombre: '✅ Servicio renovado', contexto:'renovacion', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n[ACCESOS]\n📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\nGracias por seguir con nosotros.\n\n[FIRMA]' },
-  { uid: 'plt-recordatorio', nombre: '🔔 Recordatorio de cobro', contexto:'vencimiento', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTe recuerdo que tu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄 Cualquier consulta escríbeme.\n\n[FIRMA]' },
+  { uid: 'plt-recordatorio', nombre: '🔔 Recordatorio de cobro', contexto:'vencimiento', srvUid:'todos', texto: '¡Hola [CLIENTE]! 👋\n\nTe recuerdo que tu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]' },
   { uid: 'plt-reposicion', nombre: '🔄 Cuenta reemplazada', contexto:'cuenta_caida', srvUid:'todos', texto: 'Hola [CLIENTE] 👋\n\nTu acceso de *[SERVICIO]* fue reemplazado correctamente.\n\n[ACCESOS]\n📅 Vence: [VENCE]\n\n[FIRMA]' },
   { uid: 'plt-no-renovacion', nombre: '❌ Aviso de no renovación', contexto:'no_renovo', srvUid:'todos', texto: 'Hola [CLIENTE], te informo que tu acceso a *[SERVICIO]* ha vencido y no fue renovado.\n\nSi deseas reactivarlo en el futuro, con gusto te ayudo. ¡Saludos! 😊\n\n[FIRMA]' }
 ];
@@ -2871,7 +2941,8 @@ function asegurarPlantillasBase(){
 function normalizarPlantillasDanadas(){
   PLANTILLAS_WA.forEach(p => {
     const base = PLANTILLAS_BASE_WA.find(x => x.uid === p.uid);
-    const tieneDanio = /\uFFFD/.test(String(p.nombre || '') + String(p.texto || ''));
+    const contenido = String(p.nombre || '') + String(p.texto || '');
+    const tieneDanio = /\uFFFD/.test(contenido) || /(^|\s)\?\?(?=\s|$)/.test(contenido);
     if(base && tieneDanio){
       // Las plantillas oficiales se pueden reconstruir completas sin perder el flujo.
       p.nombre = base.nombre;
@@ -2880,10 +2951,18 @@ function normalizarPlantillasDanadas(){
       p.srvUid = base.srvUid;
     } else if(tieneDanio){
       // En una plantilla creada por el usuario no se puede adivinar el emoji perdido.
-      p.nombre = String(p.nombre || '').replace(/\uFFFD/g, '');
-      p.texto = String(p.texto || '').replace(/\uFFFD/g, '');
+      p.nombre = String(p.nombre || '').replace(/\uFFFD/g, '').replace(/(^|\s)\?\?(?=\s|$)/g, '$1');
+      p.texto = String(p.texto || '').replace(/\uFFFD/g, '').replace(/(^|\s)\?\?(?=\s|$)/g, '$1');
     }
   });
+}
+function normalizarFirmaDanada(){
+  const firma = String(APP?.config?.firma || '');
+  const esFirmaYoriTex = /YORI-TEX\s*\|\s*Streaming Premium/i.test(firma);
+  const tieneEmojiPerdido = /\uFFFD/.test(firma) || /(^|\s)\?\?(?=\s|$)/.test(firma);
+  if(esFirmaYoriTex && tieneEmojiPerdido){
+    APP.config.firma = '— Cualquier consulta escríbeme 😊\nYORI-TEX | Streaming Premium 🔥';
+  }
 }
 
 // ESTADO DASHBOARD
@@ -4508,11 +4587,26 @@ function contextoPlantillaNormalizado(p){
   if(p?.uid === 'plt-no-renovacion') return 'no_renovo';
   return 'general';
 }
+function plantillaBaseServicio(contexto, srvUid){
+  const srv = getSrv(srvUid);
+  if(!srv) return null;
+  const datosAcceso = srv.tieneInvitacion
+    ? '📩 Invitación enviada a: [INVITACION]'
+    : '🔐 Datos de acceso:\n[ACCESOS]';
+  const textos = {
+    venta_nueva: '¡Hola [CLIENTE]! 👋\n\nTu acceso a *[SERVICIO]* está listo ✅\n\n' + datosAcceso + '\n\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
+    renovacion: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + (srv.tieneInvitacion ? datosAcceso + '\n\n' : '') + '📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
+    vencimiento: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]'
+  };
+  const texto = textos[contexto] || textos.venta_nueva;
+  return {uid:'base-' + contexto + '-' + srvUid, nombre:'Base automática', texto, contexto, srvUid, baseDinamica:true};
+}
 function plantillasDisponibles(contexto, srvUid){
   const exactas = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === srvUid);
   const generales = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === 'todos');
   const otras = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === 'general' && ['todos',srvUid].includes(p.srvUid || 'todos'));
-  return [...exactas, ...generales, ...otras].filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
+  const base = plantillaBaseServicio(contexto, srvUid);
+  return [base, ...exactas, ...generales, ...otras].filter(Boolean).filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
 }
 function llenarSelectPlantillas(selectId, contexto, srvUid){
   const sel = document.getElementById(selectId);
@@ -4539,7 +4633,7 @@ function ctxMensajeVenta(v){
   return {
     cliente:v.cliente || 'Cliente', servicio:v.srvNom || getSrv(v.srvUid)?.nombre || 'Servicio',
     vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
-    perfil:v.perfil || '', pin:v.pin || '', enviarPass:!!v.enviarPass,
+    perfil:v.perfil || '', pin:v.pin || '', invitacion:v.invCorreo || '', enviarPass:!!v.enviarPass,
     accesos:accesosDeVentaParaMensaje(v)
   };
 }
@@ -4549,7 +4643,7 @@ function mensajeAutomatico(contexto, ctx){
 }
 function resolverMensajeSeleccionado(contexto, srvUid, selectId, ctx){
   const puid = document.getElementById(selectId)?.value;
-  const p = PLANTILLAS_WA.find(x => x.uid === puid) || plantillasDisponibles(contexto, srvUid)[0];
+  const p = plantillasDisponibles(contexto, srvUid).find(x => x.uid === puid) || plantillasDisponibles(contexto, srvUid)[0];
   return p ? resolverPlantilla(p.texto, ctx) : mensajeAutomatico(contexto, ctx);
 }
 function mvContextoFormulario(){
@@ -4566,7 +4660,8 @@ function mvContextoFormulario(){
   const precio = document.getElementById('mv-precio').value || '\u2014';
   const enviarPass = !!document.getElementById('mv-enviar-pass')?.checked;
   const accesoManual = !_mvInvMode && correo ? [{cuenta:{correo,pass:document.getElementById('mv-cactus-pass')?.value || ''},perfil,pin,cupoIdx:0}] : [];
-  return {srvUid, ctx:{cliente:nombre,servicio:srvNom,vence,precio,correo,perfil,pin,enviarPass,accesos:accesos.length ? accesos : accesoManual}};
+  const invitacion = document.getElementById('mv-inv-correo')?.value || '';
+  return {srvUid, ctx:{cliente:nombre,servicio:srvNom,vence,precio,correo,perfil,pin,invitacion,enviarPass,accesos:accesos.length ? accesos : accesoManual}};
 }
 function mvGenWA(){
   const {srvUid,ctx} = mvContextoFormulario();
@@ -5778,8 +5873,8 @@ function renderVencimientos(){
     const isSel = _venSeleccionados.has(v.uid);
     let msgWA = '';
     if(d !== null && d < -2) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTe escribo para informarte que tu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' días y el período de gracia ya expiró.\n\nGracias por haber utilizado los servicios de *' + (APP.config.nombre||'YORI-TEX') + '* 🙏\n\n⚠️ Si deseas continuar, el valor de renovación es *$' + v.precio.toFixed(2) + '*. Caso contrario, el servicio será cortado a la brevedad.\n\n' + (APP.config.firma||'');
-    else if(d !== null && d < 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' día' + (Math.abs(d)===1?'':'s') + '.\n\n¿Deseas renovar? El valor es *$' + v.precio.toFixed(2) + '*\n\n🔄 Cualquier consulta escríbeme.\n\n' + (APP.config.firma||'');
-    else if(d === 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* vence *hoy*.\n\n¿Lo renovamos? El valor es *$' + v.precio.toFixed(2) + '*\n\n🔄 Cualquier consulta escríbeme.\n\n' + (APP.config.firma||'');
+    else if(d !== null && d < 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* venció hace ' + Math.abs(d) + ' día' + (Math.abs(d)===1?'':'s') + '.\n\n¿Deseas renovar? El valor es *$' + v.precio.toFixed(2) + '*\n\n' + (APP.config.firma||'');
+    else if(d === 0) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTu acceso a *' + v.srvNom + '* vence *hoy*.\n\n¿Lo renovamos? El valor es *$' + v.precio.toFixed(2) + '*\n\n' + (APP.config.firma||'');
     else if(d !== null && d <= 7) msgWA = 'Hola ' + v.cliente + '! 👋\n\nTe recuerdo que tu acceso a *' + v.srvNom + '* vence en *' + d + ' días* (' + fmtFecha(v.vence) + ').\n\nEl valor de la renovación es *$' + v.precio.toFixed(2) + '*\n\n¿Lo renovamos? 🔄\n\n' + (APP.config.firma||'');
     if(msgWA) venMsgWA[v.uid] = msgWA;
     const btns = isInactivo ?
@@ -8459,6 +8554,7 @@ function resolverPlantilla(texto, ctx = {}){
     PASS: enviarPass ? (cuenta.pass || ctx.pass || '') : '',
     PERFIL: acceso.perfil || ctx.perfil || '',
     PIN: acceso.pin || ctx.pin || '',
+    INVITACION: ctx.invitacion || '',
     ACCESOS: accesos.length ? accesos.map(lineaAcceso).join('\n') : '',
     FIRMA: APP.config.firma || ''
   };
@@ -8517,11 +8613,23 @@ function abrirNuevaPlantilla(){
   document.getElementById('plt-edit-uid').value='';
   document.getElementById('plt-nombre').value='';
   document.getElementById('plt-texto').value='';
+  document.getElementById('plt-texto').dataset.borradorBase='';
   document.getElementById('plt-contexto').value='general';
   document.getElementById('plt-modal-titulo').innerHTML='💬 Nueva plantilla <button class="modal-close" onclick="cerrarModal(\'modal-nueva-plantilla\')">×</button>';
   poblarServiciosPlantilla();
   document.getElementById('plt-servicio').value='todos';
   abrirModal('modal-nueva-plantilla');
+}
+function actualizarBorradorPlantillaBase(){
+  const texto = document.getElementById('plt-texto');
+  const editUID = document.getElementById('plt-edit-uid')?.value;
+  if(!texto || editUID) return;
+  const contexto = document.getElementById('plt-contexto')?.value || 'venta_nueva';
+  const srvUid = document.getElementById('plt-servicio')?.value || 'todos';
+  const base = plantillaBaseServicio(contexto, srvUid);
+  if(!base || (texto.value.trim() && texto.dataset.borradorBase !== '1')) return;
+  texto.value = base.texto;
+  texto.dataset.borradorBase = '1';
 }
 function insertVar(v){
   const ta = document.getElementById('plt-texto');
@@ -8566,10 +8674,32 @@ function guardarMensajeActualComoPlantilla(contexto, textareaId, srvUid){
   let servicio = srvUid || '';
   if(!servicio && contexto === 'venta_nueva') servicio = document.getElementById('mv-srv')?.value || 'todos';
   if(!servicio && contexto === 'renovacion') servicio = document.getElementById('ren-srv')?.value || 'todos';
-  PLANTILLAS_WA.push({uid:uid(),nombre:sanitizarTexto(nombre,80),texto,contexto:contexto||'general',srvUid:servicio||'todos'});
+  const ctx = contextoMensajeParaGuardar(textareaId);
+  const textoPlantilla = convertirMensajeEnPlantilla(texto, ctx);
+  PLANTILLAS_WA.push({uid:uid(),nombre:sanitizarTexto(nombre,80),texto:textoPlantilla,contexto:contexto||'general',srvUid:servicio||'todos'});
   renderPlantillas();
   sincronizarConSheets();
-  alert('✅ Subplantilla guardada para este producto.');
+  alert('✅ Subplantilla guardada con variables para este producto.');
+}
+function contextoMensajeParaGuardar(textareaId){
+  if(textareaId === 'mv-wa-texto') return mvContextoFormulario().ctx;
+  if(textareaId === 'post-wa-texto'){
+    const ventaUid = document.getElementById('modal-mensaje-wa')?.dataset.ventaUid;
+    const venta = APP.ventas.find(v => v.uid === ventaUid);
+    if(venta) return ctxMensajeVenta(venta);
+  }
+  return {};
+}
+function convertirMensajeEnPlantilla(texto, ctx){
+  let resultado = String(texto || '');
+  const variables = ['FIRMA','ACCESOS','INVITACION','CLIENTE','SERVICIO','VENCE','PRECIO','CUENTA','CORREO','PASS','PERFIL','PIN']
+    .map(nombre => ({nombre, valor:resolverPlantilla('[' + nombre + ']', ctx)}))
+    .filter(item => item.valor && !/^\[.+\]$/.test(item.valor))
+    .sort((a,b) => String(b.valor).length - String(a.valor).length);
+  variables.forEach(({nombre, valor}) => {
+    resultado = resultado.split(valor).join('[' + nombre + ']');
+  });
+  return resultado;
 }
 function eliminarPlantilla(puid){
   if(!confirm('¿Eliminar esta plantilla?')) return;
@@ -9439,6 +9569,8 @@ async function sincronizarManual(){
 }
 async function cerrarSesion(){
   if(!confirm('¿Cerrar sesión? Tendrás que ingresar correo, contraseña y PIN nuevamente.')) return;
+  detenerTiempoInactividad();
+  sessionStorage.removeItem(AUTH_MARCADOR_SESION);
   _pinVerificado = false;
   _pinGuardado = '';
   _pinIngresado = '';
@@ -9589,6 +9721,7 @@ function normalizarEmojisCatalogo(){
 
 function sanearMojibakeDatos(){
   sanearMojibakeEnObjeto(APP);
+  normalizarFirmaDanada();
   sanearMojibakeEnObjeto(CATALOGO_CATEGORIAS);
   sanearMojibakeEnObjeto(CATALOGO_SERVICIOS);
   sanearMojibakeEnObjeto(CATALOGO_CAT_GASTOS);
