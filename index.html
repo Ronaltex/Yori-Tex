@@ -2555,19 +2555,32 @@ function requierePinSegundoFactor(){
 }
 function continuarDespuesCorreo(){
   const pin = document.getElementById('pin-screen');
-  let pinGuardado = '';
-  try { pinGuardado = JSON.parse(localStorage.getItem('yoritex_local') || '{}')._pin || ''; } catch(e){}
-  if(pinGuardado){
-    _pinIngresado = pinGuardado;
-    if(pin) pin.style.display = 'none';
-    pinVerificar();
-    return;
-  }
-  // El PIN deja de ser una pantalla de acceso. En instalaciones antiguas se
-  // conserva internamente para no cortar la sincronización existente.
-  _pinVerificado = true;
-  _pinIngresado = '';
   if(pin) pin.style.display = 'none';
+  _pinVerificado = false;
+  _pinGuardado = '';
+  _pinIngresado = '';
+  cargarSesionConCorreo();
+}
+async function cargarSesionConCorreo(){
+  // No se habilita ningún guardado hasta recibir los datos de Google Sheets.
+  mostrarSync('🔄', 'Cargando tus datos...', 'Sincronizando con Google Sheets');
+  try{
+    const res = await apiCall({accion:'cargar', pin:''}, 60000);
+    if(!res?.ok || !res.data) throw new Error(res?.error || 'No se pudieron cargar los datos.');
+    cargarDesdeSheets(res.data);
+    _firmaNube = firmaDatos(res.data);
+    _ultimaSync = Date.now();
+    _pinVerificado = true;
+    setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
+    iniciarAutoSync();
+  }catch(err){
+    _pinVerificado = false;
+    const error = document.getElementById('auth-error');
+    if(error) error.textContent = 'No se cargaron los datos. No se guardó ningún cambio.';
+    mostrarPantallaAuth(true);
+  }finally{
+    ocultarSync();
+  }
 }
 function detenerTiempoInactividad(){
   if(_authTimerInactividad) clearTimeout(_authTimerInactividad);
