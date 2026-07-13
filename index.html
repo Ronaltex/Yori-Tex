@@ -1311,7 +1311,7 @@ body::after{
   </div>
   <div class="sec">Caja disponible</div>
   <div class="kpi-grid">
-    <div class="kpi amarillo"><div class="kl">Binance USDT</div><div class="kv" id="d-caja-usdt">0.00 USDT</div><div class="ksub" id="d-caja-usdt-usd">≈ $0.00</div></div>
+    <div class="kpi amarillo" style="display:none"><div class="kl">Binance USDT</div><div class="kv" id="d-caja-usdt">0.00 USDT</div><div class="ksub" id="d-caja-usdt-usd">≈ $0.00</div></div>
     <div class="kpi verde"><div class="kl">Banco / Transferencia</div><div class="kv" id="d-caja-banco">$0</div><div class="ksub" id="d-caja-banco-s">cobros - salidas</div></div>
     <div class="kpi azul"><div class="kl">Efectivo</div><div class="kv" id="d-caja-efectivo">$0</div><div class="ksub" id="d-caja-efectivo-s">cobros - salidas</div></div>
     <div class="kpi morado"><div class="kl">Otros medios</div><div class="kv" id="d-caja-otros">$0</div><div class="ksub" id="d-caja-otros-s">Deuna / tarjeta / otros</div></div>
@@ -1371,8 +1371,8 @@ body::after{
     <div class="page-title">Costos</div>
     <button class="btn btn-primary" style="width:auto;padding:9px 16px;font-size:13px" onclick="abrirNuevoCosto()">＋ Gasto</button>
   </div>
-  <div class="page-sub">Gastos y Binance FIFO</div>
-  <div class="saldo-box">
+  <div class="page-sub">Gastos registrados por método de pago</div>
+  <div class="saldo-box" style="display:none">
     <div><div class="sl">💱 Saldo Binance disponible</div><div class="sv" id="saldo-usdt">0.00 USDT</div><div class="ss" id="saldo-usd">≈ $0.00 USD</div></div>
     <button class="btn btn-ghost" style="width:auto;padding:8px 12px;font-size:12px;border-color:var(--yellow-border);color:var(--yellow)" onclick="abrirModal('modal-recarga-binance')">＋ Recarga P2P</button>
   </div>
@@ -1413,8 +1413,8 @@ body::after{
   <div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-bottom:6px" id="kpi-cats-grid"></div>
   <div class="filters" id="costos-filtros" style="display:none"></div>
   <div class="card" id="costos-lista"><div class="empty"><div class="e-ico">💸</div><div>Sin gastos registrados</div></div></div>
-  <div class="sec">Historial Binance P2P</div>
-  <div id="bin-historial"><div class="empty"><div class="e-ico">🟡</div><div>Sin recargas</div></div></div>
+  <div class="sec" style="display:none">Historial Binance P2P</div>
+  <div id="bin-historial" style="display:none"><div class="empty"><div class="e-ico">🟡</div><div>Sin recargas</div></div></div>
 </div>
 
 <!-- CONFIG -->
@@ -1568,7 +1568,7 @@ body::after{
     </div>
       <div class="cfg-row" onclick="exportarCSV('ventas')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--green-bg)">📋</div><div><div class="cfg-label">Ventas a Excel (CSV)</div><div class="cfg-sub">Registro completo de ventas</div></div></div><div class="cfg-arrow">›</div></div>
       <div class="cfg-row" onclick="exportarCSV('inventario')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--blue-bg)">📦</div><div><div class="cfg-label">Inventario a Excel (CSV)</div><div class="cfg-sub">Cuentas, cupos y clientes</div></div></div><div class="cfg-arrow">›</div></div>
-      <div class="cfg-row" onclick="exportarCSV('costos')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--red-bg)">💸</div><div><div class="cfg-label">Costos a Excel (CSV)</div><div class="cfg-sub">Historial de gastos y Binance</div></div></div><div class="cfg-arrow">›</div></div>
+      <div class="cfg-row" onclick="exportarCSV('costos')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--red-bg)">💸</div><div><div class="cfg-label">Costos a Excel (CSV)</div><div class="cfg-sub">Historial de gastos por método</div></div></div><div class="cfg-arrow">›</div></div>
     </div>
     <div class="cfg-section">
       <div class="cfg-section-title">🔒 Copia de seguridad completa</div>
@@ -2702,6 +2702,9 @@ const MESES_CORTOS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct',
 const MESES_LARGOS=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const FECHA_CORTE_NEGOCIO = '2026-06-07';
 
+// USDT se registra como gasto, sin controlar recargas ni saldo disponible.
+const USDT_CONTROL_SALDO = false;
+
 // BASE DE DATOS PRINCIPAL
 let APP = {
   ventas: [],
@@ -2734,7 +2737,7 @@ let APP = {
     fondoImagen: null,
     fondoOpacidad: 16,
     notifVenc: true,
-    notifDias: [3,1,0],
+    notifDias: [2,0],
     notifVentas: true,
     notifPagos: true,
     dominio: 'yori-tex.com',
@@ -3382,15 +3385,17 @@ document.addEventListener('click', e => {
 // NAVEGACIÓN
 // ══════════════════════════════════════
 function navIr(id, btn){
+  const screen = document.getElementById('s-' + id);
+  if(!screen) return;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const screen = document.getElementById('s-' + id);
   screen.classList.remove('screen-enter');
   screen.classList.add('active');
   void screen.offsetWidth;
   screen.classList.add('screen-enter');
   const boton = btn || [...document.querySelectorAll('.nav-item')].find(x => (x.getAttribute('onclick') || '').includes(`'${id}'`));
   if(boton) boton.classList.add('active');
+  if(id === 'registro') renderRegistro();
   if(id === 'inventario') renderInventario();
   if(id === 'vencimientos') renderVencimientos();
   if(id === 'dashboard') renderDashboard();
@@ -3565,6 +3570,9 @@ function actualizarSaldoBinance(){
 // También devuelve el desglose por lote para mostrar en pantalla.
 function calcFIFO(usdt){
   if(!usdt || usdt <= 0) return { rows:[], total:0, faltante:0 };
+  if(!USDT_CONTROL_SALDO){
+    return { rows:[], total:parseFloat(usdt), faltante:0 };
+  }
   const pool = getLotesBinanceDisponibles();
 
   // Consumir del pool FIFO
@@ -3605,6 +3613,7 @@ function calcFIFO(usdt){
 
 // Descontar USDT del saldo Binance registrando una salida con costo FIFO exacto
 function descontarUSDTBinance(usdt, concepto, cuentaUID, costoUID, fecha){
+  if(!USDT_CONTROL_SALDO) return true;
   const saldo = getSaldoBinance();
   if(saldo < usdt){
     if(!confirm(`⚠️ Saldo Binance insuficiente.\n\nSaldo actual: ${saldo.toFixed(2)} USDT\nGasto: ${usdt.toFixed(2)} USDT\nSaldo resultante: ${(saldo-usdt).toFixed(2)} USDT\n\n¿Continuar de todos modos? El saldo quedará negativo.`)){
@@ -4284,7 +4293,8 @@ function abrirNuevaVenta(){
   _mvCuentaSelUID = null;
   _mvCuentaSelUIDs = [];
   _mvInvMode = true;
-  document.getElementById('mv-wa-preview-wrap').style.display = 'none';
+  const vistaPreviaVenta = document.getElementById('mv-wa-preview-wrap');
+  if(vistaPreviaVenta) vistaPreviaVenta.style.display = 'none';
   ['mv-nombre','mv-wa','mv-precio','mv-perfil','mv-pin','mv-inv-correo','mv-notas','mv-cactus-correo','mv-cactus-pass','mv-cactus-costo'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value = '';
@@ -6620,8 +6630,8 @@ function renderCajaDisponible(){
   const egresos = sumarPorMetodoCaja(APP.egresos || [], 'monto');
   const adelantosCaja = sumarPorMetodoCaja((APP.adelantosProveedor || []).filter(a => !String(a.metodo||'').toLowerCase().includes('binance')), 'monto');
   const neto = key => (ingresos[key] || 0) - (costos[key] || 0) - (reembolsos[key] || 0) - (egresos[key] || 0) - (adelantosCaja[key] || 0);
-  const saldoUsdt = getSaldoBinance();
-  const tasa = getTasaPromBinance();
+  const saldoUsdt = USDT_CONTROL_SALDO ? getSaldoBinance() : 0;
+  const tasa = USDT_CONTROL_SALDO ? getTasaPromBinance() : 1;
   const saldoUsdtUsd = saldoUsdt * tasa;
   const banco = neto('banco');
   const efectivo = neto('efectivo');
@@ -7315,7 +7325,7 @@ function crearNotificacionLocal(tipo,titulo,cuerpo,clave,destino){
   actualizarBadgeNotificaciones();
   const segmentos = {vencimiento:'Vencimiento',cuenta:'Cuenta',inventario:'Inventario',venta:'Venta nueva',pago:'Pago',renovacion:'Renovación',reposicion:'Cuenta reemplazada',proveedor:'Proveedor',saldo_proveedor:'Proveedor'};
   mostrarNotificacionSistema(`YORI-TEX · ${segmentos[tipo] || 'Aviso'}`, `${titulo} · ${cuerpo}`, aviso.uid);
-  if(['venta','pago','renovacion','reposicion','proveedor','saldo_proveedor'].includes(tipo)) enviarAvisoExternoDesdeComputadora(aviso);
+  if(['venta','pago','renovacion','reposicion','proveedor','saldo_proveedor','vencimiento','cuenta'].includes(tipo)) enviarAvisoExternoDesdeComputadora(aviso);
 }
 function destinoDeNotificacion(n){
   if(n?.destino) return n.destino;
@@ -7465,17 +7475,17 @@ async function registrarDispositivoFirebase(){
 }
 function generarAvisosVencimientos(){
   if(!APP.config.notifVenc) return;
-  const diasCfg=Array.isArray(APP.config.notifDias)?APP.config.notifDias:[3,1,0];
+  const diasCfg=Array.isArray(APP.config.notifDias)?APP.config.notifDias:[2,0];
   (APP.ventas||[]).filter(v=>v.activa!==false&&!v.eliminadoRegistro).forEach(v=>{
     const dias=diasHasta(v.vence);
-    if(!diasCfg.includes(dias)) return;
-    const cuando=dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
+    if(!(dias < 0 || diasCfg.includes(dias))) return;
+    const cuando=dias < 0 ? `venció hace ${Math.abs(dias)} día${Math.abs(dias)===1?'':'s'}` : dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
     crearNotificacionLocal('vencimiento',`${v.srvNom||'Servicio'} ${cuando}`,`${v.cliente} · ${fmtFecha(v.vence)}`,`vence-${v.uid}-${v.vence}-${dias}`, {pantalla:'vencimientos',ventaUid:v.uid});
   });
   (APP.cuentas||[]).filter(c=>!c.archivada && c.hasta).forEach(c=>{
     const dias=diasHasta(c.hasta);
-    if(!diasCfg.includes(dias)) return;
-    const cuando=dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
+    if(!(dias < 0 || diasCfg.includes(dias))) return;
+    const cuando=dias < 0 ? `venció hace ${Math.abs(dias)} día${Math.abs(dias)===1?'':'s'}` : dias===0?'vence hoy':dias===1?'vence mañana':`vence en ${dias} días`;
     crearNotificacionLocal('cuenta',`Cuenta por renovar: ${c.srvNom||c.id||'Inventario'} ${cuando}`,`${c.id||'Cuenta'} · ${fmtFecha(c.hasta)}`,`cuenta-vence-${c.uid}-${c.hasta}-${dias}`, {pantalla:'inventario',cuentaUid:c.uid});
   });
 }
@@ -7620,6 +7630,11 @@ function costoCalcFIFO(){
   const usdt = parseFloat(document.getElementById('costo-usdt').value) || 0;
   const prev = document.getElementById('costo-fifo-preview');
   const rowsEl = document.getElementById('costo-fifo-rows');
+  if(!USDT_CONTROL_SALDO){
+    prev.style.display = 'none';
+    if(rowsEl) rowsEl.innerHTML = '';
+    return;
+  }
   if(!usdt){ prev.style.display = 'none'; return; }
 
   const fifo = calcFIFO(usdt);
@@ -8225,7 +8240,7 @@ function renderConfig(){
   document.getElementById('cfg-wa').value = APP.config.wa || '';
   if(document.getElementById('notif-venc')) document.getElementById('notif-venc').checked = APP.config.notifVenc !== false;
   if(document.getElementById('notif-ventas')) document.getElementById('notif-ventas').checked = APP.config.notifVentas !== false;
-  if(document.getElementById('notif-dias')) document.getElementById('notif-dias').value = (APP.config.notifDias || [3,1,0]).join(', ');
+  if(document.getElementById('notif-dias')) document.getElementById('notif-dias').value = (APP.config.notifDias || [2,0]).join(', ');
   if(document.getElementById('cfg-pin-segundo')) document.getElementById('cfg-pin-segundo').checked = APP.config.pinSegundoFactor !== false;
   if(document.getElementById('cfg-dominio')) document.getElementById('cfg-dominio').value = APP.config.dominio || 'yori-tex.com';
   if(document.getElementById('cfg-correo-admin')) document.getElementById('cfg-correo-admin').value = APP.config.correoAdmin || '';
@@ -8400,7 +8415,7 @@ function guardarConfig(){
     fondoImagen: APP.config.fondoImagen || null,
     notifVenc: document.getElementById('notif-venc').checked,
     notifVentas: document.getElementById('notif-ventas')?.checked !== false,
-    notifDias: (document.getElementById('notif-dias')?.value || '3,1,0').split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>=0&&x<=30),
+    notifDias: (document.getElementById('notif-dias')?.value || '2,0').split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>=0&&x<=30),
     dominio: 'yori-tex.com',
     appUrl: urlPublicaActual(),
     correoAdmin: sanitizarTexto(document.getElementById('cfg-correo-admin')?.value || '',200),
@@ -9734,6 +9749,11 @@ function repararMojibakeManual(txt){
 function repararMojibakeTexto(txt){
   if(typeof txt !== 'string') return txt;
   txt = txt.normalize('NFC');
+  // Errores ya guardados en catálogos conocidos: aquí sí es seguro restaurarlos.
+  txt = txt
+    .replace(/Dise(?:\uFFFD)+o/gi, m => m[0] === 'd' ? 'diseño' : 'Diseño')
+    .replace(/Configuraci(?:\uFFFD)+n/gi, m => m[0] === 'c' ? 'configuración' : 'Configuración')
+    .replace(/Renovaci(?:\uFFFD)+n/gi, m => m[0] === 'r' ? 'renovación' : 'Renovación');
   if(!new RegExp('[\\u00c3\\u00c2\\u00e2\\u00f0\\u00ef]').test(txt)) return txt;
   try {
     const cp1252 = {
@@ -9798,10 +9818,18 @@ function normalizarEmojisCatalogo(){
   CATALOGO_CATEGORIAS.forEach(c => { if(catEmoji[c.uid]) c.emoji = catEmoji[c.uid]; });
   CATALOGO_SERVICIOS.forEach(s => { if(srvEmoji[s.uid]) s.emoji = srvEmoji[s.uid]; });
   CATALOGO_CAT_GASTOS.forEach(g => { if(gastoEmoji[g.uid]) g.emoji = gastoEmoji[g.uid]; });
+  const categoriaDiseno = CATALOGO_CATEGORIAS.find(c => c.uid === 'cat-diseno');
+  if(categoriaDiseno){
+    categoriaDiseno.nombre = 'Diseño';
+    categoriaDiseno.desc = 'Plataformas de diseño y creatividad';
+  }
 }
 
 function sanearMojibakeDatos(){
   sanearMojibakeEnObjeto(APP);
+  if(Array.isArray(APP.config?.notifDias) && APP.config.notifDias.join(',') === '3,1,0'){
+    APP.config.notifDias = [2,0];
+  }
   normalizarFirmaDanada();
   sanearMojibakeEnObjeto(CATALOGO_CATEGORIAS);
   sanearMojibakeEnObjeto(CATALOGO_SERVICIOS);
