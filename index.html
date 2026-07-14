@@ -4579,12 +4579,9 @@ function mvCalcVence(){
 function enviarWA(numero, msg){
   const wa = String(numero).replace(/\D/g,'');
   if(!wa){ alert('Número de WhatsApp no disponible'); return; }
-  const mensajeOriginal = String(msg || '');
-  if(mensajeOriginal.includes('\uFFFD')){
-    alert('Este mensaje contiene un carácter dañado. Corrige el nombre o dato del cliente en Editar venta antes de enviarlo.');
-    return;
-  }
-  const texto = repararMojibakeTexto(mensajeOriginal).normalize('NFC');
+  // Un registro antiguo puede traer el carácter de reemplazo. Nunca debe impedir
+  // enviar un mensaje; la limpieza conserva el resto del texto legible.
+  const texto = limpiarTextoParaMensaje(msg).normalize('NFC');
   const enlace = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(texto);
   const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if(esMovil){ window.open(enlace, '_blank'); return; }
@@ -4649,8 +4646,10 @@ function accesosDeVentaParaMensaje(v){
   return (cuenta.correo || v.correo) ? [{cuenta:{...cuenta,correo:cuenta.correo || v.correo},cupoIdx:v.cupoIdx,perfil:v.perfil||'',pin:v.pin||''}] : [];
 }
 function ctxMensajeVenta(v){
+  const srv = getSrv(v.srvUid);
   return {
-    cliente:v.cliente || 'Cliente', servicio:v.srvNom || getSrv(v.srvUid)?.nombre || 'Servicio',
+    cliente:limpiarTextoParaMensaje(v.cliente || 'Cliente'),
+    servicio:srv ? `${srv.emoji} ${srv.nombre}` : limpiarTextoParaMensaje(v.srvNom || 'Servicio'),
     vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
     perfil:v.perfil || '', pin:v.pin || '', invitacion:v.invCorreo || '', enviarPass:!!v.enviarPass,
     accesos:accesosDeVentaParaMensaje(v)
@@ -9746,14 +9745,32 @@ function repararMojibakeManual(txt){
   return txt;
 }
 
+function limpiarTextoParaMensaje(txt){
+  return repararMojibakeTexto(String(txt || ''))
+    // El carácter de reemplazo ya no contiene la letra original. Se retira para
+    // que WhatsApp pueda abrirse; los casos frecuentes se restauran antes.
+    .replace(/\uFFFD+/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function repararMojibakeTexto(txt){
   if(typeof txt !== 'string') return txt;
   txt = txt.normalize('NFC');
-  // Errores ya guardados en catálogos conocidos: aquí sí es seguro restaurarlos.
+  // Errores ya guardados y frecuentes: aquí sí es seguro restaurarlos.
   txt = txt
     .replace(/Dise(?:\uFFFD)+o/gi, m => m[0] === 'd' ? 'diseño' : 'Diseño')
     .replace(/Configuraci(?:\uFFFD)+n/gi, m => m[0] === 'c' ? 'configuración' : 'Configuración')
-    .replace(/Renovaci(?:\uFFFD)+n/gi, m => m[0] === 'r' ? 'renovación' : 'Renovación');
+    .replace(/Renovaci(?:\uFFFD)+n/gi, m => m[0] === 'r' ? 'renovación' : 'Renovación')
+    .replace(/\bAndr\uFFFDs\b/gi, m => m[0] === 'a' ? 'andrés' : 'Andrés')
+    .replace(/\bJos\uFFFD\b/gi, m => m[0] === 'j' ? 'josé' : 'José')
+    .replace(/\bMar\uFFFDa\b/gi, m => m[0] === 'm' ? 'maría' : 'María')
+    .replace(/\bS\uFFFDnchez\b/gi, m => m[0] === 's' ? 'sánchez' : 'Sánchez')
+    .replace(/\bGonz\uFFFDlez\b/gi, m => m[0] === 'g' ? 'gonzález' : 'González')
+    .replace(/\bRodr\uFFFDguez\b/gi, m => m[0] === 'r' ? 'rodríguez' : 'Rodríguez');
+  // Cuando no se puede saber la letra perdida, es preferible ocultar el símbolo
+  // roto antes que mostrarlo en toda la aplicación o copiarlo a WhatsApp.
+  txt = txt.replace(/\uFFFD+/g, '');
   if(!new RegExp('[\\u00c3\\u00c2\\u00e2\\u00f0\\u00ef]').test(txt)) return txt;
   try {
     const cp1252 = {
@@ -9837,6 +9854,19 @@ function sanearMojibakeDatos(){
   sanearMojibakeEnObjeto(PLANTILLAS_WA);
   normalizarPlantillasDanadas();
   normalizarEmojisCatalogo();
+  normalizarServiciosDeRegistros();
+}
+
+function normalizarServiciosDeRegistros(){
+  const normalizar = registro => {
+    if(!registro || !registro.srvUid) return;
+    const srv = getSrv(registro.srvUid);
+    // srvUid es la fuente fiable. Evita que un nombre guardado con "??" o emojis
+    // corruptos vuelva a aparecer en ventas, vencimientos y mensajes.
+    if(srv) registro.srvNom = `${srv.emoji} ${srv.nombre}`;
+  };
+  (APP.ventas || []).forEach(normalizar);
+  (APP.cuentas || []).forEach(normalizar);
 }
 function repararMojibakeDOM(root){
   root = root || document.body;
