@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v13-20260714-texto-limpio';
+const CACHE_NAME = 'yoritex-v15-20260714-texto-preservado';
 const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',

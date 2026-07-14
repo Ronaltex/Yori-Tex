@@ -4647,9 +4647,10 @@ function accesosDeVentaParaMensaje(v){
 }
 function ctxMensajeVenta(v){
   const srv = getSrv(v.srvUid);
+  const servicioGuardado = limpiarTextoParaMensaje(v.srvNom || '').replace(/^\?+\s*/, '');
   return {
     cliente:limpiarTextoParaMensaje(v.cliente || 'Cliente'),
-    servicio:srv ? `${srv.emoji} ${srv.nombre}` : limpiarTextoParaMensaje(v.srvNom || 'Servicio'),
+    servicio:servicioGuardado || (srv ? `${srv.emoji} ${srv.nombre}` : 'Servicio'),
     vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
     perfil:v.perfil || '', pin:v.pin || '', invitacion:v.invCorreo || '', enviarPass:!!v.enviarPass,
     accesos:accesosDeVentaParaMensaje(v)
@@ -9832,9 +9833,31 @@ function normalizarEmojisCatalogo(){
     'cg-cuentas':'📦', 'cg-publicidad':'📣', 'cg-suscripcion':'🔧',
     'cg-operativo':'🏧', 'cg-otro':'📌'
   };
-  CATALOGO_CATEGORIAS.forEach(c => { if(catEmoji[c.uid]) c.emoji = catEmoji[c.uid]; });
-  CATALOGO_SERVICIOS.forEach(s => { if(srvEmoji[s.uid]) s.emoji = srvEmoji[s.uid]; });
-  CATALOGO_CAT_GASTOS.forEach(g => { if(gastoEmoji[g.uid]) g.emoji = gastoEmoji[g.uid]; });
+  const catNombre = {
+    'cat-streaming':'Streaming', 'cat-herramienta':'Herramienta / IA',
+    'cat-diseno':'Diseño', 'cat-nube':'Nube / Almacenamiento',
+    'cat-iptv':'IPTV', 'cat-otros':'Otros'
+  };
+  const srvNombre = {
+    'srv-netflix':'Netflix', 'srv-spotify':'Spotify Familiar', 'srv-disney':'Disney+',
+    'srv-hbo':'Max (HBO)', 'srv-chatgpt':'ChatGPT Plus', 'srv-capcut':'CapCut Pro',
+    'srv-canva':'Canva Pro (Equipos)', 'srv-google-one':'Google One', 'srv-iptv':'IPTV General'
+  };
+  const gastoNombre = {
+    'cg-cuentas':'Adquisición de cuentas', 'cg-publicidad':'Publicidad',
+    'cg-suscripcion':'Suscripción herramienta', 'cg-operativo':'Operativo', 'cg-otro':'Otro'
+  };
+  // Estos IDs son internos y estables. Siempre ganan sobre un nombre viejo dañado
+  // que venga desde Google Sheets, incluyendo los casos que muestran "??".
+  CATALOGO_CATEGORIAS.forEach(c => { if(catEmoji[c.uid]) c.emoji = catEmoji[c.uid]; if(catNombre[c.uid]) c.nombre = catNombre[c.uid]; });
+  CATALOGO_SERVICIOS.forEach(s => {
+    if(srvEmoji[s.uid]) s.emoji = srvEmoji[s.uid];
+    const nombreLimpio = limpiarTextoParaMensaje(s.nombre || '').replace(/^\?+\s*/, '');
+    // Conserva variantes reales como "Spotify PREMIUM"; usa el estándar solo
+    // cuando el nombre no se puede aprovechar en absoluto.
+    s.nombre = nombreLimpio || srvNombre[s.uid] || s.nombre;
+  });
+  CATALOGO_CAT_GASTOS.forEach(g => { if(gastoEmoji[g.uid]) g.emoji = gastoEmoji[g.uid]; if(gastoNombre[g.uid]) g.nombre = gastoNombre[g.uid]; });
   const categoriaDiseno = CATALOGO_CATEGORIAS.find(c => c.uid === 'cat-diseno');
   if(categoriaDiseno){
     categoriaDiseno.nombre = 'Diseño';
@@ -9863,7 +9886,10 @@ function normalizarServiciosDeRegistros(){
     const srv = getSrv(registro.srvUid);
     // srvUid es la fuente fiable. Evita que un nombre guardado con "??" o emojis
     // corruptos vuelva a aparecer en ventas, vencimientos y mensajes.
-    if(srv) registro.srvNom = `${srv.emoji} ${srv.nombre}`;
+    if(srv){
+      const nombreGuardado = limpiarTextoParaMensaje(registro.srvNom || '').replace(/^\?+\s*/, '');
+      registro.srvNom = `${srv.emoji} ${nombreGuardado || srv.nombre}`;
+    }
   };
   (APP.ventas || []).forEach(normalizar);
   (APP.cuentas || []).forEach(normalizar);
