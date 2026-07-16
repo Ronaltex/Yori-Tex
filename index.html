@@ -2558,18 +2558,39 @@ function continuarDespuesCorreo(){
   cargarSesionConCorreo();
 }
 async function cargarSesionConCorreo(){
-  // No se habilita ningún guardado hasta recibir los datos de Google Sheets.
+  // La carga de la nube no puede impedir el acceso: primero protegemos lo local.
   mostrarSync('🔄', 'Cargando tus datos...', 'Sincronizando con Google Sheets');
+  const pendienteLocal = leerPendienteSync();
+  let pendienteEnviado = false;
   try{
-    const pendienteLocal = leerPendienteSync();
     if(pendienteLocal?.data){
       const sub = document.getElementById('sync-sub');
       if(sub) sub.textContent = 'Recuperando cambios pendientes de este dispositivo';
-      await apiCall({accion:'guardar', pin:'', data:pendienteLocal.data}, 60000);
-      limpiarPendienteSync();
+      try {
+        await apiCall({accion:'guardar', pin:'', data:pendienteLocal.data}, 120000);
+        limpiarPendienteSync();
+        pendienteEnviado = true;
+      } catch(errPendiente) {
+        // La nube puede estar lenta o caída. Conservamos el cambio y continuamos.
+        _ultimoErrorSync = errPendiente?.message || 'No se pudo recuperar el cambio pendiente.';
+      }
     }
-    const res = await apiCall({accion:'cargar', pin:''}, 60000);
+    const res = await apiCall({accion:'cargar', pin:''}, 120000);
     if(!res?.ok || !res.data) throw new Error(res?.error || 'No se pudieron cargar los datos.');
+    if(pendienteLocal?.data && !pendienteEnviado){
+      // No sobrescribir la versión local más reciente con una nube anterior.
+      cargarDesdeSheets(pendienteLocal.data);
+      guardarLocal(pendienteLocal.data);
+      _syncPendiente = pendienteLocal.data;
+      _syncDirty = true;
+      guardarPendienteSync(pendienteLocal.data);
+      _firmaNube = firmaDatos(res.data);
+      _pinVerificado = true;
+      setSyncStatus('Cambios locales pendientes', 'warn');
+      iniciarAutoSync();
+      setTimeout(() => procesarColaSync(), 1500);
+      return;
+    }
     cargarDesdeSheets(res.data);
     _firmaNube = firmaDatos(res.data);
     _ultimaSync = Date.now();
@@ -2577,10 +2598,26 @@ async function cargarSesionConCorreo(){
     setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
     iniciarAutoSync();
   }catch(err){
-    _pinVerificado = false;
-    const error = document.getElementById('auth-error');
-    if(error) error.textContent = 'No se pudo conectar con Google Sheets. Los cambios pendientes de este dispositivo siguen guardados y se recuperarán al volver a entrar.';
-    mostrarPantallaAuth(true);
+    // Si Sheets falla, entrar con la última copia local y reintentar después.
+    let localData = pendienteLocal?.data || null;
+    if(!localData){
+      try { localData = JSON.parse(localStorage.getItem('yoritex_local') || 'null')?.data || null; } catch(e) {}
+    }
+    if(localData){
+      cargarDesdeSheets(localData);
+      _syncPendiente = localData;
+      _syncDirty = true;
+      guardarPendienteSync(localData);
+      _pinVerificado = true;
+      setSyncStatus('Modo local · reintentando nube', 'warn');
+      iniciarAutoSync();
+      setTimeout(() => procesarColaSync(), 1500);
+    } else {
+      _pinVerificado = false;
+      const error = document.getElementById('auth-error');
+      if(error) error.textContent = 'No se pudo cargar la nube y todavía no hay una copia local disponible. Revisa internet e intenta otra vez.';
+      mostrarPantallaAuth(true);
+    }
   }finally{
     ocultarSync();
   }
@@ -9178,7 +9215,7 @@ async function _verificarYActualizarDesdeSheets(){
 // ══════════════════════════════════════
 async function apiCall(body, timeoutMs){
   const accion = body && body.accion;
-  const limite = timeoutMs || (accion === 'cargar' ? 60000 : 45000);
+  const limite = timeoutMs || (accion === 'cargar' ? 120000 : 120000);
   let ultimoError = null;
   for(let intento=1; intento<=3; intento++){
     const controller = new AbortController();
@@ -9436,7 +9473,7 @@ async function _sincronizarBackground(payload){
   const ind = document.getElementById('sync-indicador');
   if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
   try {
-    await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 45000);
+    await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 120000);
     if(!_syncPendiente) limpiarPendienteSync();
     _syncDirty = !!_syncPendiente;
     _ultimaSync = Date.now();
