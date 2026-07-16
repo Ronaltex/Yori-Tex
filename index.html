@@ -2139,7 +2139,14 @@ body::after{
     <div class="divider"></div>
     <div class="sec">Datos del reembolso</div>
     <div class="row2">
-      <div class="field"><label>Monto reembolso ($)</label><input type="number" id="cc-rem-monto" placeholder="0.00" step="0.01"/></div>
+      <div class="field"><label>Reembolso calculado ($)</label><input type="number" id="cc-rem-calculado" placeholder="0.00" step="0.01" readonly/></div>
+      <div class="field"><label>Monto final reconocido ($)</label><input type="number" id="cc-rem-monto" placeholder="0.00" step="0.01" oninput="this.dataset.auto='false';ccActualizarReembolso()"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Estado del reembolso</label><select id="cc-rem-estado" onchange="ccActualizarReembolso()"><option value="pendiente">Pendiente</option><option value="parcial">Pagado parcial</option><option value="pagado">Pagado</option></select></div>
+      <div class="field"><label>Monto pagado ($)</label><input type="number" id="cc-rem-pagado" placeholder="0.00" step="0.01"/></div>
+    </div>
+    <div class="row2">
       <div class="field"><label>Método de pago</label>
         <select id="cc-rem-metodo">
           <option value="Efectivo">💵 Efectivo</option>
@@ -2166,10 +2173,18 @@ body::after{
       <input type="radio" name="cc-repo-tipo" value="nueva" onchange="ccToggleRepo()">
       <div><div class="ro-title">🆕 Cuenta nueva</div><div class="ro-sub">Comprarás/asignarás una cuenta nueva</div></div>
     </label>
+    <label class="radio-opt">
+      <input type="radio" name="cc-repo-tipo" value="nueva_credito" onchange="ccToggleRepo()">
+      <div><div class="ro-title">🧾 Cuenta nueva con crédito</div><div class="ro-sub">Nuevo plazo desde cero, descontando los días no usados</div></div>
+    </label>
 
     <!-- REPOSICIÓN DESDE INVENTARIO -->
     <div id="cc-repo-inv-bloque">
       <div class="field" style="margin-top:10px"><label>Seleccionar cuenta del inventario</label>
+        <div class="row2">
+          <select id="cc-repo-cat-sel" onchange="ccRepoActProductos()"><option value="">— Categoría —</option></select>
+          <select id="cc-repo-srv-sel" onchange="ccRepoActCuentas()"><option value="">— Producto —</option></select>
+        </div>
         <select id="cc-repo-cuenta-sel" onchange="ccSelCuentaRepo()">
           <option value="">— Selecciona cuenta —</option>
         </select>
@@ -2179,6 +2194,20 @@ body::after{
           <select id="cc-repo-cupo-sel"><option value="">— Selecciona cupo —</option></select>
         </div>
       </div>
+      <div class="field">
+        <label>Vigencia que recibirá el cliente</label>
+        <select id="cc-repo-vigencia" onchange="ccActualizarVigenciaReposicion()">
+          <option value="original">Conservar los días que faltaban</option>
+          <option value="extra">Conservar + días de cortesía</option>
+          <option value="reiniciar">Reiniciar plazo desde hoy</option>
+          <option value="manual">Elegir fecha manual</option>
+        </select>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Días extra / nuevo plazo</label><input type="number" id="cc-repo-dias" min="0" step="1" placeholder="0" oninput="ccActualizarVigenciaReposicion()"/></div>
+        <div class="field"><label>Fecha final del cliente</label><input type="date" id="cc-repo-vence-final" onchange="ccActualizarVigenciaReposicion()"/></div>
+      </div>
+      <div id="cc-repo-resumen" class="aviso">Selecciona el cliente y la cuenta para calcular la nueva vigencia.</div>
       <div class="row2">
         <div class="field"><label>Costo de reposición ($) <span style="font-size:10px;color:var(--text3)">(lo que pagaste)</span></label>
           <input type="number" id="cc-repo-costo" placeholder="0.00" step="0.01"/>
@@ -2204,6 +2233,7 @@ body::after{
       </div>
       <div class="field"><label>N° cupos de la nueva cuenta</label><input type="number" id="cc-repo-cupos" placeholder="5" min="1" max="30" value="5"/></div>
       <div class="row2">
+        <div class="field"><label>Precio nuevo período ($)</label><input type="number" id="cc-repo-nuevo-precio" placeholder="Usar precio anterior" step="0.01"/></div>
         <div class="field"><label>Costo de la nueva cuenta ($)</label><input type="number" id="cc-repo-nueva-costo" placeholder="0.00" step="0.01"/></div>
         <div class="field"><label>Método pago</label>
           <select id="cc-repo-nueva-metodo">
@@ -2223,12 +2253,15 @@ body::after{
   </div>
 
   <div class="divider"></div>
-  <div class="field"><label>¿A qué cliente/venta aplica? <span style="font-size:11px;color:var(--text3)">(opcional — para reembolso por cliente)</span></label>
-    <select id="cc-venta-sel">
+  <div class="field"><label>Cliente/venta afectado <span style="font-size:11px;color:var(--text3)">(obligatorio para reponer; opcional para reembolsar a todos)</span></label>
+    <select id="cc-venta-sel" onchange="ccActualizarReembolso();ccActualizarVigenciaReposicion()">
       <option value="">— Todos los clientes de esta cuenta —</option>
     </select>
   </div>
-  <button class="btn btn-red" style="margin-bottom:8px" onclick="ccGuardar()">⚡ Registrar cuenta caída</button>
+  <div class="row2">
+    <button class="btn btn-red" onclick="ccGuardar(true)">⚡ Guardar y preparar mensaje</button>
+    <button class="btn btn-navy" onclick="ccGuardar(false)">Guardar sin mensaje</button>
+  </div>
 </div>
 </div>
 
@@ -4092,6 +4125,7 @@ function evSelCuentaInv(){
     }
   });
   cupoWrap.style.display = 'block';
+  ccActualizarVigenciaReposicion();
 }
 function abrirEditarVenta(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
@@ -4659,7 +4693,9 @@ function plantillaBaseServicio(contexto, srvUid){
   const textos = {
     venta_nueva: '¡Hola [CLIENTE]! 👋\n\nTu acceso a *[SERVICIO]* está listo ✅\n\n' + datosAcceso + '\n\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
     renovacion: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + (srv.tieneInvitacion ? datosAcceso + '\n\n' : '') + '📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
-    vencimiento: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]'
+    vencimiento: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]',
+    cuenta_caida: 'Hola [CLIENTE] 👋\n\nTu acceso de *[SERVICIO]* fue reemplazado correctamente.\n\n[ACCESOS]\n📅 Nuevo vencimiento: [VENCE]\n[DIAS_CORTESIA]\n\n[FIRMA]',
+    reembolso: 'Hola [CLIENTE] 👋\n\nLamento el inconveniente con tu acceso de *[SERVICIO]*.\n\nReembolso calculado: *$[REEMBOLSO_CALCULADO]*\nMonto reconocido: *$[REEMBOLSO]*\nEstado: *[REEMBOLSO_ESTADO]*\n\n[FIRMA]'
   };
   const texto = textos[contexto] || textos.venta_nueva;
   return {uid:'base-' + contexto + '-' + srvUid, nombre:'Base automática', texto, contexto, srvUid, baseDinamica:true};
@@ -4692,18 +4728,20 @@ function accesosDeVentaParaMensaje(v){
   const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID) || {};
   return (cuenta.correo || v.correo) ? [{cuenta:{...cuenta,correo:cuenta.correo || v.correo},cupoIdx:v.cupoIdx,perfil:v.perfil||'',pin:v.pin||''}] : [];
 }
-function ctxMensajeVenta(v){
+function ctxMensajeVenta(v, extra={}){
   const srv = getSrv(v.srvUid);
   return {
     cliente:limpiarTextoParaMensaje(v.cliente || 'Cliente'),
     servicio:nombreServicioLimpio(v.srvNom || '', srv),
     vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
     perfil:v.perfil || '', pin:v.pin || '', invitacion:v.invCorreo || '', enviarPass:!!v.enviarPass,
-    accesos:accesosDeVentaParaMensaje(v)
+    accesos:accesosDeVentaParaMensaje(v), ...extra
   };
 }
 function mensajeAutomatico(contexto, ctx){
   if(contexto === 'renovacion') return `¡Hola ${ctx.cliente}! 👋\n\nTu servicio *${ctx.servicio}* fue renovado correctamente ✅\n\n📅 Nuevo vencimiento: ${ctx.vence}\n💵 Monto: $${ctx.precio}\n\n${APP.config.firma || ''}`;
+  if(contexto === 'reembolso') return `Hola ${ctx.cliente} 👋\n\nLamento el inconveniente con tu acceso de *${ctx.servicio}*.\n\nReembolso calculado: $${ctx.reembolsoCalculado || '0.00'}\nMonto reconocido: $${ctx.reembolso || '0.00'}\nEstado: ${ctx.reembolsoEstado || 'Pendiente'}\n\n${APP.config.firma || ''}`;
+  if(contexto === 'cuenta_caida') return `Hola ${ctx.cliente} 👋\n\nTu acceso de *${ctx.servicio}* fue reemplazado correctamente.\n\n📅 Nuevo vencimiento: ${ctx.vence}\n${ctx.diasCortesia ? '🎁 Días extra por cortesía: '+ctx.diasCortesia+'\n' : ''}\n${APP.config.firma || ''}`;
   return `¡Hola ${ctx.cliente}! 👋\n\nTu acceso de *${ctx.servicio}* está listo ✅\n\n📅 Vence: ${ctx.vence}\n💵 Monto: $${ctx.precio}\n\n${APP.config.firma || ''}`;
 }
 function resolverMensajeSeleccionado(contexto, srvUid, selectId, ctx){
@@ -6320,6 +6358,7 @@ function abrirMensajeEntregaVenta(ventaUid){
 }
 function mostrarMensajePostVenta(v, contexto){
   if(!v) return;
+  document.getElementById('modal-mensaje-wa').dataset.ccExtra = '';
   document.getElementById('post-wa-numero').value = v.wa || '';
   document.getElementById('post-wa-contexto').value = contexto;
   document.getElementById('post-wa-servicio').value = v.srvUid || '';
@@ -6328,12 +6367,24 @@ function mostrarMensajePostVenta(v, contexto){
   document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v));
   abrirModal('modal-mensaje-wa');
 }
+function mostrarMensajeCuentaCaida(v, contexto, extra={}){
+  if(!v || !v.wa){ alert('El registro se guardó, pero falta el WhatsApp del cliente para preparar el mensaje.'); return; }
+  const modal=document.getElementById('modal-mensaje-wa');
+  modal.dataset.ventaUid=v.uid||''; modal.dataset.ccExtra=JSON.stringify(extra||{});
+  document.getElementById('post-wa-numero').value=v.wa||'';
+  document.getElementById('post-wa-contexto').value=contexto;
+  document.getElementById('post-wa-servicio').value=v.srvUid||'';
+  llenarSelectPlantillas('post-wa-plantilla',contexto,v.srvUid||'');
+  document.getElementById('post-wa-texto').value=resolverMensajeSeleccionado(contexto,v.srvUid||'','post-wa-plantilla',ctxMensajeVenta(v,extra));
+  abrirModal('modal-mensaje-wa');
+}
 function postActualizarMensajePlantilla(){
   const uidVenta = document.getElementById('modal-mensaje-wa').dataset.ventaUid;
   const v = APP.ventas.find(x => x.uid === uidVenta);
   if(!v) return;
   const contexto = document.getElementById('post-wa-contexto').value;
-  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v));
+  let extra={}; try{extra=JSON.parse(document.getElementById('modal-mensaje-wa').dataset.ccExtra||'{}');}catch(e){}
+  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v,extra));
 }
 function postEnviarWA(){
   enviarWA(document.getElementById('post-wa-numero').value, document.getElementById('post-wa-texto').value);
@@ -7127,23 +7178,11 @@ function abrirCuentaCaida(cuentaUID){
   document.getElementById('cc-repo-desde').value = hoyStr;
   document.getElementById('cc-repo-hasta').value = '';
   // Limpiar campos
-  ['cc-rem-monto','cc-rem-notas','cc-repo-costo','cc-repo-correo','cc-repo-pass','cc-repo-nueva-costo'].forEach(id => {
+  ['cc-rem-monto','cc-rem-notas','cc-repo-costo','cc-repo-correo','cc-repo-pass','cc-repo-nueva-costo','cc-repo-nuevo-precio'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('cc-repo-cupos').value = 5;
-  // Poblar selector de cuentas del inventario para reposición
-  const selCuenta = document.getElementById('cc-repo-cuenta-sel');
-  selCuenta.innerHTML = '<option value="">— Selecciona cuenta —</option>';
-  APP.cuentas.filter(x => x.uid !== cuentaUID).forEach(x => {
-    const xsrv = getSrv(x.srvUid);
-    const lib = x.cupos ? x.cupos.filter(cu => cu.estado === 'libre').length : 0;
-    if(lib > 0){
-      const o = document.createElement('option');
-      o.value = x.uid;
-      o.textContent = `${xsrv ? xsrv.emoji + ' ' : ''}${x.id}${x.correo ? ' · ' + x.correo : ''} (${lib} libre${lib !== 1 ? 's' : ''})`;
-      selCuenta.appendChild(o);
-    }
-  });
+  ccRepoInicializar(c);
   document.getElementById('cc-repo-cupo-wrap').style.display = 'none';
   // Poblar selector de ventas afectadas
   const selVenta = document.getElementById('cc-venta-sel');
@@ -7158,7 +7197,48 @@ function abrirCuentaCaida(cuentaUID){
       }
     });
   }
+  ccActualizarReembolso();
+  ccActualizarVigenciaReposicion();
   abrirModal('modal-cuenta-caida');
+}
+
+function ccRepoInicializar(c){
+  const catSel = document.getElementById('cc-repo-cat-sel');
+  const srvSel = document.getElementById('cc-repo-srv-sel');
+  if(!catSel || !srvSel) return;
+  catSel.innerHTML = '<option value="">— Categoría —</option>' + CATALOGO_CATEGORIAS.map(x=>`<option value="${esc(x.uid)}">${esc((x.emoji||'')+' '+x.nombre)}</option>`).join('');
+  const srvOrigen = c ? getSrv(c.srvUid) : null;
+  catSel.value = srvOrigen?.catUid || '';
+  ccRepoActProductos();
+  srvSel.value = c?.srvUid || '';
+  ccRepoActCuentas();
+  document.getElementById('cc-repo-vigencia').value = 'original';
+  document.getElementById('cc-repo-dias').value = '';
+  document.getElementById('cc-repo-vence-final').value = '';
+}
+function ccRepoActProductos(){
+  const cat = document.getElementById('cc-repo-cat-sel')?.value || '';
+  const sel = document.getElementById('cc-repo-srv-sel');
+  if(!sel) return;
+  const items = CATALOGO_SERVICIOS.filter(s=>!cat || s.catUid===cat);
+  sel.innerHTML = '<option value="">— Producto —</option>' + items.map(s=>`<option value="${esc(s.uid)}">${esc((s.emoji||'')+' '+s.nombre)}</option>`).join('');
+  ccRepoActCuentas();
+}
+function ccRepoActCuentas(){
+  const destinoSrv = document.getElementById('cc-repo-srv-sel')?.value || '';
+  const origenUID = document.getElementById('cc-cuenta-uid')?.value || '';
+  const sel = document.getElementById('cc-repo-cuenta-sel');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— Selecciona cuenta —</option>';
+  APP.cuentas.filter(x=>x.uid!==origenUID && (!destinoSrv || x.srvUid===destinoSrv) && !x.archivada && (x.cupos||[]).some(cu=>cu.estado==='libre')).forEach(x=>{
+    const srv=getSrv(x.srvUid), libres=(x.cupos||[]).filter(cu=>cu.estado==='libre').length;
+    const dias=x.hasta ? Math.max(0,Math.ceil((new Date(x.hasta+'T12:00:00')-new Date(hoy()+'T12:00:00'))/86400000)) : null;
+    const o=document.createElement('option'); o.value=x.uid;
+    o.textContent=`${srv ? (srv.emoji||'')+' ' : ''}${x.id}${x.correo ? ' · '+x.correo : ''} · ${libres} libre${libres!==1?'s':''}${x.hasta ? ' · vence '+fmtFecha(x.hasta)+' ('+dias+' días)' : ''}`;
+    sel.appendChild(o);
+  });
+  document.getElementById('cc-repo-cupo-wrap').style.display='none';
+  ccActualizarVigenciaReposicion();
 }
 
 function ccToggleAccion(){
@@ -7170,7 +7250,7 @@ function ccToggleAccion(){
 function ccToggleRepo(){
   const tipo = document.querySelector('input[name="cc-repo-tipo"]:checked').value;
   document.getElementById('cc-repo-inv-bloque').style.display = tipo === 'inventario' ? 'block' : 'none';
-  document.getElementById('cc-repo-nueva-bloque').style.display = tipo === 'nueva' ? 'block' : 'none';
+  document.getElementById('cc-repo-nueva-bloque').style.display = ['nueva','nueva_credito'].includes(tipo) ? 'block' : 'none';
 }
 
 function ccSelCuentaRepo(){
@@ -7190,6 +7270,41 @@ function ccSelCuentaRepo(){
     }
   });
   cupoWrap.style.display = 'block';
+}
+
+function ccVentaAfectada(){
+  const cuentaUID=document.getElementById('cc-cuenta-uid')?.value||'';
+  const c=obtenerCuentaInventarioOVirtual(cuentaUID), sel=document.getElementById('cc-venta-sel')?.value||'';
+  if(!c?.cupos) return null;
+  const idx=sel!==''?parseInt(sel):c.cupos.findIndex(x=>x.estado==='ocupado'), cu=c.cupos[idx];
+  const v=cu?.ventaUid?APP.ventas.find(x=>x.uid===cu.ventaUid):APP.ventas.find(x=>x.cuentaUID===cuentaUID&&parseInt(x.cupoIdx)===idx&&x.activa!==false);
+  return v?{venta:v,cupo:cu,idx}:null;
+}
+function ccDiasRestantes(v){
+  if(!v?.vence) return 0;
+  return Math.max(0,Math.ceil((new Date(v.vence+'T12:00:00')-new Date(hoy()+'T12:00:00'))/86400000));
+}
+function ccActualizarReembolso(){
+  const c=obtenerCuentaInventarioOVirtual(document.getElementById('cc-cuenta-uid')?.value||''), sel=document.getElementById('cc-venta-sel')?.value||'', afectados=[];
+  if(c?.cupos)c.cupos.forEach((cu,i)=>{if(cu.estado==='ocupado'&&(sel===''||String(i)===String(sel))){const v=cu.ventaUid?APP.ventas.find(x=>x.uid===cu.ventaUid):null;if(v)afectados.push(v);}});
+  const total=afectados.reduce((s,v)=>s+(parseFloat(v.precio)||0)*ccDiasRestantes(v)/Math.max(1,parseInt(v.dias)||30),0);
+  const cal=document.getElementById('cc-rem-calculado'),monto=document.getElementById('cc-rem-monto');
+  if(cal)cal.value=total.toFixed(2);
+  if(monto&&(!monto.value||monto.dataset.auto==='true')){monto.value=total.toFixed(2);monto.dataset.auto='true';}
+  if(document.getElementById('cc-rem-estado')?.value==='pagado')document.getElementById('cc-rem-pagado').value=monto?.value||total.toFixed(2);
+}
+function ccFechaVigenciaReposicion(){
+  const info=ccVentaAfectada();if(!info)return null;const modo=document.getElementById('cc-repo-vigencia')?.value||'original',faltan=ccDiasRestantes(info.venta);let dias=faltan;
+  if(modo==='extra')dias=faltan+(parseInt(document.getElementById('cc-repo-dias')?.value)||0);
+  if(modo==='reiniciar')dias=parseInt(document.getElementById('cc-repo-dias')?.value)||30;
+  if(modo==='manual'){const f=document.getElementById('cc-repo-vence-final')?.value||'';return{dias:f?Math.max(0,Math.ceil((new Date(f+'T12:00:00')-new Date(hoy()+'T12:00:00'))/86400000)):0,fecha:f,faltan};}
+  return{dias,fecha:sumarDias(hoy(),dias),faltan};
+}
+function ccActualizarVigenciaReposicion(){
+  const box=document.getElementById('cc-repo-resumen');if(!box)return;const info=ccVentaAfectada(),vig=ccFechaVigenciaReposicion(),cuenta=APP.cuentas.find(x=>x.uid===document.getElementById('cc-repo-cuenta-sel')?.value);
+  if(!info||!vig){box.textContent='Selecciona el cliente y la cuenta para calcular la nueva vigencia.';return;}
+  const limite=cuenta?.hasta?Math.max(0,Math.ceil((new Date(cuenta.hasta+'T12:00:00')-new Date(hoy()+'T12:00:00'))/86400000)):null;
+  box.textContent=`Le quedaban ${vig.faltan} días · nuevo vencimiento: ${fmtFecha(vig.fecha)} · cuenta elegida: ${limite===null?'vigencia no definida':limite+' días restantes'}${limite!==null&&vig.dias>limite?' · ⚠️ supera la vigencia de la cuenta':' · ✅ compatible'}`;
 }
 
 function ccRegistrarCostoConFIFO(monto, metodo, desc, fecha, catUid, cuentaUID){
@@ -7270,60 +7385,52 @@ function ccAplicarReposicionVenta(ventaRel, cuentaOrigenUID, cupoOrigenIdx, cuen
   };
 }
 
-function ccGuardar(){
+function ccGuardar(prepararMensaje=false){
   const cuentaUID = document.getElementById('cc-cuenta-uid').value;
   const c = obtenerCuentaInventarioOVirtual(cuentaUID);
   if(!c) return;
   const accion = document.querySelector('input[name="cc-accion"]:checked').value;
   const ventaCupoIdx = document.getElementById('cc-venta-sel').value;
   const hoyStr = hoy();
+  let ventaMensaje = null, mensajeExtra = {};
 
   if(accion === 'reembolso'){
-    // Registrar reembolso por cada cliente afectado (o solo el seleccionado)
     const monto = parseFloat(document.getElementById('cc-rem-monto').value) || 0;
     if(monto < 0){ alert('El reembolso no puede ser negativo'); return; }
     const metodo = document.getElementById('cc-rem-metodo').value;
+    const estado = document.getElementById('cc-rem-estado')?.value || 'pendiente';
+    const pagado = Math.max(0, parseFloat(document.getElementById('cc-rem-pagado')?.value) || 0);
     const fecha = document.getElementById('cc-rem-fecha').value || hoyStr;
     const notas = document.getElementById('cc-rem-notas').value || 'Cuenta caída';
     const srv = getSrv(c.srvUid);
     const srvNom = srv ? srv.emoji + ' ' + srv.nombre : c.id;
-    if(ventaCupoIdx !== ''){
-      // Solo el cupo seleccionado
-      const cu = c.cupos[parseInt(ventaCupoIdx)];
-      if(cu){
-        APP.reembolsos.push({ uid: uid(), fecha, cliente: cu.cliente || 'Cliente', servicio: srvNom + ' (' + c.id + ')', motivo: '⚡ ' + notas, monto, metodo });
-        cu.estado = 'libre';
-        // Buscar venta relacionada y marcar inactiva
-        const ventaRel = cu.ventaUid
-          ? APP.ventas.find(v => v.uid === cu.ventaUid && v.activa !== false)
-          : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === parseInt(ventaCupoIdx) && v.activa !== false);
-        if(ventaRel){ ventaRel.activa = false; ventaRel.motivoSalida = 'Cuenta caída — reembolso dado'; }
-      }
-    } else {
-      // Todos los cupos ocupados
-      if(c.cupos) c.cupos.forEach((cu, i) => {
-        if(cu.estado === 'ocupado'){
-          APP.reembolsos.push({ uid: uid(), fecha, cliente: cu.cliente || 'Cliente', servicio: srvNom + ' (' + c.id + ')', motivo: '⚡ ' + notas, monto, metodo });
-          cu.estado = 'libre';
-          const ventaRel = cu.ventaUid
-            ? APP.ventas.find(v => v.uid === cu.ventaUid && v.activa !== false)
-            : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === i && v.activa !== false);
-          if(ventaRel){ ventaRel.activa = false; ventaRel.motivoSalida = 'Cuenta caída — reembolso dado'; }
-        }
-      });
-    }
-    // Registrar el reembolso también como gasto
-    if(monto > 0) ccRegistrarCostoConFIFO(monto, metodo, `Reembolso por cuenta caída — ${srvNom} (${c.id})`, fecha, 'cg-otro', cuentaUID);
+    const afectados = (c.cupos || []).map((cu,i)=>({cu,i,v:cu.ventaUid ? APP.ventas.find(x=>x.uid===cu.ventaUid && x.activa!==false) : APP.ventas.find(x=>x.cuentaUID===cuentaUID && parseInt(x.cupoIdx)===i && x.activa!==false)})).filter(x=>x.cu.estado==='ocupado' && x.v && (ventaCupoIdx==='' || String(x.i)===String(ventaCupoIdx)));
+    const calculadoTotal = afectados.reduce((s,x)=>s+(parseFloat(x.v.precio)||0)*ccDiasRestantes(x.v)/Math.max(1,parseInt(x.v.dias)||30),0);
+    if(!afectados.length){ alert('No hay un cliente activo asociado a esta cuenta.'); return; }
+    afectados.forEach((x,idx)=>{
+      const calculado=(parseFloat(x.v.precio)||0)*ccDiasRestantes(x.v)/Math.max(1,parseInt(x.v.dias)||30);
+      const parte=calculadoTotal>0 ? monto*(calculado/calculadoTotal) : (afectados.length===1?monto:0);
+      const partePagada=calculadoTotal>0 ? pagado*(calculado/calculadoTotal) : (afectados.length===1?pagado:0);
+      APP.reembolsos.push({uid:uid(),fecha,cliente:x.cu.cliente||x.v.cliente||'Cliente',servicio:srvNom+' ('+c.id+')',motivo:'⚡ '+notas,monto:Number(parte.toFixed(2)),montoCalculado:Number(calculado.toFixed(2)),montoPagado:Number(partePagada.toFixed(2)),saldoPendiente:Number(Math.max(0,parte-partePagada).toFixed(2)),estado,metodo,ventaUID:x.v.uid,diasRestantes:ccDiasRestantes(x.v)});
+      x.cu.estado='libre'; x.v.activa=false; x.v.motivoSalida='Cuenta caída — reembolso '+estado;
+      if(idx===0) ventaMensaje=x.v;
+    });
+    if(pagado>0) ccRegistrarCostoConFIFO(pagado, metodo, `Reembolso pagado por cuenta caída — ${srvNom} (${c.id})`, fecha, 'cg-otro', cuentaUID);
+    mensajeExtra={reembolso:monto.toFixed(2),reembolsoCalculado:calculadoTotal.toFixed(2),reembolsoPagado:pagado.toFixed(2),reembolsoEstado:estado,diasRestantes:ventaMensaje?ccDiasRestantes(ventaMensaje):0};
 
   } else {
     // REPOSICIÓN
     const tipo = document.querySelector('input[name="cc-repo-tipo"]:checked').value;
-    const srv = getSrv(c.srvUid);
+    const destinoSrvUid = document.getElementById('cc-repo-srv-sel')?.value || c.srvUid;
+    const srv = getSrv(destinoSrvUid);
     const srvNom = srv ? srv.emoji + ' ' + srv.nombre : c.id;
 
-    // Determinar cliente afectado (cupo específico o primero ocupado)
-    let cupoAfectadoIdx = ventaCupoIdx !== '' ? parseInt(ventaCupoIdx) : (c.cupos ? c.cupos.findIndex(cu => cu.estado === 'ocupado') : -1);
+    if(ventaCupoIdx === ''){ alert('Para reponer debes seleccionar el cliente afectado.'); return; }
+    let cupoAfectadoIdx = parseInt(ventaCupoIdx);
     const cupoAfectado = cupoAfectadoIdx >= 0 && c.cupos ? c.cupos[cupoAfectadoIdx] : null;
+    if(!cupoAfectado || cupoAfectado.estado!=='ocupado'){ alert('Selecciona un cupo ocupado válido.'); return; }
+    const ventaAfectada = cupoAfectado.ventaUid ? APP.ventas.find(v=>v.uid===cupoAfectado.ventaUid && v.activa!==false) : null;
+    if(!ventaAfectada){ alert('No encontré la venta activa de este cliente.'); return; }
 
     if(tipo === 'inventario'){
       const cuentaRepoUID = document.getElementById('cc-repo-cuenta-sel').value;
@@ -7333,13 +7440,18 @@ function ccGuardar(){
       const cuentaRepo = APP.cuentas.find(x => x.uid === cuentaRepoUID);
       if(!cuentaRepo){ alert('Cuenta no encontrada'); return; }
       const cupoIdxNum = parseInt(cupoRepoIdx);
+      const vig=ccFechaVigenciaReposicion();
+      if(!vig || vig.fecha===''){ alert('Selecciona una vigencia válida.'); return; }
+      const cuentaDias=cuentaRepo.hasta?Math.max(0,Math.ceil((new Date(cuentaRepo.hasta+'T12:00:00')-new Date(hoyStr+'T12:00:00'))/86400000)):null;
+      if(cuentaDias!==null && vig.dias>cuentaDias){ alert('La vigencia elegida supera la fecha real de la cuenta de reemplazo. Escoge otra cuenta o reduce los días.'); return; }
+      ventaAfectada.vence=vig.fecha; ventaAfectada.dias=vig.dias;
       // Mover cliente al nuevo cupo conservando toda la relación con la venta.
       if(cupoAfectado){
-        const ventaRel = cupoAfectado.ventaUid
-          ? APP.ventas.find(v => v.uid === cupoAfectado.ventaUid && v.activa !== false)
-          : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
-        if(ventaRel) ccAplicarReposicionVenta(ventaRel, cuentaUID, cupoAfectadoIdx, cuentaRepo, cupoIdxNum, cupoAfectado);
-        else cuentaRepo.cupos[cupoIdxNum] = { ...cuentaRepo.cupos[cupoIdxNum], ...cupoAfectado, estado:'ocupado' };
+        ventaAfectada.srvUid = destinoSrvUid;
+        ventaAfectada.srvNom = srv ? srv.emoji + ' ' + srv.nombre : ventaAfectada.srvNom;
+        ccAplicarReposicionVenta(ventaAfectada, cuentaUID, cupoAfectadoIdx, cuentaRepo, cupoIdxNum, cupoAfectado);
+        ventaMensaje=ventaAfectada;
+        mensajeExtra={diasRestantes:vig.faltan,diasCortesia:Math.max(0,vig.dias-vig.faltan),reemplazoServicio:cuentaRepo.srvNom||srvNom};
         // Liberar cupo original
         if(!c.esVirtual) c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
       }
@@ -7363,7 +7475,7 @@ function ccGuardar(){
       const cuposArr = [];
       for(let i = 0; i < cuposNum; i++) cuposArr.push({ estado: 'libre' });
       const nuevaCuenta = {
-        uid: uid(), srvUid: c.srvUid, srvNom: srvNom,
+        uid: uid(), srvUid: destinoSrvUid, srvNom: srvNom,
         id: `${(srv?.nombre || 'SRV').toUpperCase().slice(0,3)}-R${Date.now().toString(36).slice(-3).toUpperCase()}`,
         correo: correoNuevo, pass: passNuevo, costo: costoNuevo, metodoPago: metodoNuevo,
         desde, hasta, cupos: cuposArr, creado: new Date().toISOString()
@@ -7371,11 +7483,21 @@ function ccGuardar(){
       APP.cuentas.push(nuevaCuenta);
       // Actualizar venta relacionada
       if(cupoAfectado){
-        const ventaRel = cupoAfectado.ventaUid
-          ? APP.ventas.find(v => v.uid === cupoAfectado.ventaUid && v.activa !== false)
-          : APP.ventas.find(v => v.cuentaUID === cuentaUID && v.cupoIdx === cupoAfectadoIdx && v.activa !== false);
-        if(ventaRel) ccAplicarReposicionVenta(ventaRel, cuentaUID, cupoAfectadoIdx, nuevaCuenta, 0, cupoAfectado);
-        else nuevaCuenta.cupos[0] = { ...cupoAfectado, estado:'ocupado' };
+        const esCredito = tipo === 'nueva_credito';
+        if(esCredito){
+          const credito=(parseFloat(ventaAfectada.precio)||0)*ccDiasRestantes(ventaAfectada)/Math.max(1,parseInt(ventaAfectada.dias)||30);
+          const precioPeriodo=parseFloat(document.getElementById('cc-repo-nuevo-precio')?.value)||parseFloat(ventaAfectada.precio)||0;
+          const precioNuevo=Math.max(0,precioPeriodo-credito);
+          ventaAfectada.activa=false; ventaAfectada.motivoSalida='Cuenta caída — crédito aplicado a nueva venta';
+          const nuevaVenta={...ventaAfectada,srvUid:destinoSrvUid,srvNom:srv ? srv.emoji+' '+srv.nombre : ventaAfectada.srvNom,uid:uid(),id:numVenta(),fecha:hoyStr,vence:hasta||sumarDias(hoyStr,30),dias:30,precio:Number(precioNuevo.toFixed(2)),cuentaUID:nuevaCuenta.uid,cupoIdx:0,cupoIdxs:[0],cuposAsignados:[{cuentaUID:nuevaCuenta.uid,cupoIdx:0,precio:Number(precioNuevo.toFixed(2)),estado:'pagado',fecha:hoyStr,vence:hasta||sumarDias(hoyStr,30)}],activa:true,creado:new Date().toISOString(),notas:(ventaAfectada.notas||'')+' | Crédito por días no usados: $'+credito.toFixed(2)};
+          APP.ventas.push(nuevaVenta); ventaMensaje=nuevaVenta; mensajeExtra={credito:credito.toFixed(2),saldoNuevo:precioNuevo.toFixed(2),nuevoPlazo:30};
+          nuevaCuenta.cupos[0]={...cupoAfectado,estado:'ocupado',ventaUid:nuevaVenta.uid,vence:nuevaVenta.vence,periodoDesde:hoyStr,periodoHasta:nuevaVenta.vence,montoVenta:nuevaVenta.precio};
+        } else {
+          const vig=ccFechaVigenciaReposicion();
+          const fechaFinal=hasta||vig?.fecha||sumarDias(hoyStr,ccDiasRestantes(ventaAfectada));
+          ventaAfectada.vence=fechaFinal; ventaAfectada.dias=Math.max(0,Math.ceil((new Date(fechaFinal+'T12:00:00')-new Date(hoyStr+'T12:00:00'))/86400000));
+          ccAplicarReposicionVenta(ventaAfectada, cuentaUID, cupoAfectadoIdx, nuevaCuenta, 0, cupoAfectado); ventaMensaje=ventaAfectada; mensajeExtra={diasRestantes:ccDiasRestantes(ventaAfectada),reemplazoServicio:srvNom};
+        }
         if(!c.esVirtual) c.cupos[cupoAfectadoIdx] = { estado: 'libre' };
       }
       // Registrar costo
@@ -7398,6 +7520,7 @@ function ccGuardar(){
   crearNotificacionLocal('reposicion', 'Cuenta reemplazada', `${c.id} fue reemplazada y la venta quedó vinculada al nuevo acceso.`, `reposicion-${cuentaUID}-${hoyStr}`, {pantalla:'inventario',cuentaUid:cuentaUID});
   sincronizarConSheets();
   alert('✅ Cuenta caída registrada correctamente');
+  if(prepararMensaje && ventaMensaje) mostrarMensajeCuentaCaida(ventaMensaje, accion==='reembolso'?'reembolso':'cuenta_caida', mensajeExtra);
 }
 
 // ══════════════════════════════════════
@@ -8769,6 +8892,13 @@ function resolverPlantilla(texto, ctx = {}){
     PERFIL: acceso.perfil || ctx.perfil || '',
     PIN: acceso.pin || ctx.pin || '',
     INVITACION: ctx.invitacion || '',
+    REEMBOLSO: ctx.reembolso || '',
+    REEMBOLSO_CALCULADO: ctx.reembolsoCalculado || '',
+    REEMBOLSO_PAGADO: ctx.reembolsoPagado || '',
+    REEMBOLSO_ESTADO: ctx.reembolsoEstado || '',
+    CREDITO: ctx.credito || '',
+    SALDO_NUEVO: ctx.saldoNuevo || '',
+    DIAS_CORTESIA: ctx.diasCortesia ? String(ctx.diasCortesia) + ' días extra por cortesía 🎁' : '',
     ACCESOS: accesos.length ? accesos.map(lineaAcceso).join('\n') : '',
     FIRMA: APP.config.firma || ''
   };
