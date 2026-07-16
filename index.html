@@ -2507,6 +2507,9 @@ let _syncGuardando = false;
 let _syncPendiente = null;
 let _syncEsperas = [];
 let _ultimoErrorSync = '';
+let _syncReintentos = 0;
+let _syncReintentoTimer = null;
+const SYNC_PENDIENTE_KEY = 'yoritex_sync_pendiente';
 
 // La sesión es temporal: se pide nuevamente al abrir la app o tras 15 minutos sin actividad.
 const AUTH_INACTIVIDAD_MS = 15 * 60 * 1000;
@@ -2558,6 +2561,13 @@ async function cargarSesionConCorreo(){
   // No se habilita ningún guardado hasta recibir los datos de Google Sheets.
   mostrarSync('🔄', 'Cargando tus datos...', 'Sincronizando con Google Sheets');
   try{
+    const pendienteLocal = leerPendienteSync();
+    if(pendienteLocal?.data){
+      const sub = document.getElementById('sync-sub');
+      if(sub) sub.textContent = 'Recuperando cambios pendientes de este dispositivo';
+      await apiCall({accion:'guardar', pin:'', data:pendienteLocal.data}, 60000);
+      limpiarPendienteSync();
+    }
     const res = await apiCall({accion:'cargar', pin:''}, 60000);
     if(!res?.ok || !res.data) throw new Error(res?.error || 'No se pudieron cargar los datos.');
     cargarDesdeSheets(res.data);
@@ -2569,7 +2579,7 @@ async function cargarSesionConCorreo(){
   }catch(err){
     _pinVerificado = false;
     const error = document.getElementById('auth-error');
-    if(error) error.textContent = 'No se cargaron los datos. No se guardó ningún cambio.';
+    if(error) error.textContent = 'No se pudo conectar con Google Sheets. Los cambios pendientes de este dispositivo siguen guardados y se recuperarán al volver a entrar.';
     mostrarPantallaAuth(true);
   }finally{
     ocultarSync();
@@ -5530,7 +5540,7 @@ function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, m
   });
   return true;
 }
-function ncGuardarMasivo(){
+async function ncGuardarMasivo(){
   const srvUid = document.getElementById('nc-srv').value;
   if(!srvUid){ alert('Selecciona el servicio'); return; }
   const items = ncBulkItems();
@@ -5578,13 +5588,16 @@ function ncGuardarMasivo(){
   renderBinance();
   const _dashEl = document.getElementById('s-dashboard');
   if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
-  sincronizarConSheets();
-  alert(`Se crearon ${items.length} cuenta(s). Costo por cuenta: $${costoCuenta.toFixed(2)}`);
-}
-function ncGuardar(){
-  if(document.getElementById('nc-modo')?.value === 'masivo' && !document.getElementById('nc-edit-uid').value){
-    ncGuardarMasivo();
+  const sincronizado = await sincronizarConSheets(true);
+  if(!sincronizado){
+    alert(`⚠️ Se crearon ${items.length} cuenta(s), pero aún están solo en este dispositivo. YORI-TEX reintentará guardarlas automáticamente cuando vuelva la conexión.`);
     return;
+  }
+  alert(`✅ Se crearon y sincronizaron ${items.length} cuenta(s). Costo por cuenta: $${costoCuenta.toFixed(2)}`);
+}
+async function ncGuardar(){
+  if(document.getElementById('nc-modo')?.value === 'masivo' && !document.getElementById('nc-edit-uid').value){
+    return ncGuardarMasivo();
   }
   const srvUid = document.getElementById('nc-srv').value;
   if(!srvUid){ alert('Selecciona el servicio'); return; }
@@ -5647,7 +5660,10 @@ function ncGuardar(){
   // FIX: refrescar dashboard si está visible
   const _dashEl = document.getElementById('s-dashboard');
   if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
-  sincronizarConSheets();
+  const sincronizado = await sincronizarConSheets(true);
+  if(!sincronizado){
+    alert('⚠️ La cuenta quedó guardada solo en este dispositivo. YORI-TEX reintentará sincronizarla automáticamente cuando vuelva la conexión.');
+  }
 }
 
 // ══════════════════════════════════════
@@ -9161,37 +9177,46 @@ async function _verificarYActualizarDesdeSheets(){
 // API — COMUNICACIÓN CON GOOGLE SHEETS
 // ══════════════════════════════════════
 async function apiCall(body, timeoutMs){
-  const controller = new AbortController();
   const accion = body && body.accion;
   const limite = timeoutMs || (accion === 'cargar' ? 60000 : 45000);
-  const timeoutId = setTimeout(() => controller.abort(), limite);
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-      cache: 'no-store'
-    });
-    clearTimeout(timeoutId);
-    if(!res.ok) throw new Error('HTTP ' + res.status + ' al conectar con Google Sheets');
-    const data = await res.json();
-    if(data && data.ok === false) throw new Error(data.error || 'Google Sheets devolvió un error');
-    return data;
-  } catch(err) {
-    clearTimeout(timeoutId);
-    if(err && err.name === 'AbortError'){
-      throw new Error('La conexión con Google Sheets tardó demasiado. Revisa internet e intenta otra vez.');
+  let ultimoError = null;
+  for(let intento=1; intento<=3; intento++){
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), limite);
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(body), signal: controller.signal,
+        cache: 'no-store', redirect: 'follow'
+      });
+      clearTimeout(timeoutId);
+      if(!res.ok) throw new Error('HTTP ' + res.status + ' al conectar con Google Sheets');
+      const data = await res.json();
+      if(data && data.ok === false) throw new Error(data.error || 'Google Sheets devolvió un error');
+      return data;
+    } catch(err) {
+      clearTimeout(timeoutId);
+      ultimoError = err;
+      const esRed = err?.name === 'AbortError' || /failed to fetch|networkerror|load failed/i.test(String(err?.message || ''));
+      if(!esRed || intento === 3) break;
+      await new Promise(resolve => setTimeout(resolve, intento * 1200));
     }
-    throw err;
   }
+  if(ultimoError?.name === 'AbortError') throw new Error('La conexión con Google Sheets tardó demasiado. Revisa internet e intenta otra vez.');
+  if(/failed to fetch|networkerror|load failed/i.test(String(ultimoError?.message || ''))) throw new Error('No se pudo conectar con Google Sheets. Revisa la conexión a internet del dispositivo; YORI-TEX reintentará solo.');
+  throw ultimoError || new Error('No se pudo conectar con Google Sheets.');
 }
 function sincronizarConSheets(ahora=false){
-  if(!_pinVerificado) return Promise.resolve(false);
   const payload = construirPayload();
   _syncDirty = true;
   _syncPendiente = payload;
   guardarLocal(payload);
+  guardarPendienteSync(payload);
+  if(!_pinVerificado){
+    setSyncStatus('Guardado local · pendiente de nube', 'warn');
+    return Promise.resolve(false);
+  }
+  if(_syncReintentoTimer){ clearTimeout(_syncReintentoTimer); _syncReintentoTimer=null; }
   setSyncStatus(ahora ? 'Guardando...' : 'En cola...', 'warn');
   const espera = new Promise(resolve => _syncEsperas.push(resolve));
   if(_syncGuardarTimer) clearTimeout(_syncGuardarTimer);
@@ -9209,7 +9234,16 @@ async function procesarColaSync(){
   setSyncStatus('Guardando...', 'warn');
   const ok = await _sincronizarBackground(payload);
   _syncGuardando = false;
-  if(_syncPendiente){
+  if(ok) _syncReintentos = 0;
+  else if(!_syncPendiente && _syncReintentos < 4 && navigator.onLine !== false){
+    _syncReintentos++;
+    _syncPendiente = payload;
+    const esperaReintento = _syncReintentos * 12000;
+    setSyncStatus('Reintentando en ' + Math.round(esperaReintento/1000) + ' s...', 'warn');
+    if(_syncReintentoTimer) clearTimeout(_syncReintentoTimer);
+    _syncReintentoTimer = setTimeout(() => { _syncReintentoTimer=null; procesarColaSync(); }, esperaReintento);
+  }
+  if(_syncPendiente && !_syncReintentoTimer){
     procesarColaSync();
     return;
   }
@@ -9245,6 +9279,15 @@ function guardarLocal(payload){
   try {
     localStorage.setItem('yoritex_local', JSON.stringify({ _pin: _pinGuardado, data: payload, _ts: Date.now() }));
   } catch(e){}
+}
+function guardarPendienteSync(payload){
+  try { localStorage.setItem(SYNC_PENDIENTE_KEY, JSON.stringify({data:payload, ts:Date.now()})); } catch(e){}
+}
+function leerPendienteSync(){
+  try { return JSON.parse(localStorage.getItem(SYNC_PENDIENTE_KEY) || 'null'); } catch(e){ return null; }
+}
+function limpiarPendienteSync(){
+  try { localStorage.removeItem(SYNC_PENDIENTE_KEY); } catch(e){}
 }
 
 // Sincronización en background — no bloquea nada, solo muestra emoji pequeño
@@ -9394,6 +9437,7 @@ async function _sincronizarBackground(payload){
   if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
   try {
     await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 45000);
+    if(!_syncPendiente) limpiarPendienteSync();
     _syncDirty = !!_syncPendiente;
     _ultimaSync = Date.now();
     _firmaNube = firmaDatos(payload || construirPayload());
@@ -10062,6 +10106,9 @@ function instalarSanitizadorRenders(){
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('online', () => {
+    if(_pinVerificado) sincronizarConSheets(true);
+  });
   inicializarAuthFirebase();
   iniciarReparadorMojibake();
   instalarReparadorMensajes();
