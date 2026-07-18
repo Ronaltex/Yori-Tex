@@ -1323,6 +1323,12 @@ body::after{
     <div class="kpi rojo"><div class="kl">Pendientes</div><div class="kv" id="d-pendientes">0</div></div>
     <div class="kpi amarillo"><div class="kl">Parciales</div><div class="kv" id="d-parciales">0</div></div>
   </div>
+  <div class="sec">Actividad comercial</div>
+  <div class="kpi-grid">
+    <div class="kpi verde"><div class="kl">Ventas nuevas</div><div class="kv" id="d-ventas-nuevas">0</div><div class="ksub" id="d-ventas-nuevas-s">$0.00 cobrado</div></div>
+    <div class="kpi azul"><div class="kl">Renovaciones</div><div class="kv" id="d-renovaciones">0</div><div class="ksub" id="d-renovaciones-s">$0.00 cobrado</div></div>
+    <div class="kpi amarillo"><div class="kl">Renovaciones por cobrar</div><div class="kv" id="d-renovaciones-pend">0</div><div class="ksub" id="d-renovaciones-pend-s">$0.00 pendiente</div></div>
+  </div>
   <div class="sec">👥 Clientes</div>
   <div class="kpi-grid" style="grid-template-columns:1fr 1fr 1fr">
     <div class="kpi verde"><div class="kl">Activos</div><div class="kv" id="d-activos">0</div></div>
@@ -3382,7 +3388,7 @@ function liberarCuposDeVenta(v){
     if(!Array.isArray(cuenta.cupos)) return;
     const indices = porCuenta[cuenta.uid] || new Set();
     cuenta.cupos.forEach((cu, i) => {
-      if(cu.ventaUid === v.uid || indices.has(i)) cuenta.cupos[i] = { estado: 'libre' };
+      if(cu.ventaUid === v.uid || (!cu.ventaUid && v.activa !== false && indices.has(i))) cuenta.cupos[i] = { estado: 'libre' };
     });
   });
 }
@@ -3809,6 +3815,38 @@ function limpiarBusqueda(tipo){
 }
 function regBuscar(v){ _regBusq = v; actualizarSearchClear(document.getElementById('reg-search')); renderRegistro(); }
 
+function tipoRegistroVenta(v){
+  const tipo = String(v?.tipoRegistro || '').toLowerCase();
+  if(tipo === 'renovacion' || tipo === 'reposicion_credito' || tipo === 'venta_nueva') return tipo;
+  return v?.ventaOrigenUID ? 'renovacion' : 'venta_nueva';
+}
+function esRenovacionVenta(v){ return ['renovacion','reposicion_credito'].includes(tipoRegistroVenta(v)); }
+function etiquetaTipoRegistro(v){
+  return tipoRegistroVenta(v) === 'reposicion_credito' ? 'Reposición con crédito' : (esRenovacionVenta(v) ? 'Renovación' : 'Venta nueva');
+}
+function renderFilaRegistro(v, chips, chipLbl){
+  const tipo = tipoRegistroVenta(v);
+  const tipoColor = tipo === 'venta_nueva' ? 'verde' : (tipo === 'reposicion_credito' ? 'amarillo' : 'azul');
+  return `<div class="hist-row" id="reg-${esc(v.uid)}">
+    <div class="hist-left">
+      <div class="hist-nombre">${esc(v.srvNom)} — ${esc(v.cliente)}</div>
+      <div class="hist-sub">${esc(fmtFecha(v.fecha))} · Vence ${esc(fmtFecha(v.vence))} · ${esc(v.metodo)}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><span class="chip ${tipoColor}" style="font-size:10px">${esc(etiquetaTipoRegistro(v))}</span>${v.wa ? `<a href="https://wa.me/${encodeURIComponent(v.wa.replace(/\D/g,''))}" target="_blank" rel="noopener noreferrer"><span class="chip verde" style="font-size:10px">📱 ${esc(v.wa)}</span></a>` : ''}</div>
+    </div>
+    <div class="hist-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      <div class="hist-precio">$${(parseFloat(v.precio)||0).toFixed(2)}</div>
+      <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
+      <div style="display:flex;gap:4px;align-items:center">
+        ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 8px;color:var(--green);border-color:var(--green-border)" title="Marcar como pagada">Pagó</button>` : ''}
+        <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.85;line-height:1" title="Preparar mensaje de ${esRenovacionVenta(v)?'renovación':'entrega'}">💬</button>
+        <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
+        <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
+        <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderRegistro(){
   const hoyStr = hoy();
   let ventas = [...APP.ventas];
@@ -3888,25 +3926,14 @@ function renderRegistro(){
   }
   const chips = {pagado:'verde',por_cobrar:'rojo',parcial:'amarillo',pendiente:'rojo'};
   const chipLbl = {pagado:'Pagado ✅',por_cobrar:'Por cobrar 🕐',parcial:'Parcial ⚠️',pendiente:'Pendiente 🔴'};
-  cont.innerHTML = ventas.map(v => `
-    <div class="hist-row" id="reg-${esc(v.uid)}">
-      <div class="hist-left">
-        <div class="hist-nombre">${esc(v.srvNom)} — ${esc(v.cliente)}</div>
-        <div class="hist-sub">${esc(fmtFecha(v.fecha))} · Vence ${esc(fmtFecha(v.vence))} · ${esc(v.metodo)}</div>
-        ${v.wa ? `<div style="margin-top:4px"><a href="https://wa.me/${encodeURIComponent(v.wa.replace(/\D/g,''))}" target="_blank" rel="noopener noreferrer"><span class="chip verde" style="font-size:10px">📱 ${esc(v.wa)}</span></a></div>` : ''}
-      </div>
-      <div class="hist-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <div class="hist-precio">$${v.precio.toFixed(2)}</div>
-        <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
-        <div style="display:flex;gap:4px;align-items:center">
-          ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 8px;color:var(--green);border-color:var(--green-border)" title="Marcar como pagada">Pagó</button>` : ''}
-          <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.85;line-height:1" title="Preparar mensaje para el cliente">💬</button>
-          <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
-          <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
-          <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
-        </div>
-      </div>
-    </div>`).join('');
+  const nuevas = ventas.filter(v => !esRenovacionVenta(v));
+  const renovaciones = ventas.filter(esRenovacionVenta);
+  const bloque = (titulo, items, color, abierto) => {
+    if(!items.length) return '';
+    const total = items.reduce((s,v)=>s+(parseFloat(v.precio)||0),0);
+    return `<details class="periodo-accordion" ${abierto?'open':''}><summary><span>${esc(titulo)}</span><span class="periodo-meta">${items.length} · $${total.toFixed(2)}</span></summary><div class="periodo-items" style="border-left:3px solid ${color}">${items.map(v=>renderFilaRegistro(v,chips,chipLbl)).join('')}</div></details>`;
+  };
+  cont.innerHTML = bloque('Ventas nuevas', nuevas, 'var(--green)', true) + bloque('Renovaciones', renovaciones, 'var(--blue)', true);
 }
 
 function marcarVentaPagada(ventaUid){
@@ -4735,11 +4762,12 @@ function ctxMensajeVenta(v, extra={}){
     servicio:nombreServicioLimpio(v.srvNom || '', srv),
     vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
     perfil:v.perfil || '', pin:v.pin || '', invitacion:v.invCorreo || '', enviarPass:!!v.enviarPass,
-    accesos:accesosDeVentaParaMensaje(v), ...extra
+    estadoPago:v.estado === 'pagado' ? 'Pagado' : (v.estado === 'parcial' ? 'Pago parcial' : 'Por pagar'),
+    pagoPendiente:v.estado !== 'pagado', accesos:accesosDeVentaParaMensaje(v), ...extra
   };
 }
 function mensajeAutomatico(contexto, ctx){
-  if(contexto === 'renovacion') return `¡Hola ${ctx.cliente}! 👋\n\nTu servicio *${ctx.servicio}* fue renovado correctamente ✅\n\n📅 Nuevo vencimiento: ${ctx.vence}\n💵 Monto: $${ctx.precio}\n\n${APP.config.firma || ''}`;
+  if(contexto === 'renovacion') return `¡Hola ${ctx.cliente}! 👋\n\nTu servicio *${ctx.servicio}* fue renovado correctamente ✅\n\n📅 Nuevo vencimiento: ${ctx.vence}\n💵 Monto: $${ctx.precio}${ctx.pagoPendiente?'\n🕐 Estado de pago: '+ctx.estadoPago:''}\n\n${APP.config.firma || ''}`;
   if(contexto === 'reembolso') return `Hola ${ctx.cliente} 👋\n\nLamento el inconveniente con tu acceso de *${ctx.servicio}*.\n\nReembolso calculado: $${ctx.reembolsoCalculado || '0.00'}\nMonto reconocido: $${ctx.reembolso || '0.00'}\nEstado: ${ctx.reembolsoEstado || 'Pendiente'}\n\n${APP.config.firma || ''}`;
   if(contexto === 'cuenta_caida') return `Hola ${ctx.cliente} 👋\n\nTu acceso de *${ctx.servicio}* fue reemplazado correctamente.\n\n📅 Nuevo vencimiento: ${ctx.vence}\n${ctx.diasCortesia ? '🎁 Días extra por cortesía: '+ctx.diasCortesia+'\n' : ''}\n${APP.config.firma || ''}`;
   return `¡Hola ${ctx.cliente}! 👋\n\nTu acceso de *${ctx.servicio}* está listo ✅\n\n📅 Vence: ${ctx.vence}\n💵 Monto: $${ctx.precio}\n\n${APP.config.firma || ''}`;
@@ -4907,7 +4935,7 @@ function mvGuardar(){
     enviarPass: enviarPassVenta,
     notas: sanitizarTexto(document.getElementById('mv-notas').value, 500),
     cuentaUID, cupoIdx, cupoIdxs, cuposAsignados, costoAdq: costoAdqVenta, metodoAdq: metodoAdqVenta,
-    activa: true, creado: new Date().toISOString()
+    activa: true, tipoRegistro:'venta_nueva', ventaOrigenUID:'', creado: new Date().toISOString()
   };
   APP.ventas.push(venta);
   APP._ventaCounter++;
@@ -5350,13 +5378,7 @@ function ncRenovarCuenta(){
   c.desde = renDesde;
   c.hasta = renHasta;
   c.metodoPago = renMetodo;
-  (c.cupos || []).forEach(cu => {
-    if(cu.estado === 'ocupado'){
-      cu.pendienteCobro = true;
-      cu.periodoDesde = renDesde;
-      cu.periodoHasta = renHasta;
-    }
-  });
+  // La vigencia/costo de la cuenta madre es independiente del pago y vencimiento de cada cliente.
   // Registrar el costo automáticamente en gastos
   if(renCosto > 0){
     const desc = `Renovación ${c.id} (${c.srvNom||''})`;
@@ -5860,21 +5882,27 @@ function venBulkRenovarConfirmar(){
       metodo,
       estado: 'pagado',
       activa: true,
+      tipoRegistro: 'renovacion',
+      ventaOrigenUID: v.uid,
       creado: new Date().toISOString()
     };
     // Marcar la venta anterior como inactiva
     v.activa = false;
     APP.ventas.push(nuevaVenta);
     APP._ventaCounter++;
-    // Si tenía cupo asignado → actualizar fecha en la cuenta madre
-    if(v.cuentaUID && v.cupoIdx !== null && v.cupoIdx !== undefined){
-      const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-      if(cuenta && cuenta.cupos[v.cupoIdx]){
-        cuenta.cupos[v.cupoIdx].vence    = nuevaVence;
-        cuenta.cupos[v.cupoIdx].ventaUid = nuevaVenta.uid;
-      }
-      nuevaVenta.cuentaUID = v.cuentaUID;
-      nuevaVenta.cupoIdx   = v.cupoIdx;
+    const asignaciones = asignacionesCuposVenta(v);
+    const precioPorCupo = asignaciones.length ? (parseFloat(nuevaVenta.precio)||0)/asignaciones.length : (parseFloat(nuevaVenta.precio)||0);
+    nuevaVenta.cuposAsignados = asignaciones.map(a => {
+      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+      const idx = parseInt(a.cupoIdx);
+      const cupo = cuenta?.cupos?.[idx] || {};
+      if(cuenta?.cupos?.[idx]) cuenta.cupos[idx] = {...cupo,estado:'ocupado',cliente:nuevaVenta.cliente,wa:nuevaVenta.wa,vence:nuevaVence,ventaUid:nuevaVenta.uid,pendienteCobro:false,periodoDesde:nuevaVenta.fecha,periodoHasta:nuevaVence,montoVenta:precioPorCupo};
+      return {...a,cuentaId:cuenta?.id||'',correo:cuenta?.correo||'',perfil:cupo.perfil||'',pin:cupo.pin||'',precio:precioPorCupo,estado:'pagado',fecha:nuevaVenta.fecha,vence:nuevaVence};
+    });
+    if(nuevaVenta.cuposAsignados.length){
+      nuevaVenta.cuentaUID = nuevaVenta.cuposAsignados[0].cuentaUID;
+      nuevaVenta.cupoIdx = nuevaVenta.cuposAsignados[0].cupoIdx;
+      nuevaVenta.cupoIdxs = nuevaVenta.cuposAsignados.filter(a=>a.cuentaUID===nuevaVenta.cuentaUID).map(a=>a.cupoIdx);
     }
     renovados++;
   });
@@ -6000,6 +6028,46 @@ function venToggleCuposGrupo(clave){
   window._venCuposAbiertos.has(clave) ? window._venCuposAbiertos.delete(clave) : window._venCuposAbiertos.add(clave);
   renderVencimientos();
 }
+function referenciasInventarioVenta(v){
+  const asignaciones = asignacionesCuposVenta(v);
+  const refs = asignaciones.map(a => {
+    const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+    const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)];
+    if(!cuenta) return null;
+    return {cuentaUID:cuenta.uid,id:cuenta.id||'Cuenta',correo:cuenta.correo||'',cupoIdx:parseInt(a.cupoIdx),perfil:cupo?.perfil||v.perfil||'',pin:cupo?.pin||v.pin||''};
+  }).filter(Boolean);
+  if(!refs.length && v.cuentaUID){
+    const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
+    const idx = parseInt(v.cupoIdx);
+    const cupo = cuenta?.cupos?.[idx];
+    if(cuenta) refs.push({cuentaUID:cuenta.uid,id:cuenta.id||'Cuenta',correo:cuenta.correo||'',cupoIdx:isNaN(idx)?null:idx,perfil:cupo?.perfil||v.perfil||'',pin:cupo?.pin||v.pin||''});
+  }
+  return refs;
+}
+function resumenInventarioVencimiento(v){
+  const refs = referenciasInventarioVenta(v);
+  if(!refs.length) return `<div style="font-size:11px;color:var(--text3);margin-top:7px;padding:7px 9px;border:1px dashed var(--border);border-radius:7px">Sin cuenta de inventario vinculada</div>`;
+  return refs.map((r,i) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;padding:7px 9px;background:rgba(66,178,255,.07);border:1px solid rgba(66,178,255,.2);border-radius:7px"><div style="min-width:0"><div style="font-size:11px;font-weight:700;color:var(--text)">${esc(r.id)}${refs.length>1?' · acceso '+(i+1):''}</div><div style="font-size:10px;color:var(--text3);white-space:normal;overflow-wrap:anywhere">${esc(r.correo||'Sin correo')}${r.cupoIdx!==null?' · Cupo '+(r.cupoIdx+1):''}${r.perfil?' · Perfil '+esc(r.perfil):''}${r.pin?' · PIN '+esc(r.pin):''}</div></div><button type="button" class="btn-sm" style="width:auto;white-space:nowrap" onclick="event.stopPropagation();irACuentaInventario('${esc(r.cuentaUID)}')">Ver cuenta</button></div>`).join('');
+}
+function irACuentaInventario(cuentaUID){
+  if(!cuentaUID) return;
+  _invBusq = '';
+  _invEstado = 'todos';
+  _invServicio = 'todos';
+  APP._filtroInv = 'todos';
+  const search = document.getElementById('inv-search');
+  if(search) search.value = '';
+  navIr('inventario');
+  setTimeout(() => {
+    const destino = document.getElementById('cuenta-' + cuentaUID);
+    if(!destino) return;
+    destino.scrollIntoView({behavior:'smooth',block:'center'});
+    destino.classList.add('notificacion-destino');
+    const cuerpo = destino.querySelector('.cuenta-hdr')?.nextElementSibling;
+    if(cuerpo) cuerpo.style.display = 'block';
+    setTimeout(()=>destino.classList.remove('notificacion-destino'),2200);
+  },80);
+}
 function renderVencimientos(){
   let ventas = APP._filtroVen === 'inactivo'
     ? APP.ventas.filter(v => v.activa === false && !v.eliminadoRegistro)
@@ -6095,6 +6163,7 @@ function renderVencimientos(){
         ${!_venSelMode ? (isInactivo ? '<span class="badge badge-inactivo">Inactivo</span>' : badgeVen(v.vence)) : ''}
       </div>
       <div style="font-size:12px;color:var(--text3)">Vence: ${fmtFecha(v.vence)} · $${v.precio.toFixed(2)} · ${esc(v.metodo)}</div>
+      ${resumenInventarioVencimiento(v)}
       ${(!isInactivo && d !== null && d < -2) ? `<div style="font-size:11px;color:var(--red);background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);border-radius:6px;padding:5px 9px;margin-top:6px">⚠️ Período de gracia vencido — servicio por cortar</div>` : ''}
       ${_venSelMode ? '' : btns}
     </div>`;
@@ -6354,7 +6423,8 @@ function abrirMensajeEntregaVenta(ventaUid){
     alert('Agrega el WhatsApp del cliente en Editar venta antes de preparar el mensaje.');
     return;
   }
-  mostrarMensajePostVenta(venta, 'venta_nueva');
+  const tipo = tipoRegistroVenta(venta);
+  mostrarMensajePostVenta(venta, tipo === 'venta_nueva' ? 'venta_nueva' : (tipo === 'reposicion_credito' ? 'cuenta_caida' : 'renovacion'));
 }
 function mostrarMensajePostVenta(v, contexto){
   if(!v) return;
@@ -6419,7 +6489,8 @@ function renGuardar(){
     metodo: document.getElementById('ren-metodo').value,
     wa: nuevoWA || v.wa,
     correo: nuevoCorreo || v.correo,
-    estado: document.getElementById('ren-estado').value || 'pagado', activa: true, creado: new Date().toISOString()
+    estado: document.getElementById('ren-estado').value || 'pagado', activa: true,
+    tipoRegistro:'renovacion', ventaOrigenUID:v.uid, creado: new Date().toISOString()
   };
 
   // Actualizar categoría/servicio/plan si se modificaron
@@ -6429,11 +6500,9 @@ function renGuardar(){
 
   if(document.getElementById('ren-perfil').value) nuevaVenta.perfil = document.getElementById('ren-perfil').value;
 
-  // Actualizar datos en la venta original
+  // Conservar el historial original; solo se actualizan datos de contacto compartidos.
   v.wa = nuevoWA || v.wa;
   v.correo = nuevoCorreo || v.correo;
-  if(catUid) v.catUid = catUid;
-  if(srvUid){ v.srvUid = srvUid; const srv = getSrv(srvUid); v.srvNom = srv ? srv.nombre : v.srvNom; }
 
   // Manejar cuenta de inventario
   const cuentaInvUID = origen === 'inventario' ? document.getElementById('ren-cuenta-inv').value : '';
@@ -6462,8 +6531,6 @@ function renGuardar(){
         };
       }
     }
-    v.cuentaUID = cuentaInvUID;
-    if(cupoInvIdx !== '') v.cupoIdx = parseInt(cupoInvIdx);
   } else if(origen === 'inventario' && cuentaInvUID === '' && v.cuentaUID){
     // Si había cuenta pero no se seleccionó ninguna en renovar, mantener la misma
     nuevaVenta.cuentaUID = v.cuentaUID;
@@ -6484,8 +6551,6 @@ function renGuardar(){
     liberarCupoAnterior(cuentaAnteriorUID, cupoAnteriorIdx, v.uid);
     nuevaVenta.cuentaUID = null;
     nuevaVenta.cupoIdx = null;
-    v.cuentaUID = null;
-    v.cupoIdx = null;
   }
 
   // Normalizar todas las asignaciones de la renovación para que apunten a la venta nueva.
@@ -6595,10 +6660,7 @@ function nrGuardar(){
   v.activa = false;
   v.motivoSalida = motivo;
   if(accion === 'liberar' && v.cuentaUID){
-    const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-    if(cuenta && v.cupoIdx !== null && v.cupoIdx !== undefined){
-      cuenta.cupos[v.cupoIdx] = {estado:'libre'};
-    }
+    liberarCuposDeVenta(v);
   }
 
   cerrarModal('modal-no-renovo');
@@ -6614,12 +6676,7 @@ function nrEjecutarEliminar(){
   const eliminarIngreso = document.querySelector('input[name="nrce-ingreso"]:checked')?.value === 'eliminar';
 
   // Liberar cupo en la cuenta
-  if(v.cuentaUID){
-    const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-    if(cuenta && v.cupoIdx !== null && v.cupoIdx !== undefined){
-      cuenta.cupos[v.cupoIdx] = {estado:'libre'};
-    }
-  }
+  if(v.cuentaUID) liberarCuposDeVenta(v);
 
   if(eliminarIngreso){
     // Agregar a lista negra para que no reaparezca al recargar
@@ -6830,8 +6887,8 @@ function renderEstimacionesYMetas(ingresos, ganancia, roi, cobradas){
   const rows = [
     ['Ingresos', ingresos, metas.ingresos || 0, '$'],
     ['Ganancia neta', ganancia, metas.ganancia || 0, '$'],
-    ['Ventas cobradas', cobradas.length, metas.ventas || 0, ''],
-    ['Renovaciones estimadas', ingMes.cnt, metas.renovaciones || 0, ''],
+    ['Ventas nuevas cobradas', cobradas.filter(v=>!esRenovacionVenta(v)).length, metas.ventas || 0, ''],
+    ['Renovaciones cobradas', cobradas.filter(esRenovacionVenta).length, metas.renovaciones || 0, ''],
     ['ROI', parseFloat(roi)||0, metas.roi || 0, '%']
   ];
   const el = document.getElementById('dash-metas');
@@ -6912,7 +6969,7 @@ function renderMovimientosDashboard(){
   const movs = [];
   (APP.ventas||[]).filter(v=>v.estado==='pagado' && fechaEnPeriodoDash(v.fecha)).forEach(v=>movs.push({fecha:v.fecha,tipo:'ingreso',concepto:`${v.srvNom || 'Venta'} · ${v.cliente}`,metodo:v.metodo,monto:parseFloat(v.precio)||0}));
   (APP.costos||[]).filter(g=>fechaEnPeriodoDash(g.fecha)).forEach(g=>movs.push({fecha:g.fecha,tipo:'salida',concepto:g.desc||'Costo',metodo:g.metodo,monto:parseFloat(g.montoUSD)||0,tag:g.adelantoUID?'Consumo de adelanto':'Costo'}));
-  (APP.reembolsos||[]).filter(r=>fechaEnPeriodoDash(r.fecha)).forEach(r=>movs.push({fecha:r.fecha,tipo:'salida',concepto:`Reembolso · ${r.cliente||''}`,metodo:r.metodo,monto:parseFloat(r.monto)||0,tag:'Reembolso'}));
+  (APP.reembolsos||[]).filter(r=>fechaEnPeriodoDash(r.fecha)).forEach(r=>{ const pagado = r.montoPagado === undefined || r.montoPagado === '' ? (parseFloat(r.monto)||0) : (parseFloat(r.montoPagado)||0); if(pagado>0) movs.push({fecha:r.fecha,tipo:'salida',concepto:`Reembolso · ${r.cliente||''}`,metodo:r.metodo,monto:pagado,tag:'Reembolso pagado'}); });
   (APP.egresos||[]).filter(e=>fechaEnPeriodoDash(e.fecha)).forEach(e=>movs.push({fecha:e.fecha,tipo:'salida',concepto:e.desc||'Egreso',metodo:e.metodo,monto:parseFloat(e.monto)||0,tag:e.tipo==='sueldo'?'Sueldo':'Egreso'}));
   (APP.adelantosProveedor||[]).filter(a=>fechaEnPeriodoDash(a.fecha)).forEach(a=>movs.push({fecha:a.fecha,tipo:'salida',concepto:`Adelanto · ${proveedorDeAdelanto(a)?.nombre||'Proveedor'}`,metodo:a.metodo,monto:parseFloat(a.monto)||0,tag:'Movimiento de caja',noResultado:true}));
   const visibles = movs.filter(m=>filtro==='todos'||m.tipo===filtro).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
@@ -6935,12 +6992,14 @@ function renderDashboard(){
   document.getElementById('dash-periodo-lbl').textContent = periodoLbl;
   const ventas = filtrarVentasDash();
   const gastos = filtrarGastosDash();
-  const activas = ventas.filter(v => v.activa !== false);
-  const cobradas = activas.filter(v => v.estado === 'pagado');
+  const registrosFinancieros = ventas;
+  const activas = ventas.filter(v => v.activa !== false && !v.eliminadoRegistro);
+  // Una renovación vuelve inactiva la venta anterior, pero ese cobro sigue siendo ingreso histórico.
+  const cobradas = registrosFinancieros.filter(v => v.estado === 'pagado');
   const ingresos = cobradas.reduce((s,v) => s+v.precio, 0);
   const remPeriodo = (APP.reembolsos||[]).filter(r => fechaEnPeriodoDash(r.fecha));
   const egPeriodo = (APP.egresos||[]).filter(e => fechaEnPeriodoDash(e.fecha));
-  const totalRemb = remPeriodo.reduce((s,r) => s+(parseFloat(r.monto)||0), 0);
+  const totalRemb = remPeriodo.reduce((s,r) => s + (r.montoPagado === undefined || r.montoPagado === '' ? (parseFloat(r.monto)||0) : (parseFloat(r.montoPagado)||0)), 0);
   const sueldoTotal = egPeriodo.filter(e => e.tipo === 'sueldo').reduce((s,e) => s+(parseFloat(e.monto)||0), 0);
   const otrosEgresos = egPeriodo.filter(e => e.tipo !== 'sueldo').reduce((s,e) => s+(parseFloat(e.monto)||0), 0);
   const costosTot = gastos.reduce((s,g) => s+g.montoUSD, 0);
@@ -6982,6 +7041,17 @@ function renderDashboard(){
   document.getElementById('d-pagados').textContent = cobradas.length;
   document.getElementById('d-pendientes').textContent = activas.filter(v => ['pendiente','por_cobrar'].includes(v.estado)).length;
   document.getElementById('d-parciales').textContent = activas.filter(v => v.estado==='parcial').length;
+  const ventasNuevasPeriodo = registrosFinancieros.filter(v => !esRenovacionVenta(v));
+  const renovacionesPeriodo = registrosFinancieros.filter(esRenovacionVenta);
+  const nuevasCobradas = ventasNuevasPeriodo.filter(v=>v.estado==='pagado');
+  const renovCobradas = renovacionesPeriodo.filter(v=>v.estado==='pagado');
+  const renovPendientes = renovacionesPeriodo.filter(v=>v.estado!=='pagado');
+  setText('d-ventas-nuevas', ventasNuevasPeriodo.length);
+  setText('d-ventas-nuevas-s', '$'+nuevasCobradas.reduce((s,v)=>s+(parseFloat(v.precio)||0),0).toFixed(2)+' cobrado');
+  setText('d-renovaciones', renovacionesPeriodo.length);
+  setText('d-renovaciones-s', '$'+renovCobradas.reduce((s,v)=>s+(parseFloat(v.precio)||0),0).toFixed(2)+' cobrado');
+  setText('d-renovaciones-pend', renovPendientes.length);
+  setText('d-renovaciones-pend-s', '$'+renovPendientes.reduce((s,v)=>s+(parseFloat(v.precio)||0),0).toFixed(2)+' pendiente');
   const totalClientes = new Set(APP.ventas.map(v => v.cliente)).size;
   const activosSet = new Set(APP.ventas.filter(v => v.activa !== false).map(v => v.cliente)).size;
   const inactivosSet = new Set(APP.ventas.filter(v => v.activa === false).map(v => v.cliente)).size;
@@ -7489,7 +7559,7 @@ function ccGuardar(prepararMensaje=false){
           const precioPeriodo=parseFloat(document.getElementById('cc-repo-nuevo-precio')?.value)||parseFloat(ventaAfectada.precio)||0;
           const precioNuevo=Math.max(0,precioPeriodo-credito);
           ventaAfectada.activa=false; ventaAfectada.motivoSalida='Cuenta caída — crédito aplicado a nueva venta';
-          const nuevaVenta={...ventaAfectada,srvUid:destinoSrvUid,srvNom:srv ? srv.emoji+' '+srv.nombre : ventaAfectada.srvNom,uid:uid(),id:numVenta(),fecha:hoyStr,vence:hasta||sumarDias(hoyStr,30),dias:30,precio:Number(precioNuevo.toFixed(2)),cuentaUID:nuevaCuenta.uid,cupoIdx:0,cupoIdxs:[0],cuposAsignados:[{cuentaUID:nuevaCuenta.uid,cupoIdx:0,precio:Number(precioNuevo.toFixed(2)),estado:'pagado',fecha:hoyStr,vence:hasta||sumarDias(hoyStr,30)}],activa:true,creado:new Date().toISOString(),notas:(ventaAfectada.notas||'')+' | Crédito por días no usados: $'+credito.toFixed(2)};
+          const nuevaVenta={...ventaAfectada,srvUid:destinoSrvUid,srvNom:srv ? srv.emoji+' '+srv.nombre : ventaAfectada.srvNom,uid:uid(),id:numVenta(),fecha:hoyStr,vence:hasta||sumarDias(hoyStr,30),dias:30,precio:Number(precioNuevo.toFixed(2)),cuentaUID:nuevaCuenta.uid,cupoIdx:0,cupoIdxs:[0],cuposAsignados:[{cuentaUID:nuevaCuenta.uid,cupoIdx:0,precio:Number(precioNuevo.toFixed(2)),estado:'pagado',fecha:hoyStr,vence:hasta||sumarDias(hoyStr,30)}],activa:true,tipoRegistro:'reposicion_credito',ventaOrigenUID:ventaAfectada.uid,creditoAplicado:Number(credito.toFixed(2)),creado:new Date().toISOString(),notas:(ventaAfectada.notas||'')+' | Crédito por días no usados: $'+credito.toFixed(2)};
           APP.ventas.push(nuevaVenta); ventaMensaje=nuevaVenta; mensajeExtra={credito:credito.toFixed(2),saldoNuevo:precioNuevo.toFixed(2),nuevoPlazo:30};
           nuevaCuenta.cupos[0]={...cupoAfectado,estado:'ocupado',ventaUid:nuevaVenta.uid,vence:nuevaVenta.vence,periodoDesde:hoyStr,periodoHasta:nuevaVenta.vence,montoVenta:nuevaVenta.precio};
         } else {
@@ -9751,6 +9821,9 @@ function normalizarVenta(v){
     correo: v.correo || '',
     metodo: v.metodo || 'Transferencia',
     estado: v.estado || 'pagado',
+    tipoRegistro: v.tipoRegistro || (v.ventaOrigenUID ? 'renovacion' : 'venta_nueva'),
+    ventaOrigenUID: v.ventaOrigenUID || '',
+    creditoAplicado: isNaN(parseFloat(v.creditoAplicado)) ? 0 : parseFloat(v.creditoAplicado),
     costoAdq: parseFloat(v.costoAdq) || 0,
     metodoAdq: v.metodoAdq || 'Transferencia',
     notas:  v.notas  || '',
