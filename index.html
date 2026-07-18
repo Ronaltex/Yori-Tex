@@ -1271,7 +1271,7 @@ body::after{
     <button class="filter-btn" onclick="venFiltrar('hoy',this)">Hoy</button>
     <button class="filter-btn" onclick="venFiltrar('pronto',this)">Esta semana</button>
     <button class="filter-btn" onclick="venFiltrar('ok',this)">Al día</button>
-    <button class="filter-btn" onclick="venFiltrar('inactivo',this)">Inactivos</button>
+    <button class="filter-btn" onclick="venFiltrar('inactivo',this)">Inactivos · 5 días</button>
   </div>
   <div class="search-wrap"><span class="search-ico">🔍</span><input type="text" placeholder="Buscar cliente, servicio..." oninput="venBuscar(this.value)"></div>
   <div id="ven-lista"><div class="empty"><div class="e-ico">⏰</div><div>Sin vencimientos aún</div></div></div>
@@ -1540,7 +1540,7 @@ body::after{
     <div id="cat-subtab-servicios">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="font-size:13px;color:var(--text2)">Servicios y categorías</div>
-        <button class="btn btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="abrirModal('modal-nuevo-servicio')">＋ Servicio</button>
+        <button class="btn btn-primary" style="width:auto;padding:7px 14px;font-size:12px" onclick="abrirNuevoServicio()">＋ Servicio</button>
       </div>
       <div id="cat-servicios-lista"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
@@ -1789,6 +1789,11 @@ body::after{
     <div class="pass-wrap"><input type="password" id="nc-pass" placeholder="••••••••"/><button class="eye-btn" onclick="togglePass('nc-pass',this)">👁</button></div>
   </div>
   <div class="field"><label>Número de cupos / perfiles máx.</label><input type="number" id="nc-cupos" placeholder="5" min="1" max="30"/></div>
+  <div id="nc-modelo-acceso" class="aviso" style="display:none"></div>
+  <div class="field" id="nc-direccion-wrap" style="display:none">
+    <label>Dirección del plan familiar</label>
+    <textarea id="nc-direccion" placeholder="Dirección exacta registrada en Spotify" style="height:72px"></textarea>
+  </div>
   <div id="nc-bulk-block" style="display:none">
     <div class="divider"></div>
     <div class="sec">Carga masiva</div>
@@ -2425,6 +2430,15 @@ body::after{
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Perfil y PIN</div><div class="ts">Como Netflix, Disney: cada cliente tiene su perfil</div></div><label class="toggle"><input type="checkbox" id="srv-perfil"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Correo de Invitación</div><div class="ts">Como Spotify, Canva, Google One: se invita al cliente</div></div><label class="toggle"><input type="checkbox" id="srv-invitacion"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Acceso con Correo/Contraseña directa</div><div class="ts">Se comparte el correo y pass al cliente</div></div><label class="toggle"><input type="checkbox" id="srv-pass"><span class="toggle-slider"></span></label></div>
+  <div class="toggle-row"><div class="toggle-info"><div class="tl">Usa cuenta madre</div><div class="ts">La cuenta contiene perfiles, invitaciones u otros accesos</div></div><label class="toggle"><input type="checkbox" id="srv-cuenta-madre" onchange="srvToggleModeloAcceso()"><span class="toggle-slider"></span></label></div>
+  <div id="srv-modelo-acceso" style="display:none">
+    <div class="toggle-row"><div class="toggle-info"><div class="tl">La cuenta madre también se vende</div><div class="ts">Crea un acceso vendible adicional para el titular</div></div><label class="toggle"><input type="checkbox" id="srv-madre-vendible"><span class="toggle-slider"></span></label></div>
+    <div class="row2">
+      <div class="field"><label>Tipo de accesos</label><select id="srv-tipo-acceso"><option value="perfil">Perfiles</option><option value="invitacion">Invitaciones</option><option value="dispositivo">Dispositivos</option><option value="cupo">Cupos</option></select></div>
+      <div class="field"><label>Cantidad sin contar madre</label><input type="number" id="srv-accesos-base" min="1" max="30" value="1"/></div>
+    </div>
+  </div>
+  <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere dirección familiar</div><div class="ts">La dirección se guarda y copia desde inventario</div></div><label class="toggle"><input type="checkbox" id="srv-direccion"><span class="toggle-slider"></span></label></div>
   <div class="divider"></div>
   <button class="btn btn-primary" onclick="srvGuardar()">💾 Guardar servicio</button>
 </div>
@@ -3000,7 +3014,7 @@ let CATALOGO_CATEGORIAS = [
 
 let CATALOGO_SERVICIOS = [
   { uid: 'srv-netflix', catUid: 'cat-streaming', nombre: 'Netflix', emoji: '🎬', planes: ['Perfil individual', 'Pantalla extra', 'Netflix combo'], tienePerfil: true, tienePin: true, tieneInvitacion: false, tienePass: false },
-  { uid: 'srv-spotify', catUid: 'cat-streaming', nombre: 'Spotify Familiar', emoji: '🎵', planes: ['Cupo familiar 1 mes', 'Cupo familiar 3 meses'], tienePerfil: false, tienePin: false, tieneInvitacion: true, tienePass: false },
+  { uid: 'srv-spotify', catUid: 'cat-streaming', nombre: 'Spotify Familiar', emoji: '🎵', planes: ['Cupo familiar 1 mes', 'Cupo familiar 3 meses'], tienePerfil: false, tienePin: false, tieneInvitacion: true, tienePass: false, usaCuentaMadre: true, madreVendible: true, tipoAcceso: 'invitacion', accesosBase: 5, requiereDireccion: true },
   { uid: 'srv-disney', catUid: 'cat-streaming', nombre: 'Disney+', emoji: '🏰', planes: ['Estándar 1 mes', 'Premium 1 mes'], tienePerfil: true, tienePin: false, tieneInvitacion: false, tienePass: false },
   { uid: 'srv-hbo', catUid: 'cat-streaming', nombre: 'Max (HBO)', emoji: '📺', planes: ['Perfil 1 mes', 'Perfil 3 meses'], tienePerfil: true, tienePin: false, tieneInvitacion: false, tienePass: false },
   { uid: 'srv-chatgpt', catUid: 'cat-herramienta', nombre: 'ChatGPT Plus', emoji: '🤖', planes: ['Compartido 1 mes', 'Individual 1 mes'], tienePerfil: false, tienePin: false, tieneInvitacion: false, tienePass: true },
@@ -4318,6 +4332,7 @@ function editarVentaGuardar(abrirMensaje=false){
       const pin = cupoViejo.pin || v.pin || '';
       if(cuentaNueva && cuentaNueva.cupos && cuentaNueva.cupos[a.cupoIdx]){
         cuentaNueva.cupos[a.cupoIdx] = {
+          ...cupoViejo,
           estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
           perfil, pin, vence: v.vence,
           pendienteCobro: v.estado !== 'pagado',
@@ -4857,6 +4872,7 @@ function mvGuardar(){
           vence
         });
         cuentaAsig.cupos[asig.cupoIdx] = {
+          ...cuentaAsig.cupos[asig.cupoIdx],
           estado:'ocupado', cliente:nombre, wa:waInput,
           perfil: perfilAsig,
           pin: pinAsig, vence,
@@ -4973,6 +4989,23 @@ function invEstadoFiltrar(f, btn){
   document.querySelectorAll('#inv-status-filtros .inv-status-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderInventario();
+}
+
+async function copiarDireccionInventario(cuentaUID, boton){
+  const cuenta = (APP.cuentas || []).find(c => c.uid === cuentaUID);
+  const direccion = String(cuenta?.direccion || '').trim();
+  if(!direccion){ alert('Esta cuenta todavía no tiene una dirección guardada.'); return; }
+  try {
+    if(navigator.clipboard?.writeText) await navigator.clipboard.writeText(direccion);
+    else {
+      const temporal = document.createElement('textarea');
+      temporal.value = direccion;
+      temporal.style.position = 'fixed'; temporal.style.opacity = '0';
+      document.body.appendChild(temporal); temporal.select(); document.execCommand('copy'); temporal.remove();
+    }
+    const original = boton?.textContent;
+    if(boton){ boton.textContent = 'Copiada'; setTimeout(()=>{ boton.textContent = original || 'Copiar'; },1400); }
+  } catch(e){ alert('No se pudo copiar la dirección. Mantén pulsado el texto para copiarla manualmente.'); }
 }
 
 function renderInventario(){
@@ -5135,11 +5168,13 @@ function renderInventario(){
         else vigenciaBadge = `<span class="badge badge-ok" style="font-size:9px">Vence ${fStr} · ${dHasta}d</span>`;
       }
     }
+  const modeloCuenta = modeloAccesoServicio(srv);
   const cuposHtml = c.cupos.map((cu, i) => {
+      const nombreAcceso = cu.etiquetaAcceso || etiquetaTipoAcceso(c.tipoAcceso || modeloCuenta.tipoAcceso, i, c.madreVendible === undefined ? modeloCuenta.madreVendible : !!c.madreVendible);
       if(cu.estado === 'libre') return `
         <div class="cupo-row">
           <div class="cupo-dot dot-libre"></div>
-          <div class="cupo-info"><div class="cupo-cliente" style="color:var(--green)">Cupo ${i+1} — Libre</div></div>
+          <div class="cupo-info"><div class="cupo-cliente" style="color:var(--green)">${esc(nombreAcceso)} · Libre</div></div>
           <button class="btn-sm" onclick="${c.esVirtual && cu.ventaUid ? `abrirEditarVenta('${esc(cu.ventaUid)}')` : `abrirEditarCupo('${esc(c.uid)}',${i})`}">✏️</button>
         </div>`;
       const wa = cu.wa ? cu.wa.replace(/\D/g,'') : '';
@@ -5157,7 +5192,7 @@ function renderInventario(){
           <div style="display:flex;align-items:center;gap:8px">
             <div class="cupo-dot dot-ocupado" style="flex-shrink:0"></div>
             <div class="cupo-info" style="flex:1">
-              <div class="cupo-cliente">${esc(cu.cliente||'Cupo '+(i+1))} ${planStr}</div>
+              <div class="cupo-cliente">${esc(cu.cliente||nombreAcceso)} <span style="font-size:9px;color:var(--orange)">· ${esc(nombreAcceso)}</span> ${planStr}</div>
               <div class="cupo-sub">${cu.perfil?'Perfil: '+esc(cu.perfil)+' · ':''}${venceBadge || '<span style="color:var(--text3);font-size:10px">Sin fecha asignada</span>'}</div>
               ${invStr}
             </div>
@@ -5176,6 +5211,7 @@ function renderInventario(){
           <div style="flex:1;min-width:0">
             <div class="cuenta-nombre">${srv?esc(srv.emoji):''} ${esc(c.id)}</div>
             <div class="cuenta-correo">${esc(c.correo)}${c.costo?' · Costo: $'+c.costo.toFixed(2):''}</div>
+            ${c.direccion ? `<div style="display:flex;align-items:center;gap:6px;margin-top:5px;max-width:100%"><div style="font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(c.direccion)}">📍 ${esc(c.direccion)}</div><button type="button" class="btn-sm" style="width:auto;padding:4px 7px;flex-shrink:0" onclick="event.stopPropagation();copiarDireccionInventario('${esc(c.uid)}',this)">Copiar</button></div>` : ''}
             <div class="account-state ${cuentaEstado}">${cuentaEstadoTxt}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
@@ -5323,12 +5359,17 @@ function abrirEditarCuenta(cuentaUID){
     if(srv){
       catSel.value = srv.catUid;
       ncActCat();
-      setTimeout(() => { document.getElementById('nc-srv').value = c.srvUid; }, 50);
+      setTimeout(() => {
+        document.getElementById('nc-srv').value = c.srvUid;
+        ncActSrv();
+        document.getElementById('nc-cupos').value = c.cupos.length;
+      }, 50);
     }
     document.getElementById('nc-id').value = c.id;
     document.getElementById('nc-correo').value = c.correo;
     document.getElementById('nc-pass').value = c.pass || '';
     document.getElementById('nc-cupos').value = c.cupos.length;
+    document.getElementById('nc-direccion').value = c.direccion || '';
     document.getElementById('nc-costo').value = c.costo || '';
     document.getElementById('nc-pventa').value = c.pventa || '';
     document.getElementById('nc-notas').value = c.notas || '';
@@ -5569,7 +5610,7 @@ function abrirNuevaCuenta(){
   document.getElementById('nc-titulo').innerHTML = '📦 Nueva cuenta <button class="modal-close" onclick="cerrarModal(\'modal-nueva-cuenta\')">×</button>';
   document.getElementById('nc-renovar-bloque').style.display = 'none';
   document.getElementById('nc-costo-por-cupo').style.display = 'none';
-  ['nc-cat','nc-srv','nc-id','nc-correo','nc-pass','nc-cupos','nc-costo','nc-pventa','nc-notas','nc-desde','nc-hasta','nc-vendidos','nc-bulk-cantidad','nc-bulk-pass-same','nc-bulk-lista'].forEach(id => {
+  ['nc-cat','nc-srv','nc-id','nc-correo','nc-pass','nc-cupos','nc-direccion','nc-costo','nc-pventa','nc-notas','nc-desde','nc-hasta','nc-vendidos','nc-bulk-cantidad','nc-bulk-pass-same','nc-bulk-lista'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
@@ -5602,7 +5643,50 @@ function ncActCat(){
     const o = document.createElement('option'); o.value = s.uid; o.textContent = s.emoji + ' ' + s.nombre; sel.appendChild(o);
   });
 }
-function ncActSrv(){}
+function modeloAccesoServicio(srv){
+  const esSpotifyFamiliar = srv?.uid === 'srv-spotify' || /spotify\s+familiar/i.test(String(srv?.nombre || ''));
+  const usaCuentaMadre = srv?.usaCuentaMadre === undefined ? esSpotifyFamiliar : !!srv.usaCuentaMadre;
+  const madreVendible = usaCuentaMadre && (srv?.madreVendible === undefined ? esSpotifyFamiliar : !!srv.madreVendible);
+  const tipoAcceso = srv?.tipoAcceso || (esSpotifyFamiliar ? 'invitacion' : srv?.tieneInvitacion ? 'invitacion' : srv?.tienePerfil ? 'perfil' : 'cupo');
+  const accesosBase = Math.max(1, parseInt(srv?.accesosBase) || (esSpotifyFamiliar ? 5 : 1));
+  return { usaCuentaMadre, madreVendible, tipoAcceso, accesosBase, totalSugerido: accesosBase + (madreVendible ? 1 : 0) };
+}
+function etiquetaTipoAcceso(tipo, indice, madreVendible){
+  if(madreVendible && indice === 0) return 'Cuenta madre';
+  const numero = indice + (madreVendible ? 0 : 1);
+  const nombres = {invitacion:'Invitación',perfil:'Perfil',dispositivo:'Dispositivo',cupo:'Cupo',individual:'Acceso'};
+  return `${nombres[tipo] || 'Acceso'} ${numero}`;
+}
+function crearCuposModelo(srv, cantidad, anteriores=[]){
+  const modelo = modeloAccesoServicio(srv);
+  return Array.from({length:cantidad}, (_,i) => ({
+    ...(anteriores[i] || {estado:'libre'}),
+    tipoAcceso: modelo.madreVendible && i === 0 ? 'madre' : modelo.tipoAcceso,
+    etiquetaAcceso: etiquetaTipoAcceso(modelo.tipoAcceso, i, modelo.madreVendible)
+  }));
+}
+function ncActSrv(){
+  const srv = getSrv(document.getElementById('nc-srv')?.value);
+  const modeloBox = document.getElementById('nc-modelo-acceso');
+  const direccionWrap = document.getElementById('nc-direccion-wrap');
+  if(!srv){
+    if(modeloBox) modeloBox.style.display = 'none';
+    if(direccionWrap) direccionWrap.style.display = 'none';
+    return;
+  }
+  const modelo = modeloAccesoServicio(srv);
+  if(modeloBox){
+    const plurales = {invitacion:'invitaciones',perfil:'perfiles',dispositivo:'dispositivos',cupo:'cupos'};
+    modeloBox.style.display = '';
+    modeloBox.innerHTML = modelo.usaCuentaMadre
+      ? `<b>Cuenta madre:</b> ${modelo.madreVendible ? '1 acceso madre vendible + ' : ''}${modelo.accesosBase} ${modelo.accesosBase===1 ? (modelo.tipoAcceso === 'invitacion' ? 'invitación' : modelo.tipoAcceso) : (plurales[modelo.tipoAcceso] || 'accesos')}. Total sugerido: <b>${modelo.totalSugerido}</b>.`
+      : '<b>Cuenta individual:</b> no depende de una cuenta madre.';
+  }
+  const requiereDireccion = srv.requiereDireccion === true || srv.uid === 'srv-spotify' || /spotify\s+familiar/i.test(String(srv.nombre || ''));
+  if(direccionWrap) direccionWrap.style.display = requiereDireccion ? '' : 'none';
+  const editando = !!document.getElementById('nc-edit-uid')?.value;
+  if(!editando && document.getElementById('nc-cupos')) document.getElementById('nc-cupos').value = modelo.totalSugerido;
+}
 function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, fecha, adelantoUID){
   if(costoCuenta <= 0) return true;
   const costoUID = uid();
@@ -5659,6 +5743,8 @@ async function ncGuardarMasivo(){
   const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
   const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
   const notas = document.getElementById('nc-notas').value;
+  const modelo = modeloAccesoServicio(srv);
+  const direccion = document.getElementById('nc-direccion').value.trim();
   const baseNum = APP.cuentas.length + 1;
   if(adelantoUID){
     const adelanto = (APP.adelantosProveedor||[]).find(a=>a.uid===adelantoUID);
@@ -5672,9 +5758,10 @@ async function ncGuardarMasivo(){
       pass: item.pass,
       costo: costoCuenta, metodoPago, desde: ncDesde, hasta: ncHasta,
       renovable,
+      usaCuentaMadre: modelo.usaCuentaMadre, madreVendible: modelo.madreVendible, tipoAcceso: modelo.tipoAcceso, direccion,
       pventa,
       notas,
-      cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
+      cupos: crearCuposModelo(srv, numCupos)
     });
     registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, ncDesde || hoy(), adelantoUID);
   });
@@ -5711,6 +5798,8 @@ async function ncGuardar(){
   const ncHasta = document.getElementById('nc-hasta').value;
   const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
   const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
+  const modelo = modeloAccesoServicio(srv);
+  const direccion = document.getElementById('nc-direccion').value.trim();
   if(editUID){
     const i = APP.cuentas.findIndex(c => c.uid === editUID);
     if(i > -1){
@@ -5723,9 +5812,10 @@ async function ncGuardar(){
         pass: document.getElementById('nc-pass').value,
         costo: costoTotal, metodoPago, desde: ncDesde, hasta: ncHasta,
         renovable,
+        usaCuentaMadre: modelo.usaCuentaMadre, madreVendible: modelo.madreVendible, tipoAcceso: modelo.tipoAcceso, direccion,
         pventa,
         notas: document.getElementById('nc-notas').value,
-        cupos: Array.from({length:numCupos}, (_,k) => old[k] || {estado:'libre'})
+        cupos: crearCuposModelo(srv, numCupos, old)
       };
     }
   } else {
@@ -5735,9 +5825,10 @@ async function ncGuardar(){
       pass: document.getElementById('nc-pass').value,
       costo: costoTotal, metodoPago, desde: ncDesde, hasta: ncHasta,
       renovable,
+      usaCuentaMadre: modelo.usaCuentaMadre, madreVendible: modelo.madreVendible, tipoAcceso: modelo.tipoAcceso, direccion,
       pventa,
       notas: document.getElementById('nc-notas').value,
-      cupos: Array.from({length:numCupos}, () => ({estado:'libre'}))
+      cupos: crearCuposModelo(srv, numCupos)
     });
 
     // Auto-registrar el costo real y, si se eligió, descontarlo del adelanto exacto.
@@ -5781,6 +5872,46 @@ function venToggleSeccion(grupoId){
   if(_venGruposAbiertos.has(grupoId)) _venGruposAbiertos.delete(grupoId);
   else _venGruposAbiertos.add(grupoId);
   renderVencimientos();
+}
+
+const DIAS_RETENCION_INACTIVOS = 5;
+function fechaInactivacionVenta(v){
+  const exacta = normalizarFechaValor(v?.fechaInactivacion);
+  if(exacta) return exacta;
+  return normalizarFechaValor(v?.vence) || normalizarFechaValor(v?.fecha) || '';
+}
+function ventaFueSustituida(v){
+  return (APP.ventas || []).some(actual => actual.uid !== v.uid && actual.ventaOrigenUID === v.uid);
+}
+function esInactivoReutilizable(v){
+  if(!v || v.activa !== false || v.eliminadoRegistro || v.purgaOperativa) return false;
+  if(ventaFueSustituida(v) || /renovad|reposici[oó]n|reembolso|cuenta ca[ií]da|eliminad/i.test(String(v.motivoSalida || ''))) return false;
+  const fecha = fechaInactivacionVenta(v);
+  if(!fecha) return false;
+  const antiguedad = -diasHasta(fecha);
+  return antiguedad >= 0 && antiguedad <= DIAS_RETENCION_INACTIVOS;
+}
+function depurarInactivosAntiguos(){
+  let cambios = false;
+  (APP.ventas || []).forEach(v => {
+    if(v.activa !== false || v.eliminadoRegistro || v.purgaOperativa) return;
+    const fecha = fechaInactivacionVenta(v);
+    const antiguedad = fecha ? -diasHasta(fecha) : DIAS_RETENCION_INACTIVOS + 1;
+    if(ventaFueSustituida(v) || antiguedad > DIAS_RETENCION_INACTIVOS){
+      v.eliminadoRegistro = true;
+      v.purgaOperativa = true;
+      v.cuentaUID = null;
+      v.cupoIdx = null;
+      v.cupoIdxs = [];
+      v.cuposAsignados = [];
+      v.correo = '';
+      v.perfil = '';
+      v.pin = '';
+      v.invCorreo = '';
+      cambios = true;
+    }
+  });
+  return cambios;
 }
 
 function renderBadgeVencimientos(){
@@ -5888,6 +6019,8 @@ function venBulkRenovarConfirmar(){
     };
     // Marcar la venta anterior como inactiva
     v.activa = false;
+    v.motivoSalida = 'Renovado';
+    v.fechaInactivacion = new Date().toISOString();
     APP.ventas.push(nuevaVenta);
     APP._ventaCounter++;
     const asignaciones = asignacionesCuposVenta(v);
@@ -6069,8 +6202,9 @@ function irACuentaInventario(cuentaUID){
   },80);
 }
 function renderVencimientos(){
+  depurarInactivosAntiguos();
   let ventas = APP._filtroVen === 'inactivo'
-    ? APP.ventas.filter(v => v.activa === false && !v.eliminadoRegistro)
+    ? APP.ventas.filter(esInactivoReutilizable)
     : APP.ventas.filter(v => v.activa !== false && !v.eliminadoRegistro);
   const cnt = { vencido:0, hoy:0, pronto:0 };
   APP.ventas.filter(v => v.activa !== false && !v.eliminadoRegistro).forEach(v => {
@@ -6160,7 +6294,7 @@ function renderVencimientos(){
           ${chkHtml}
           <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--white)">${esc(v.cliente)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(v.srvNom)} · ${esc(v.id)}${cuposDeVenta(v)>1 ? ' · ' + cuposDeVenta(v) + ' cupos' : ''}</div></div>
         </div>
-        ${!_venSelMode ? (isInactivo ? '<span class="badge badge-inactivo">Inactivo</span>' : badgeVen(v.vence)) : ''}
+        ${!_venSelMode ? (isInactivo ? `<span class="badge badge-inactivo">Disponible ${Math.max(0, DIAS_RETENCION_INACTIVOS + diasHasta(fechaInactivacionVenta(v)))}d</span>` : badgeVen(v.vence)) : ''}
       </div>
       <div style="font-size:12px;color:var(--text3)">Vence: ${fmtFecha(v.vence)} · $${v.precio.toFixed(2)} · ${esc(v.metodo)}</div>
       ${resumenInventarioVencimiento(v)}
@@ -6594,6 +6728,8 @@ function renGuardar(){
   nuevaVenta.costoAsignadoUSD = usaInventario ? costoAdq : 0;
 
   v.activa = false;
+  v.motivoSalida = 'Renovado';
+  v.fechaInactivacion = new Date().toISOString();
   APP.ventas.push(nuevaVenta);
   APP._ventaCounter++;
   cerrarModal('modal-renovar');
@@ -6658,7 +6794,8 @@ function nrGuardar(){
   }
 
   v.activa = false;
-  v.motivoSalida = motivo;
+  v.motivoSalida = motivo || 'No renovó';
+  v.fechaInactivacion = new Date().toISOString();
   if(accion === 'liberar' && v.cuentaUID){
     liberarCuposDeVenta(v);
   }
@@ -8821,6 +8958,17 @@ function poblarSrvCatSelect(){
   sel.innerHTML = '<option value="">— Selecciona —</option>';
   CATALOGO_CATEGORIAS.forEach(c => { const o = document.createElement('option'); o.value=c.uid; o.textContent=c.emoji+' '+c.nombre; sel.appendChild(o); });
 }
+function abrirNuevoServicio(){
+  document.getElementById('srv-edit-uid').value = '';
+  document.getElementById('srv-modal-titulo').innerHTML = '📺 Nuevo servicio <button class="modal-close" onclick="cerrarModal(\'modal-nuevo-servicio\')">×</button>';
+  ['srv-nombre','srv-emoji','srv-planes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['srv-perfil','srv-invitacion','srv-pass','srv-cuenta-madre','srv-madre-vendible','srv-direccion'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
+  document.getElementById('srv-tipo-acceso').value = 'perfil';
+  document.getElementById('srv-accesos-base').value = 1;
+  poblarSrvCatSelect();
+  srvToggleModeloAcceso();
+  abrirModal('modal-nuevo-servicio');
+}
 function srvGuardar(){
   const catUid = document.getElementById('srv-cat').value;
   const nombre = document.getElementById('srv-nombre').value.trim();
@@ -8833,7 +8981,12 @@ function srvGuardar(){
     tienePerfil: document.getElementById('srv-perfil').checked,
     tienePin: document.getElementById('srv-perfil').checked,
     tieneInvitacion: document.getElementById('srv-invitacion').checked,
-    tienePass: document.getElementById('srv-pass').checked
+    tienePass: document.getElementById('srv-pass').checked,
+    usaCuentaMadre: document.getElementById('srv-cuenta-madre').checked,
+    madreVendible: document.getElementById('srv-cuenta-madre').checked && document.getElementById('srv-madre-vendible').checked,
+    tipoAcceso: document.getElementById('srv-tipo-acceso').value || 'cupo',
+    accesosBase: Math.max(1, parseInt(document.getElementById('srv-accesos-base').value) || 1),
+    requiereDireccion: document.getElementById('srv-direccion').checked
   };
   const editUID = document.getElementById('srv-edit-uid').value;
   if(editUID){ const i = CATALOGO_SERVICIOS.findIndex(s=>s.uid===editUID); if(i>-1) CATALOGO_SERVICIOS[i]={...CATALOGO_SERVICIOS[i],...datos}; }
@@ -8845,9 +8998,16 @@ function srvGuardar(){
   mvPoblarCategorias();
   sincronizarConSheets();
 }
+function srvToggleModeloAcceso(){
+  const activo = !!document.getElementById('srv-cuenta-madre')?.checked;
+  const bloque = document.getElementById('srv-modelo-acceso');
+  if(bloque) bloque.style.display = activo ? '' : 'none';
+  if(!activo && document.getElementById('srv-madre-vendible')) document.getElementById('srv-madre-vendible').checked = false;
+}
 function abrirEditarServicio(suid){
   const s = CATALOGO_SERVICIOS.find(x=>x.uid===suid);
   if(!s) return;
+  const modelo = modeloAccesoServicio(s);
   poblarSrvCatSelect();
   setTimeout(()=>{
     document.getElementById('srv-edit-uid').value = suid;
@@ -8859,6 +9019,12 @@ function abrirEditarServicio(suid){
     document.getElementById('srv-perfil').checked = s.tienePerfil;
     document.getElementById('srv-invitacion').checked = s.tieneInvitacion;
     document.getElementById('srv-pass').checked = s.tienePass;
+    document.getElementById('srv-cuenta-madre').checked = modelo.usaCuentaMadre;
+    document.getElementById('srv-madre-vendible').checked = modelo.madreVendible;
+    document.getElementById('srv-tipo-acceso').value = modelo.tipoAcceso;
+    document.getElementById('srv-accesos-base').value = modelo.accesosBase;
+    document.getElementById('srv-direccion').checked = s.requiereDireccion === true || s.uid === 'srv-spotify' || /spotify\s+familiar/i.test(String(s.nombre || ''));
+    srvToggleModeloAcceso();
   }, 50);
   abrirModal('modal-nuevo-servicio');
 }
@@ -9494,6 +9660,7 @@ function configParaSync(){
   return cfg;
 }
 function construirPayload(){
+  depurarInactivosAntiguos();
   const ventasPayload = (APP.ventas || []).map(v => ({
     ...v,
     cupoIdxs: Array.isArray(v.cupoIdxs) ? v.cupoIdxs.join(',') : (v.cupoIdxs || ''),
@@ -9765,6 +9932,8 @@ function normalizarWA(waRaw, vuid){
 
 function normalizarCuenta(c){
   if(!c) return c;
+  const modeloSrv = modeloAccesoServicio(getSrv(c.srvUid));
+  const sinModeloGuardado = c.usaCuentaMadre === undefined || c.usaCuentaMadre === '' || c.usaCuentaMadre === null;
   return {
     ...c,
     desde: parsearFecha(c.desde) || c.desde || '',
@@ -9772,6 +9941,10 @@ function normalizarCuenta(c){
     costo: parseFloat(c.costo) || 0,
     archivada: c.archivada === true || c.archivada === 'TRUE' || c.archivada === 'true',
     renovable: !(c.renovable === false || c.renovable === 'FALSE' || c.renovable === 'false' || c.renovable === 'no'),
+    usaCuentaMadre: sinModeloGuardado ? modeloSrv.usaCuentaMadre : (c.usaCuentaMadre === true || c.usaCuentaMadre === 'TRUE' || c.usaCuentaMadre === 'true'),
+    madreVendible: sinModeloGuardado ? modeloSrv.madreVendible : (c.madreVendible === true || c.madreVendible === 'TRUE' || c.madreVendible === 'true'),
+    tipoAcceso: c.tipoAcceso || modeloSrv.tipoAcceso,
+    direccion: c.direccion || '',
     cupos: Array.isArray(c.cupos) ? c.cupos.map(cu => ({
       ...cu,
       vence: parsearFecha(cu.vence) || cu.vence || '',
@@ -9824,6 +9997,8 @@ function normalizarVenta(v){
     tipoRegistro: v.tipoRegistro || (v.ventaOrigenUID ? 'renovacion' : 'venta_nueva'),
     ventaOrigenUID: v.ventaOrigenUID || '',
     creditoAplicado: isNaN(parseFloat(v.creditoAplicado)) ? 0 : parseFloat(v.creditoAplicado),
+    fechaInactivacion: v.fechaInactivacion || '',
+    purgaOperativa: v.purgaOperativa === true || v.purgaOperativa === 'TRUE' || v.purgaOperativa === 'true',
     costoAdq: parseFloat(v.costoAdq) || 0,
     metodoAdq: v.metodoAdq || 'Transferencia',
     notas:  v.notas  || '',
@@ -9927,8 +10102,11 @@ function cargarDesdeSheets(data){
   inyectarDatosPDF();
   normalizarFechasApp();
 
+  const huboDepuracion = depurarInactivosAntiguos();
+
   guardarLocal(construirPayload());
   inicializarUI();
+  if(huboDepuracion) setTimeout(() => sincronizarConSheets(), 1200);
 }
 
 function inyectarDatosPDF(){
