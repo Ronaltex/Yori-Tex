@@ -3395,7 +3395,9 @@ function asignacionesCuposVenta(v){
   return indicesCuposVenta(v).map(i => ({ cuentaUID: v.cuentaUID, cupoIdx: i })).filter(x => x.cuentaUID && !isNaN(x.cupoIdx));
 }
 function cupoLibreConRol(cupo){
-  return {estado:'libre',tipoAcceso:cupo?.tipoAcceso||'',etiquetaAcceso:cupo?.etiquetaAcceso||'',rolConfirmado:cupo?.rolConfirmado||false,rolOrigen:cupo?.rolOrigen||''};
+  const libre = {estado:'libre',tipoAcceso:cupo?.tipoAcceso||'',etiquetaAcceso:cupo?.etiquetaAcceso||'',rolConfirmado:cupo?.rolConfirmado||false,rolOrigen:cupo?.rolOrigen||''};
+  if(cupo?.tipoAcceso === 'madre' && cupo.invCorreo) libre.invCorreo = cupo.invCorreo;
+  return libre;
 }
 function liberarCuposDeVenta(v){
   if(!v) return;
@@ -3413,15 +3415,93 @@ function liberarCuposDeVenta(v){
     });
   });
 }
+function reconciliarRelacionesVentasCupos(){
+  const resultado = {reparados:0,huerfanos:0,conflictos:0};
+  const activas = (APP.ventas || []).filter(v => v && v.activa !== false && !v.eliminadoRegistro);
+
+  // Compatibilidad con ventas antiguas que conservaron cuentaUID, pero perdieron
+  // cupoIdx/cuposAsignados. Solo repara cuando existe un único cupo ocupado
+  // que coincide por cliente, WhatsApp y producto.
+  activas.forEach(venta => {
+    if(asignacionesCuposVenta(venta).length || !venta.cuentaUID) return;
+    const cuenta = APP.cuentas.find(c => c.uid === venta.cuentaUID);
+    if(!cuenta) return;
+    const cliente = ccNormalizarIdentidad(venta.cliente);
+    const wa = String(venta.wa || '').replace(/\D/g,'');
+    const candidatos = (cuenta.cupos || []).map((cu,i) => ({cu,i})).filter(({cu}) => {
+      if(cu.estado !== 'ocupado') return false;
+      const mismoCliente = cliente && ccNormalizarIdentidad(cu.cliente) === cliente;
+      const cuWa = String(cu.wa || '').replace(/\D/g,'');
+      const mismoWa = wa && cuWa && (wa === cuWa || wa.slice(-9) === cuWa.slice(-9));
+      return mismoCliente && mismoWa && (!cu.ventaUid || cu.ventaUid === venta.uid);
+    });
+    if(candidatos.length !== 1) return;
+    const {cu,i} = candidatos[0];
+    venta.cuposAsignados = [{cuentaUID:cuenta.uid,cupoIdx:i,precio:parseFloat(venta.precio)||0,estado:venta.estado,fecha:venta.fecha,vence:venta.vence}];
+    venta.cupoIdx = i;
+    venta.cupoIdxs = [i];
+    if(!cu.ventaUid) cu.ventaUid = venta.uid;
+    resultado.reparados++;
+  });
+
+  (APP.cuentas || []).forEach(cuenta => {
+    (cuenta.cupos || []).forEach((cupo,idx) => {
+      if(cupo.estado !== 'ocupado') return;
+      const anterior = cupo.ventaUid || '';
+      const venta = ccBuscarVentaActivaDeCupo(cuenta.uid,idx,cupo,true);
+      if(!venta){ resultado.huerfanos++; return; }
+      if(anterior !== venta.uid) resultado.reparados++;
+      const precioPorCupo = (parseFloat(venta.precio)||0) / Math.max(1,cuposDeVenta(venta));
+      const cambios = {
+        cliente:cupo.cliente || venta.cliente || '',
+        wa:cupo.wa || venta.wa || '',
+        vence:cupo.vence || venta.vence || '',
+        ventaUid:venta.uid,
+        pendienteCobro:venta.estado !== 'pagado',
+        periodoDesde:cupo.periodoDesde || venta.fecha || '',
+        periodoHasta:cupo.periodoHasta || venta.vence || '',
+        montoVenta:parseFloat(cupo.montoVenta)||precioPorCupo
+      };
+      Object.keys(cambios).forEach(k => {
+        if(String(cupo[k] ?? '') !== String(cambios[k] ?? '')) resultado.reparados++;
+        cupo[k] = cambios[k];
+      });
+    });
+  });
+
+  activas.forEach(venta => {
+    asignacionesCuposVenta(venta).forEach(a => {
+      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+      const idx = parseInt(a.cupoIdx);
+      const cupo = cuenta?.cupos?.[idx];
+      if(!cupo){ resultado.huerfanos++; return; }
+      if(cupo.ventaUid && cupo.ventaUid !== venta.uid){ resultado.conflictos++; return; }
+      const antes = JSON.stringify([cupo.estado,cupo.ventaUid,cupo.cliente,cupo.wa,cupo.vence,cupo.pendienteCobro]);
+      cupo.estado = 'ocupado';
+      cupo.ventaUid = venta.uid;
+      cupo.cliente = venta.cliente || cupo.cliente || '';
+      cupo.wa = venta.wa || cupo.wa || '';
+      cupo.vence = venta.vence || cupo.vence || '';
+      cupo.pendienteCobro = venta.estado !== 'pagado';
+      cupo.periodoDesde = venta.fecha || cupo.periodoDesde || '';
+      cupo.periodoHasta = venta.vence || cupo.periodoHasta || '';
+      if(antes !== JSON.stringify([cupo.estado,cupo.ventaUid,cupo.cliente,cupo.wa,cupo.vence,cupo.pendienteCobro])) resultado.reparados++;
+    });
+  });
+  return resultado;
+}
 function desvincularVentasDeCuenta(cuenta){
   if(!cuenta) return;
   APP.ventas.forEach(v => {
-    if(v.cuentaUID === cuenta.uid){
-      v.cuentaUID = null;
-      v.cupoIdx = null;
-      v.cupoIdxs = [];
-      v.cuposAsignados = [];
-    }
+    const actuales = asignacionesCuposVenta(v);
+    const restantes = actuales.filter(a => a.cuentaUID !== cuenta.uid);
+    if(restantes.length === actuales.length && v.cuentaUID !== cuenta.uid) return;
+    const detalles = Array.isArray(v.cuposAsignados) ? v.cuposAsignados : actuales;
+    v.cuposAsignados = detalles.filter(a => a.cuentaUID !== cuenta.uid);
+    if(!v.cuposAsignados.length && restantes.length) v.cuposAsignados = restantes;
+    v.cuentaUID = v.cuposAsignados[0]?.cuentaUID || null;
+    v.cupoIdx = v.cuposAsignados[0]?.cupoIdx ?? null;
+    v.cupoIdxs = v.cuentaUID ? v.cuposAsignados.filter(a => a.cuentaUID === v.cuentaUID).map(a => parseInt(a.cupoIdx)).filter(i => !isNaN(i)) : [];
   });
 }
 function construirCuentaVirtual(uidVirtual){
@@ -5434,23 +5514,31 @@ function ncRenovarCuenta(){
   if(renCosto > 0){
     const desc = `Renovación ${c.id} (${c.srvNom||''})`;
     const esUsdt = renMetodo.toLowerCase().includes('usdt') || renMetodo.toLowerCase().includes('binance');
+    const costoUID = uid();
+    let montoUSD = renCosto, usdtUsado = 0;
     if(esUsdt){
-      const ok = descontarUSDTBinance(renCosto, desc, c.uid, null, renDesde);
+      const fifo = calcFIFO(renCosto);
+      montoUSD = fifo.total || renCosto;
+      usdtUsado = renCosto;
+      const ok = descontarUSDTBinance(renCosto, desc, c.uid, costoUID, renDesde);
       if(!ok) return;
-      alert(`✅ Renovación registrada.\n💱 ${renCosto.toFixed(2)} USDT descontados del saldo Binance.`);
-    } else {
-      APP.costos.push({
-        uid: uid(),
-        fecha: renDesde,
-        catUid: 'cg-cuentas',
-        desc,
-        metodo: renMetodo,
-        montoUSD: renCosto,
-        usdtUsado: 0,
-        notas: `Renovación automática desde inventario. Período: ${renDesde} → ${renHasta}`
-      });
-      alert(`✅ Renovación registrada.\n💰 Costo $${renCosto.toFixed(2)} agregado automáticamente a gastos.`);
     }
+    APP.costos.push({
+      uid: costoUID,
+      tipo: 'renovacion_cuenta',
+      fecha: renDesde,
+      catUid: 'cg-cuentas',
+      desc,
+      metodo: renMetodo,
+      montoUSD,
+      usdtUsado,
+      cuentaUID: c.uid,
+      esCostoReal: true,
+      notas: `Renovación automática desde inventario. Período: ${renDesde} → ${renHasta}`
+    });
+    alert(esUsdt
+      ? `✅ Renovación registrada.\n💱 ${renCosto.toFixed(2)} USDT registrados como gasto.`
+      : `✅ Renovación registrada.\n💰 Costo $${renCosto.toFixed(2)} agregado automáticamente a gastos.`);
   } else {
     alert('✅ Vigencia actualizada.');
   }
@@ -5559,9 +5647,10 @@ function ecGuardar(){
       if(i !== cupoIdx && cu.tipoAcceso === 'madre') cuenta.cupos[i] = {...cu,tipoAcceso:modelo.tipoAcceso,etiquetaAcceso:'',rolConfirmado:true,rolOrigen:'manual'};
     });
   }
-  cuenta.cupos[cupoIdx] = {
+  const estadoNuevo = document.getElementById('ec-estado').value;
+  const cupoEditado = {
     ...cuenta.cupos[cupoIdx],
-    estado: document.getElementById('ec-estado').value,
+    estado: estadoNuevo,
     cliente: document.getElementById('ec-cliente').value,
     wa: document.getElementById('ec-wa').value,
     perfil: document.getElementById('ec-perfil').value,
@@ -5577,6 +5666,10 @@ function ecGuardar(){
     periodoDesde: cuenta.desde || hoy(),
     periodoHasta: document.getElementById('ec-vence').value || cuenta.hasta || ''
   };
+  cuenta.cupos[cupoIdx] = estadoNuevo === 'libre'
+    ? cupoLibreConRol(cupoEditado)
+    : cupoEditado;
+  if(estadoNuevo === 'ocupado') ccBuscarVentaActivaDeCupo(cuentaUID,cupoIdx,cuenta.cupos[cupoIdx],true);
   cerrarModal('modal-editar-cupo');
   renderInventario();
   sincronizarConSheets();
@@ -5761,7 +5854,7 @@ function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, m
     const fifo = calcFIFO(costoCuenta);
     usdtUsado = costoCuenta;
     montoUSDReal = fifo.total || costoCuenta;
-    descontarUSDTBinance(costoCuenta, `Adquisicion cuenta madre - ${idVal} (${srv ? srv.nombre : srvUid})`, cuentaUID, null, fecha || hoy());
+    descontarUSDTBinance(costoCuenta, `Adquisicion cuenta madre - ${idVal} (${srv ? srv.nombre : srvUid})`, cuentaUID, costoUID, fecha || hoy());
   }
   APP.costos.push({
     uid: costoUID,
@@ -6170,13 +6263,8 @@ function venBulkEliminarConfirmar(){
   uids.forEach(ventaUid => {
     const v = APP.ventas.find(x => x.uid === ventaUid);
     if(!v) return;
-    // Liberar cupo en la cuenta madre si corresponde
-    if(v.cuentaUID){
-      const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-      if(cuenta && v.cupoIdx !== null && v.cupoIdx !== undefined){
-        cuenta.cupos[v.cupoIdx] = cupoLibreConRol(cuenta.cupos[v.cupoIdx]);
-      }
-    }
+    // Una venta puede ocupar varios accesos, incluso en cuentas distintas.
+    liberarCuposDeVenta(v);
     // Agregar a lista negra para que no reaparezca (crítico para históricas)
     if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
     if(eliminarIngreso){
@@ -6190,6 +6278,9 @@ function venBulkEliminarConfirmar(){
       v.motivoSalida    = 'Eliminado masivo (ingreso conservado)';
       v.cuentaUID       = null;
       v.cupoIdx         = null;
+      v.cupoIdxs        = [];
+      v.cuposAsignados  = [];
+      v.fechaInactivacion = new Date().toISOString();
     }
     procesados++;
   });
@@ -7292,12 +7383,16 @@ function renderDashboard(){
   setText('d-renovaciones-s', '$'+renovCobradas.reduce((s,v)=>s+(parseFloat(v.precio)||0),0).toFixed(2)+' cobrado');
   setText('d-renovaciones-pend', renovPendientes.length);
   setText('d-renovaciones-pend-s', '$'+renovPendientes.reduce((s,v)=>s+(parseFloat(v.precio)||0),0).toFixed(2)+' pendiente');
-  const totalClientes = new Set(APP.ventas.map(v => v.cliente)).size;
-  const activosSet = new Set(APP.ventas.filter(v => v.activa !== false).map(v => v.cliente)).size;
-  const inactivosSet = new Set(APP.ventas.filter(v => v.activa === false).map(v => v.cliente)).size;
-  document.getElementById('d-activos').textContent = activosSet;
-  document.getElementById('d-inactivos').textContent = inactivosSet;
-  document.getElementById('d-tasa').textContent = (totalClientes>0?((activosSet/totalClientes)*100).toFixed(0):0) + '%';
+  const clienteKey = v => {
+    const wa = String(v?.wa || '').replace(/\D/g,'');
+    return wa.length >= 7 ? 'wa:'+wa.slice(-9) : 'nom:'+ccNormalizarIdentidad(v?.cliente);
+  };
+  const totalClientes = new Set(APP.ventas.filter(v=>!v.eliminadoRegistro).map(clienteKey).filter(k=>!k.endsWith(':'))).size;
+  const activosIds = new Set(APP.ventas.filter(v => v.activa !== false && !v.eliminadoRegistro).map(clienteKey));
+  const inactivosIds = new Set(APP.ventas.filter(esInactivoReutilizable).map(clienteKey).filter(k => !activosIds.has(k)));
+  document.getElementById('d-activos').textContent = activosIds.size;
+  document.getElementById('d-inactivos').textContent = inactivosIds.size;
+  document.getElementById('d-tasa').textContent = (totalClientes>0?((activosIds.size/totalClientes)*100).toFixed(0):0) + '%';
   // Gráfica: agrupar según período
   let chartLabels, chartData;
   if(_dashPeriodo === 'todo'){
@@ -7582,12 +7677,55 @@ function ccSelCuentaRepo(){
   cupoWrap.style.display = 'block';
 }
 
+function ccNormalizarIdentidad(valor){
+  return String(valor || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+}
+function ccBuscarVentaActivaDeCupo(cuentaUID, cupoIdx, cupo, reparar=false){
+  const idx = parseInt(cupoIdx);
+  const activas = (APP.ventas || []).filter(v => v && v.activa !== false && !v.eliminadoRegistro);
+  let venta = cupo?.ventaUid ? activas.find(v => v.uid === cupo.ventaUid) : null;
+
+  if(!venta && cuentaUID && !isNaN(idx)){
+    venta = activas.find(v => asignacionesCuposVenta(v).some(a => a.cuentaUID === cuentaUID && parseInt(a.cupoIdx) === idx));
+  }
+  if(!venta && cuentaUID && !isNaN(idx)){
+    venta = activas.find(v => v.cuentaUID === cuentaUID && indicesCuposVenta(v).some(i => parseInt(i) === idx));
+  }
+  if(!venta){
+    const cliente = ccNormalizarIdentidad(cupo?.cliente);
+    const wa = String(cupo?.wa || '').replace(/\D/g,'');
+    const cuenta = obtenerCuentaInventarioOVirtual(cuentaUID);
+    const candidatos = activas.map(v => {
+      let puntos = 0;
+      if(cliente && ccNormalizarIdentidad(v.cliente) === cliente) puntos += 5;
+      const ventaWa = String(v.wa || '').replace(/\D/g,'');
+      if(wa && ventaWa && (ventaWa === wa || ventaWa.slice(-9) === wa.slice(-9))) puntos += 7;
+      if(cuenta?.srvUid && v.srvUid === cuenta.srvUid) puntos += 4;
+      else if(cuenta?.srvNom && ccNormalizarIdentidad(v.srvNom).includes(ccNormalizarIdentidad(cuenta.srvNom))) puntos += 4;
+      if(cuentaUID && v.cuentaUID === cuentaUID) puntos += 3;
+      if(cupo?.vence && normalizarFechaValor(v.vence) === normalizarFechaValor(cupo.vence)) puntos += 2;
+      return {v,puntos};
+    }).filter(x => x.puntos >= 9).sort((a,b) => b.puntos-a.puntos || String(b.v.creado||b.v.fecha||'').localeCompare(String(a.v.creado||a.v.fecha||'')));
+    if(candidatos.length && (candidatos.length === 1 || candidatos[0].puntos > candidatos[1].puntos)) venta = candidatos[0].v;
+  }
+
+  if(venta && reparar && cupo){
+    cupo.ventaUid = venta.uid;
+    if(!venta.cuentaUID) venta.cuentaUID = cuentaUID;
+    if((venta.cupoIdx === null || venta.cupoIdx === undefined || venta.cupoIdx === '') && !isNaN(idx)) venta.cupoIdx = idx;
+    if(!asignacionesCuposVenta(venta).length && cuentaUID && !isNaN(idx)){
+      venta.cupoIdxs = [idx];
+      venta.cuposAsignados = [{cuentaUID,cupoIdx:idx,precio:parseFloat(venta.precio)||0,estado:venta.estado,fecha:venta.fecha,vence:venta.vence}];
+    }
+  }
+  return venta || null;
+}
 function ccVentaAfectada(){
   const cuentaUID=document.getElementById('cc-cuenta-uid')?.value||'';
   const c=obtenerCuentaInventarioOVirtual(cuentaUID), sel=document.getElementById('cc-venta-sel')?.value||'';
   if(!c?.cupos) return null;
   const idx=sel!==''?parseInt(sel):c.cupos.findIndex(x=>x.estado==='ocupado'), cu=c.cupos[idx];
-  const v=cu?.ventaUid?APP.ventas.find(x=>x.uid===cu.ventaUid):APP.ventas.find(x=>x.cuentaUID===cuentaUID&&parseInt(x.cupoIdx)===idx&&x.activa!==false);
+  const v=ccBuscarVentaActivaDeCupo(cuentaUID,idx,cu,false);
   return v?{venta:v,cupo:cu,idx}:null;
 }
 function ccDiasRestantes(v){
@@ -7595,8 +7733,8 @@ function ccDiasRestantes(v){
   return Math.max(0,Math.ceil((new Date(v.vence+'T12:00:00')-new Date(hoy()+'T12:00:00'))/86400000));
 }
 function ccActualizarReembolso(){
-  const c=obtenerCuentaInventarioOVirtual(document.getElementById('cc-cuenta-uid')?.value||''), sel=document.getElementById('cc-venta-sel')?.value||'', afectados=[];
-  if(c?.cupos)c.cupos.forEach((cu,i)=>{if(cu.estado==='ocupado'&&(sel===''||String(i)===String(sel))){const v=cu.ventaUid?APP.ventas.find(x=>x.uid===cu.ventaUid):null;if(v)afectados.push(v);}});
+  const cuentaUID=document.getElementById('cc-cuenta-uid')?.value||'', c=obtenerCuentaInventarioOVirtual(cuentaUID), sel=document.getElementById('cc-venta-sel')?.value||'', afectados=[];
+  if(c?.cupos)c.cupos.forEach((cu,i)=>{if(cu.estado==='ocupado'&&(sel===''||String(i)===String(sel))){const v=ccBuscarVentaActivaDeCupo(cuentaUID,i,cu,false);if(v)afectados.push(v);}});
   const total=afectados.reduce((s,v)=>s+(parseFloat(v.precio)||0)*ccDiasRestantes(v)/Math.max(1,parseInt(v.dias)||30),0);
   const cal=document.getElementById('cc-rem-calculado'),monto=document.getElementById('cc-rem-monto');
   if(cal)cal.value=total.toFixed(2);
@@ -7714,7 +7852,7 @@ function ccGuardar(prepararMensaje=false){
     const notas = document.getElementById('cc-rem-notas').value || 'Cuenta caída';
     const srv = getSrv(c.srvUid);
     const srvNom = srv ? srv.emoji + ' ' + srv.nombre : c.id;
-    const afectados = (c.cupos || []).map((cu,i)=>({cu,i,v:cu.ventaUid ? APP.ventas.find(x=>x.uid===cu.ventaUid && x.activa!==false) : APP.ventas.find(x=>x.cuentaUID===cuentaUID && parseInt(x.cupoIdx)===i && x.activa!==false)})).filter(x=>x.cu.estado==='ocupado' && x.v && (ventaCupoIdx==='' || String(x.i)===String(ventaCupoIdx)));
+    const afectados = (c.cupos || []).map((cu,i)=>({cu,i,v:ccBuscarVentaActivaDeCupo(cuentaUID,i,cu,true)})).filter(x=>x.cu.estado==='ocupado' && x.v && (ventaCupoIdx==='' || String(x.i)===String(ventaCupoIdx)));
     const calculadoTotal = afectados.reduce((s,x)=>s+(parseFloat(x.v.precio)||0)*ccDiasRestantes(x.v)/Math.max(1,parseInt(x.v.dias)||30),0);
     if(!afectados.length){ alert('No hay un cliente activo asociado a esta cuenta.'); return; }
     afectados.forEach((x,idx)=>{
@@ -7722,7 +7860,10 @@ function ccGuardar(prepararMensaje=false){
       const parte=calculadoTotal>0 ? monto*(calculado/calculadoTotal) : (afectados.length===1?monto:0);
       const partePagada=calculadoTotal>0 ? pagado*(calculado/calculadoTotal) : (afectados.length===1?pagado:0);
       APP.reembolsos.push({uid:uid(),fecha,cliente:x.cu.cliente||x.v.cliente||'Cliente',servicio:srvNom+' ('+c.id+')',motivo:'⚡ '+notas,monto:Number(parte.toFixed(2)),montoCalculado:Number(calculado.toFixed(2)),montoPagado:Number(partePagada.toFixed(2)),saldoPendiente:Number(Math.max(0,parte-partePagada).toFixed(2)),estado,metodo,ventaUID:x.v.uid,diasRestantes:ccDiasRestantes(x.v)});
-      x.cu.estado='libre'; x.v.activa=false; x.v.motivoSalida='Cuenta caída — reembolso '+estado;
+      if(!c.esVirtual && c.cupos?.[x.i]) c.cupos[x.i] = cupoLibreConRol(c.cupos[x.i]);
+      x.v.activa=false;
+      x.v.motivoSalida='Cuenta caída — reembolso '+estado;
+      x.v.fechaInactivacion=new Date().toISOString();
       if(idx===0) ventaMensaje=x.v;
     });
     if(pagado>0) ccRegistrarCostoConFIFO(pagado, metodo, `Reembolso pagado por cuenta caída — ${srvNom} (${c.id})`, fecha, 'cg-otro', cuentaUID);
@@ -7739,7 +7880,7 @@ function ccGuardar(prepararMensaje=false){
     let cupoAfectadoIdx = parseInt(ventaCupoIdx);
     const cupoAfectado = cupoAfectadoIdx >= 0 && c.cupos ? c.cupos[cupoAfectadoIdx] : null;
     if(!cupoAfectado || cupoAfectado.estado!=='ocupado'){ alert('Selecciona un cupo ocupado válido.'); return; }
-    const ventaAfectada = cupoAfectado.ventaUid ? APP.ventas.find(v=>v.uid===cupoAfectado.ventaUid && v.activa!==false) : null;
+    const ventaAfectada = ccBuscarVentaActivaDeCupo(cuentaUID,cupoAfectadoIdx,cupoAfectado,true);
     if(!ventaAfectada){ alert('No encontré la venta activa de este cliente.'); return; }
 
     if(tipo === 'inventario'){
@@ -10208,11 +10349,12 @@ function cargarDesdeSheets(data){
   inyectarDatosPDF();
   normalizarFechasApp();
 
+  const conciliacion = reconciliarRelacionesVentasCupos();
   const huboDepuracion = depurarInactivosAntiguos();
 
   guardarLocal(construirPayload());
   inicializarUI();
-  if(huboDepuracion) setTimeout(() => sincronizarConSheets(), 1200);
+  if(huboDepuracion || conciliacion.reparados > 0) setTimeout(() => sincronizarConSheets(), 1200);
 }
 
 function inyectarDatosPDF(){
