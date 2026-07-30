@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v22-20260716-sync-sin-bloqueo';
+const CACHE_NAME = 'yoritex-v23-20260730-integridad-reposiciones';
 const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
