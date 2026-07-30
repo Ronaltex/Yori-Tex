@@ -4140,7 +4140,7 @@ function liberarCuposDeVenta(v){
   });
 }
 function reconciliarRelacionesVentasCupos(){
-  const resultado = {reparados:0,huerfanos:0,conflictos:0};
+  const resultado = {reparados:0,huerfanos:0,conflictos:0,liberadosVencidos:0,huerfanosDetalle:[]};
   const activas = (APP.ventas || []).filter(v => v && v.activa !== false && !v.eliminadoRegistro);
 
   // Quitar referencias antiguas que quedaron dentro de una venta múltiple
@@ -4200,7 +4200,27 @@ function reconciliarRelacionesVentasCupos(){
       if(cupo.estado !== 'ocupado') return;
       const anterior = cupo.ventaUid || '';
       const venta = ccBuscarVentaActivaDeCupo(cuenta.uid,idx,cupo,true);
-      if(!venta){ resultado.huerfanos++; return; }
+      if(!venta){
+        const fechaLimite = String(cupo.periodoHasta || cupo.vence || '').slice(0,10);
+        // Un residuo sin venta solo se libera automáticamente cuando su propia
+        // fecha confirma que ya terminó. Sin fecha o con vigencia futura se
+        // conserva y se reporta: nunca se adivina sobre el acceso de un cliente.
+        if(/^\d{4}-\d{2}-\d{2}$/.test(fechaLimite) && fechaLimite < hoy()){
+          cuenta.cupos[idx] = cupoLibreConRol(cupo);
+          resultado.reparados++;
+          resultado.liberadosVencidos++;
+          return;
+        }
+        resultado.huerfanos++;
+        resultado.huerfanosDetalle.push({
+          cuentaUID:cuenta.uid,
+          cuenta:cuenta.id || cuenta.correo || cuenta.uid,
+          cupoIdx:idx,
+          cliente:cupo.cliente || '',
+          vence:fechaLimite
+        });
+        return;
+      }
       if(anterior !== venta.uid) resultado.reparados++;
       const precioPorCupo = (parseFloat(venta.precio)||0) / Math.max(1,cuposDeVenta(venta));
       const cambios = {
@@ -8680,7 +8700,33 @@ function ccBuscarVentaActivaDeCupo(cuentaUID, cupoIdx, cupo, reparar=false){
     cupo.ventaUid = venta.uid;
     if(!venta.cuentaUID) venta.cuentaUID = cuentaUID;
     if((venta.cupoIdx === null || venta.cupoIdx === undefined || venta.cupoIdx === '') && !isNaN(idx)) venta.cupoIdx = idx;
-    if(!asignacionesCuposVenta(venta).length && cuentaUID && !isNaN(idx)){
+    const asignacionesPrevias = asignacionesCuposVenta(venta);
+    const yaIncluyeCupo = asignacionesPrevias.some(a => a.cuentaUID === cuentaUID && parseInt(a.cupoIdx) === idx);
+    const esDestinoExplicito = cuentaUID && !isNaN(idx) &&
+      venta.cuentaUID === cuentaUID && parseInt(venta.cupoIdx) === idx;
+    // Compatibilidad con reposiciones antiguas: algunas actualizaron el destino
+    // principal de la venta, pero dejaron cuposAsignados apuntando a la cuenta
+    // caída. Solo se corrige cuando hay un único origen y este ya está archivado.
+    if(!yaIncluyeCupo && esDestinoExplicito && asignacionesPrevias.length === 1){
+      const anterior = asignacionesPrevias[0];
+      const cuentaAnterior = APP.cuentas.find(c => c.uid === anterior.cuentaUID);
+      const idxAnterior = parseInt(anterior.cupoIdx);
+      const cupoAnterior = cuentaAnterior?.cupos?.[idxAnterior];
+      if(cuentaAnterior?.archivada && cupoAnterior?.ventaUid === venta.uid){
+        cuentaAnterior.cupos[idxAnterior] = cupoLibreConRol(cupoAnterior);
+        venta.cupoIdxs = [idx];
+        venta.cuposAsignados = [{
+          cuentaUID,
+          cupoIdx:idx,
+          perfil:cupo.perfil || venta.perfil || '',
+          pin:cupo.pin || venta.pin || '',
+          precio:parseFloat(cupo.montoVenta) || parseFloat(venta.precio) || 0,
+          estado:venta.estado,
+          fecha:venta.fecha,
+          vence:venta.vence
+        }];
+      }
+    } else if(!asignacionesPrevias.length && cuentaUID && !isNaN(idx)){
       venta.cupoIdxs = [idx];
       venta.cuposAsignados = [{cuentaUID,cupoIdx:idx,precio:parseFloat(venta.precio)||0,estado:venta.estado,fecha:venta.fecha,vence:venta.vence}];
     }
@@ -9228,6 +9274,17 @@ function analizarIntegridadYori(){
     else if(cupo.ventaUid && cupo.ventaUid!==v.uid) vinculosRotos.push({tipo:'diferente',venta:v,cuenta,cupo,cuentaUID:a.cuentaUID,cupoIdx:a.cupoIdx});
     else if(cuenta.archivada) vinculosRotos.push({tipo:'archivada',venta:v,cuenta,cupo,cuentaUID:a.cuentaUID,cupoIdx:a.cupoIdx});
   }));
+  const ventasPorUid=new Map(activas.map(v=>[String(v.uid||''),v]));
+  (APP.cuentas||[]).forEach(cuenta=>(cuenta.cupos||[]).forEach((cupo,cupoIdx)=>{
+    if(cupo.estado!=='ocupado')return;
+    const venta=ventasPorUid.get(String(cupo.ventaUid||''));
+    if(!venta){
+      vinculosRotos.push({tipo:'cupo_sin_venta',venta:null,cuenta,cupo,cuentaUID:cuenta.uid,cupoIdx});
+      return;
+    }
+    const declarado=asignacionesCuposVenta(venta).some(a=>a.cuentaUID===cuenta.uid && parseInt(a.cupoIdx)===cupoIdx);
+    if(!declarado) vinculosRotos.push({tipo:'venta_sin_cupo',venta,cuenta,cupo,cuentaUID:cuenta.uid,cupoIdx});
+  }));
   const ventasCero=activas.filter(v=>(parseFloat(v.precio)||0)===0 && !String(v.uid||'').startsWith('hist-')).map(v=>{
     const wa=String(v.wa||'').replace(/\D/g,'');
     const candidatos=(APP.ventas||[]).filter(o=>o.uid!==v.uid && (parseFloat(o.precio)||0)>0 && o.srvUid===v.srvUid && (
@@ -9260,9 +9317,20 @@ function abrirRevisionIntegridad(){
     const [cuentaUID,idx]=x.key.split(':'),cuenta=APP.cuentas.find(c=>c.uid===cuentaUID);
     return `<div class="repo-message-row"><strong>${esc(cuenta?.id||cuentaUID)} · Cupo ${parseInt(idx)+1}</strong><div class="hist-sub">${x.ventas.map(v=>esc(v.cliente)+' ('+esc(v.id)+')').join(' · ')}</div></div>`;
   }).join(''));
-  if(analisis.vinculosRotos.length) bloques.push('<div class="sec">🔗 Relaciones que no coinciden</div>'+analisis.vinculosRotos.map(x=>
-    `<div class="repo-message-row"><strong>${esc(x.venta.cliente)} · ${esc(x.venta.id)}</strong><div class="hist-sub">${x.tipo==='archivada'?'Vinculada a una cuenta archivada':x.tipo==='diferente'?'El cupo está registrado a nombre de otra venta':'La cuenta o el cupo ya no existe'}.</div><button class="btn btn-navy" style="margin-top:8px" onclick="cerrarModal('modal-revision-integridad');abrirEditarVenta('${esc(x.venta.uid)}')">Revisar venta</button></div>`
-  ).join(''));
+  if(analisis.vinculosRotos.length) bloques.push('<div class="sec">🔗 Relaciones que no coinciden</div>'+analisis.vinculosRotos.map(x=>{
+    const titulo=x.venta
+      ? `${esc(x.venta.cliente)} · ${esc(x.venta.id)}`
+      : `${esc(x.cuenta?.id||x.cuentaUID)} · Cupo ${parseInt(x.cupoIdx)+1}`;
+    const detalle=x.tipo==='archivada'?'Vinculada a una cuenta archivada'
+      :x.tipo==='diferente'?'El cupo está registrado a nombre de otra venta'
+      :x.tipo==='cupo_sin_venta'?'El cupo figura ocupado, pero no apunta a una venta activa'
+      :x.tipo==='venta_sin_cupo'?'El cupo apunta a la venta, pero la venta no declara este acceso'
+      :'La cuenta o el cupo ya no existe';
+    const accion=x.venta
+      ? `<button class="btn btn-navy" style="margin-top:8px" onclick="cerrarModal('modal-revision-integridad');abrirEditarVenta('${esc(x.venta.uid)}')">Revisar venta</button>`
+      : `<button class="btn btn-navy" style="margin-top:8px" onclick="cerrarModal('modal-revision-integridad');navIr('inventario')">Revisar inventario</button>`;
+    return `<div class="repo-message-row"><strong>${titulo}</strong><div class="hist-sub">${detalle}.</div>${accion}</div>`;
+  }).join(''));
   if(analisis.ventasCero.length) bloques.push('<div class="sec">🧩 Ventas de $0 para revisar</div>'+analisis.ventasCero.map(x=>{
     const unico=x.candidatos.length===1;
     return `<div class="repo-message-row"><strong>${esc(x.venta.cliente)} · ${esc(x.venta.id)}</strong><div class="hist-sub">${esc(x.venta.srvNom)} · ${x.candidatos.length} posible(s) venta(s) original(es) pagada(s)</div>${unico?`<button class="btn btn-primary" style="margin-top:8px" onclick="repararVentaCeroComoReposicion('${esc(x.venta.uid)}','${esc(x.candidatos[0].uid)}')">Revisar y convertir en reposición</button>`:'<div class="repo-validacion warn">Requiere selección manual; no se fusionará automáticamente.</div>'}</div>`;
