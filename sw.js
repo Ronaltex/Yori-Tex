@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v24-20260730-redisenio-visual';
+const CACHE_NAME = 'yoritex-v25-20260730-sync-integridad';
 const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',

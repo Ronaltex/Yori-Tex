@@ -3261,6 +3261,7 @@ let _syncGuardando = false;
 let _syncPendiente = null;
 let _syncEsperas = [];
 let _ultimoErrorSync = '';
+let _ultimoErrorSyncReintentable = false;
 let _syncReintentos = 0;
 let _syncReintentoTimer = null;
 let _mvGuardando = false;
@@ -3268,6 +3269,8 @@ let _ccGuardando = false;
 let _evGuardando = false;
 let _renGuardando = false;
 const SYNC_PENDIENTE_KEY = 'yoritex_sync_pendiente';
+const SYNC_RECUPERACION_KEY = 'yoritex_sync_recuperacion';
+const SYNC_PENDIENTE_VERSION = 2;
 
 // La sesión es temporal: se pide nuevamente al abrir la app o tras 15 minutos sin actividad.
 const AUTH_INACTIVIDAD_MS = 15 * 60 * 1000;
@@ -3318,8 +3321,20 @@ function continuarDespuesCorreo(){
 async function cargarSesionConCorreo(){
   // La carga de la nube no puede impedir el acceso: primero protegemos lo local.
   mostrarSync('🔄', 'Cargando tus datos...', 'Sincronizando con Google Sheets');
-  const pendienteLocal = leerPendienteSync();
+  const pendienteLeido = leerPendienteSync();
+  // Las colas creadas por versiones anteriores podían contener una operación
+  // que ya había sido revertida en pantalla. No se reenvían a ciegas.
+  const pendienteLegacy = pendienteLeido?.data && pendienteLeido.version !== SYNC_PENDIENTE_VERSION
+    ? pendienteLeido
+    : null;
+  if(pendienteLegacy){
+    archivarPendienteSync(pendienteLegacy, 'cola_version_anterior');
+    limpiarPendienteSync();
+  }
+  const pendienteLocal = pendienteLeido?.version === SYNC_PENDIENTE_VERSION &&
+    pendienteLeido?.estado !== 'bloqueado' ? pendienteLeido : null;
   let pendienteEnviado = false;
+  let pendientePuedeReintentarse = true;
   try{
     if(pendienteLocal?.data){
       const sub = document.getElementById('sync-sub');
@@ -3329,13 +3344,19 @@ async function cargarSesionConCorreo(){
         limpiarPendienteSync();
         pendienteEnviado = true;
       } catch(errPendiente) {
-        // La nube puede estar lenta o caída. Conservamos el cambio y continuamos.
+        // Solo una caída real de red conserva la cola. Los conflictos de datos
+        // se aíslan para impedir un ciclo infinito al abrir la aplicación.
         _ultimoErrorSync = errPendiente?.message || 'No se pudo recuperar el cambio pendiente.';
+        pendientePuedeReintentarse = errPendiente?.reintentable === true;
+        if(!pendientePuedeReintentarse){
+          archivarPendienteSync(pendienteLocal, _ultimoErrorSync);
+          limpiarPendienteSync();
+        }
       }
     }
     const res = await apiCall({accion:'cargar', pin:''}, 120000);
     if(!res?.ok || !res.data) throw new Error(res?.error || 'No se pudieron cargar los datos.');
-    if(pendienteLocal?.data && !pendienteEnviado){
+    if(pendienteLocal?.data && !pendienteEnviado && pendientePuedeReintentarse){
       // No sobrescribir la versión local más reciente con una nube anterior.
       cargarDesdeSheets(pendienteLocal.data);
       guardarLocal(pendienteLocal.data);
@@ -3350,14 +3371,15 @@ async function cargarSesionConCorreo(){
       return;
     }
     cargarDesdeSheets(res.data);
+    guardarLocal(res.data);
     _firmaNube = firmaDatos(res.data);
     _ultimaSync = Date.now();
     _pinVerificado = true;
-    setSyncStatus('Sync ' + textoHace(_ultimaSync), 'ok');
+    setSyncStatus(pendienteLegacy ? 'Nube recuperada · cola antigua aislada' : 'Sync ' + textoHace(_ultimaSync), pendienteLegacy ? 'warn' : 'ok');
     iniciarAutoSync();
   }catch(err){
     // Si Sheets falla, entrar con la última copia local y reintentar después.
-    let localData = pendienteLocal?.data || null;
+    let localData = pendientePuedeReintentarse ? (pendienteLocal?.data || null) : null;
     if(!localData){
       try { localData = JSON.parse(localStorage.getItem('yoritex_local') || 'null')?.data || null; } catch(e) {}
     }
@@ -4120,6 +4142,33 @@ function liberarCuposDeVenta(v){
 function reconciliarRelacionesVentasCupos(){
   const resultado = {reparados:0,huerfanos:0,conflictos:0};
   const activas = (APP.ventas || []).filter(v => v && v.activa !== false && !v.eliminadoRegistro);
+
+  // Quitar referencias antiguas que quedaron dentro de una venta múltiple
+  // cuando ese cupo ya fue asignado explícitamente a otra venta. Solo se
+  // corrige automáticamente si la venta conserva al menos otro cupo propio;
+  // así nunca se deja a un cliente sin acceso por una deducción ambigua.
+  activas.forEach(venta => {
+    const detalles = Array.isArray(venta.cuposAsignados)
+      ? venta.cuposAsignados
+      : (() => { try { return JSON.parse(venta.cuposAsignados || '[]'); } catch(e){ return []; } })();
+    if(!Array.isArray(detalles) || detalles.length < 2) return;
+    const propios = detalles.filter(a => {
+      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+      const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)];
+      return cupo && cupo.estado === 'ocupado' && cupo.ventaUid === venta.uid;
+    });
+    const obsoletos = detalles.filter(a => {
+      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+      const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)];
+      return cupo && cupo.estado === 'ocupado' && cupo.ventaUid && cupo.ventaUid !== venta.uid;
+    });
+    if(!propios.length || !obsoletos.length) return;
+    venta.cuposAsignados = propios;
+    venta.cuentaUID = propios[0].cuentaUID;
+    venta.cupoIdx = parseInt(propios[0].cupoIdx);
+    venta.cupoIdxs = propios.filter(a => a.cuentaUID === venta.cuentaUID).map(a => parseInt(a.cupoIdx));
+    resultado.reparados += obsoletos.length;
+  });
 
   // Compatibilidad con ventas antiguas que conservaron cuentaUID, pero perdieron
   // cupoIdx/cuposAsignados. Solo repara cuando existe un único cupo ocupado
@@ -5520,8 +5569,13 @@ function snapshotOperacionCritica(){
     reembolsos: JSON.parse(JSON.stringify(APP.reembolsos || [])),
     egresos: JSON.parse(JSON.stringify(APP.egresos || [])),
     movimientosBinance: JSON.parse(JSON.stringify(APP.movimientosBinance || [])),
+    proveedores: JSON.parse(JSON.stringify(APP.proveedores || [])),
+    adelantosProveedor: JSON.parse(JSON.stringify(APP.adelantosProveedor || [])),
+    asignacionesProveedor: JSON.parse(JSON.stringify(APP.asignacionesProveedor || [])),
     notificaciones: JSON.parse(JSON.stringify(APP.notificaciones || [])),
     mensajesReposicion: JSON.parse(JSON.stringify(APP.mensajesReposicion || [])),
+    ventasEliminadas: JSON.parse(JSON.stringify(APP.ventasEliminadas || [])),
+    cuentasEliminadas: JSON.parse(JSON.stringify(APP.cuentasEliminadas || [])),
     ventaCounter: APP._ventaCounter
   };
 }
@@ -5534,8 +5588,13 @@ function restaurarSnapshotOperacion(s){
   APP.reembolsos = s.reembolsos;
   APP.egresos = s.egresos;
   APP.movimientosBinance = s.movimientosBinance;
+  APP.proveedores = s.proveedores;
+  APP.adelantosProveedor = s.adelantosProveedor;
+  APP.asignacionesProveedor = s.asignacionesProveedor;
   APP.notificaciones = s.notificaciones;
   APP.mensajesReposicion = s.mensajesReposicion;
+  APP.ventasEliminadas = s.ventasEliminadas;
+  APP.cuentasEliminadas = s.cuentasEliminadas;
   APP._ventaCounter = s.ventaCounter;
   renderRegistro();
   renderInventario();
@@ -5546,6 +5605,15 @@ function restaurarSnapshotOperacion(s){
   actualizarBadgeNotificaciones();
   actualizarBadgeMensajesReposicion();
   actualizarSaldoBinance();
+  // Una operación crítica rechazada no puede sobrevivir en localStorage ni
+  // continuar reintentándose después de que la interfaz volvió atrás.
+  if(_syncGuardarTimer){ clearTimeout(_syncGuardarTimer); _syncGuardarTimer = null; }
+  if(_syncReintentoTimer){ clearTimeout(_syncReintentoTimer); _syncReintentoTimer = null; }
+  _syncPendiente = null;
+  _syncDirty = false;
+  _syncReintentos = 0;
+  limpiarPendienteSync();
+  guardarLocal(construirPayload());
 }
 function mvSetGuardando(activo){
   _mvGuardando = !!activo;
@@ -11099,38 +11167,108 @@ async function apiCall(body, timeoutMs){
         cache: 'no-store', redirect: 'follow'
       });
       clearTimeout(timeoutId);
-      if(!res.ok) throw new Error('HTTP ' + res.status + ' al conectar con Google Sheets');
+      if(!res.ok){
+        const errorHttp = new Error('HTTP ' + res.status + ' al conectar con Google Sheets');
+        errorHttp.reintentable = res.status === 408 || res.status === 429 || res.status >= 500;
+        throw errorHttp;
+      }
       const data = await res.json();
-      if(data && data.ok === false) throw new Error(data.error || 'Google Sheets devolvió un error');
+      if(data && data.ok === false){
+        const errorServidor = new Error(data.error || 'Google Sheets devolvió un error');
+        errorServidor.codigo = String(data.error || '').split(':')[0] || 'ERROR_SERVIDOR';
+        errorServidor.reintentable = false;
+        throw errorServidor;
+      }
       return data;
     } catch(err) {
       clearTimeout(timeoutId);
       ultimoError = err;
-      const esRed = err?.name === 'AbortError' || /failed to fetch|networkerror|load failed/i.test(String(err?.message || ''));
+      const esRed = err?.reintentable === true || err?.name === 'AbortError' || /failed to fetch|networkerror|load failed/i.test(String(err?.message || ''));
       if(!esRed || intento === 3) break;
       await new Promise(resolve => setTimeout(resolve, intento * 1200));
     }
   }
-  if(ultimoError?.name === 'AbortError') throw new Error('La conexión con Google Sheets tardó demasiado. Revisa internet e intenta otra vez.');
-  if(/failed to fetch|networkerror|load failed/i.test(String(ultimoError?.message || ''))) throw new Error('No se pudo conectar con Google Sheets. Revisa la conexión a internet del dispositivo; YORI-TEX reintentará solo.');
+  if(ultimoError?.name === 'AbortError'){
+    const errorTiempo = new Error('La conexión con Google Sheets tardó demasiado. Revisa internet e intenta otra vez.');
+    errorTiempo.reintentable = true;
+    throw errorTiempo;
+  }
+  if(/failed to fetch|networkerror|load failed/i.test(String(ultimoError?.message || ''))){
+    const errorRed = new Error('No se pudo conectar con Google Sheets. Revisa la conexión a internet del dispositivo.');
+    errorRed.reintentable = true;
+    throw errorRed;
+  }
   throw ultimoError || new Error('No se pudo conectar con Google Sheets.');
+}
+function esperarSyncLibre(limiteMs=130000){
+  const inicio = Date.now();
+  return new Promise(resolve => {
+    const revisar = () => {
+      if(!_syncGuardando || Date.now() - inicio >= limiteMs) return resolve(!_syncGuardando);
+      setTimeout(revisar, 120);
+    };
+    revisar();
+  });
+}
+function cancelarColaSyncPendiente(){
+  if(_syncGuardarTimer){ clearTimeout(_syncGuardarTimer); _syncGuardarTimer = null; }
+  if(_syncReintentoTimer){ clearTimeout(_syncReintentoTimer); _syncReintentoTimer = null; }
+  _syncPendiente = null;
+  _syncReintentos = 0;
+  const esperas = _syncEsperas.splice(0);
+  esperas.forEach(resolve => resolve(false));
+  limpiarPendienteSync();
+}
+async function sincronizarOperacionCritica(payload){
+  if(!_pinVerificado){
+    _ultimoErrorSync = 'No hay una sesión conectada con la nube.';
+    _ultimoErrorSyncReintentable = false;
+    return false;
+  }
+  // El payload crítico contiene el estado completo más reciente, por lo que
+  // reemplaza cualquier autosave anterior que todavía estuviera en espera.
+  if(!_syncGuardando) cancelarColaSyncPendiente();
+  const libre = await esperarSyncLibre();
+  if(!libre){
+    _ultimoErrorSync = 'Había otra sincronización que no terminó. La operación fue cancelada sin guardar.';
+    _ultimoErrorSyncReintentable = true;
+    return false;
+  }
+  cancelarColaSyncPendiente();
+  _syncGuardando = true;
+  _syncDirty = true;
+  setSyncStatus('Confirmando en la nube...', 'warn');
+  const ok = await _sincronizarBackground(payload, {critica:true});
+  _syncGuardando = false;
+  if(ok){
+    guardarLocal(payload);
+    limpiarPendienteSync();
+    _syncDirty = false;
+    _syncReintentos = 0;
+  } else {
+    // El llamador restaurará su snapshot. Nunca se agenda un segundo envío
+    // oculto de una venta, renovación o reposición rechazada.
+    limpiarPendienteSync();
+    _syncDirty = false;
+  }
+  return ok;
 }
 function sincronizarConSheets(ahora=false){
   const payload = construirPayload();
+  if(ahora) return sincronizarOperacionCritica(payload);
   _syncDirty = true;
   _syncPendiente = payload;
   guardarLocal(payload);
-  guardarPendienteSync(payload);
+  guardarPendienteSync(payload, {estado:'pendiente'});
   if(!_pinVerificado){
     setSyncStatus('Guardado local · pendiente de nube', 'warn');
     return Promise.resolve(false);
   }
   if(_syncReintentoTimer){ clearTimeout(_syncReintentoTimer); _syncReintentoTimer=null; }
-  setSyncStatus(ahora ? 'Guardando...' : 'En cola...', 'warn');
+  setSyncStatus('En cola...', 'warn');
   const espera = new Promise(resolve => _syncEsperas.push(resolve));
   if(_syncGuardarTimer) clearTimeout(_syncGuardarTimer);
-  if(ahora) procesarColaSync();
-  else _syncGuardarTimer = setTimeout(procesarColaSync, 850);
+  _syncGuardarTimer = setTimeout(procesarColaSync, 850);
   return espera;
 }
 async function procesarColaSync(){
@@ -11144,13 +11282,19 @@ async function procesarColaSync(){
   const ok = await _sincronizarBackground(payload);
   _syncGuardando = false;
   if(ok) _syncReintentos = 0;
-  else if(!_syncPendiente && _syncReintentos < 4 && navigator.onLine !== false){
+  else if(_ultimoErrorSyncReintentable && !_syncPendiente && _syncReintentos < 4 && navigator.onLine !== false){
     _syncReintentos++;
     _syncPendiente = payload;
+    guardarPendienteSync(payload, {estado:'pendiente'});
     const esperaReintento = _syncReintentos * 12000;
     setSyncStatus('Reintentando en ' + Math.round(esperaReintento/1000) + ' s...', 'warn');
     if(_syncReintentoTimer) clearTimeout(_syncReintentoTimer);
     _syncReintentoTimer = setTimeout(() => { _syncReintentoTimer=null; procesarColaSync(); }, esperaReintento);
+  } else if(!ok && !_ultimoErrorSyncReintentable) {
+    archivarPendienteSync({data:payload, version:SYNC_PENDIENTE_VERSION}, _ultimoErrorSync || 'rechazado_por_servidor');
+    limpiarPendienteSync();
+    _syncDirty = false;
+    setSyncStatus('Cambio rechazado · nube protegida', 'err');
   }
   if(_syncPendiente && !_syncReintentoTimer){
     procesarColaSync();
@@ -11192,14 +11336,30 @@ function guardarLocal(payload){
     localStorage.setItem('yoritex_local', JSON.stringify({ _pin: _pinGuardado, data: payload, _ts: Date.now() }));
   } catch(e){}
 }
-function guardarPendienteSync(payload){
-  try { localStorage.setItem(SYNC_PENDIENTE_KEY, JSON.stringify({data:payload, ts:Date.now()})); } catch(e){}
+function guardarPendienteSync(payload, meta={}){
+  try {
+    localStorage.setItem(SYNC_PENDIENTE_KEY, JSON.stringify({
+      version: SYNC_PENDIENTE_VERSION,
+      estado: meta.estado || 'pendiente',
+      data: payload,
+      ts: Date.now()
+    }));
+  } catch(e){}
 }
 function leerPendienteSync(){
   try { return JSON.parse(localStorage.getItem(SYNC_PENDIENTE_KEY) || 'null'); } catch(e){ return null; }
 }
 function limpiarPendienteSync(){
   try { localStorage.removeItem(SYNC_PENDIENTE_KEY); } catch(e){}
+}
+function archivarPendienteSync(registro, motivo='revision'){
+  try {
+    localStorage.setItem(SYNC_RECUPERACION_KEY, JSON.stringify({
+      ...registro,
+      motivo,
+      archivado: Date.now()
+    }));
+  } catch(e){}
 }
 
 // Sincronización en background — no bloquea nada, solo muestra emoji pequeño
@@ -11344,11 +11504,13 @@ async function verificarCambiosNube(){
     _syncChecking = false;
   }
 }
-async function _sincronizarBackground(payload){
+async function _sincronizarBackground(payload, opciones={}){
   const ind = document.getElementById('sync-indicador');
   if(ind){ ind.style.display='flex'; ind.textContent='💾'; }
   try {
     await apiCall({ accion:'guardar', pin: _pinGuardado, data: payload || construirPayload() }, 120000);
+    _ultimoErrorSync = '';
+    _ultimoErrorSyncReintentable = false;
     if(!_syncPendiente) limpiarPendienteSync();
     _syncDirty = !!_syncPendiente;
     _ultimaSync = Date.now();
@@ -11362,8 +11524,9 @@ async function _sincronizarBackground(payload){
     return true;
   } catch(err){
     _ultimoErrorSync = err?.message || 'No se pudo sincronizar con Google Sheets.';
+    _ultimoErrorSyncReintentable = err?.reintentable === true;
     console.error('[YORITEX] Error al guardar en Google Sheets:', err);
-    setSyncStatus('Error al guardar', 'err');
+    setSyncStatus(_ultimoErrorSyncReintentable ? 'Sin conexión' : 'Operación rechazada', 'err');
     if(ind){
       ind.textContent='⚠️';
       ind.title = err.message || 'No se pudo sincronizar';
@@ -11845,7 +12008,24 @@ function repararMojibakeTexto(txt){
     .replace(/\bMar\uFFFDa\b/gi, m => m[0] === 'm' ? 'maría' : 'María')
     .replace(/\bS\uFFFDnchez\b/gi, m => m[0] === 's' ? 'sánchez' : 'Sánchez')
     .replace(/\bGonz\uFFFDlez\b/gi, m => m[0] === 'g' ? 'gonzález' : 'González')
-    .replace(/\bRodr\uFFFDguez\b/gi, m => m[0] === 'r' ? 'rodríguez' : 'Rodríguez');
+    .replace(/\bRodr\uFFFDguez\b/gi, m => m[0] === 'r' ? 'rodríguez' : 'Rodríguez')
+    // Algunos clientes HTTP antiguos sustituyeron el carácter completo por "?".
+    // Solo se restauran palabras inequívocas; nunca se inventa un nombre entero.
+    .replace(/\bAndr\?s\b/gi, m => m[0] === 'a' ? 'andrés' : 'Andrés')
+    .replace(/\bJos\?\b/gi, m => m[0] === 'j' ? 'josé' : 'José')
+    .replace(/\bS\?nchez\b/gi, m => m[0] === 's' ? 'sánchez' : 'Sánchez')
+    .replace(/\bSebasti\?n\b/gi, m => m[0] === 's' ? 'sebastián' : 'Sebastián')
+    .replace(/\bFern\?ndez\b/gi, m => m[0] === 'f' ? 'fernández' : 'Fernández')
+    .replace(/\bAlbarrac\?n\b/gi, m => m[0] === 'a' ? 'albarracín' : 'Albarracín')
+    .replace(/\bSimba\?a\b/gi, m => m[0] === 's' ? 'simbaña' : 'Simbaña')
+    .replace(/Dise\?o/gi, m => m[0] === 'd' ? 'diseño' : 'Diseño')
+    .replace(/Renovaci\?n/gi, m => m[0] === 'r' ? 'renovación' : 'Renovación')
+    .replace(/Reposici\?n/gi, m => m[0] === 'r' ? 'reposición' : 'Reposición')
+    .replace(/Adquisici\?n/gi, m => m[0] === 'a' ? 'adquisición' : 'Adquisición')
+    .replace(/Suscripci\?n/gi, m => m[0] === 's' ? 'suscripción' : 'Suscripción')
+    .replace(/activaci\?n/gi, 'activación')
+    .replace(/autom\?tica/gi, 'automática')
+    .replace(/Per\?odo/gi, m => m[0] === 'p' ? 'período' : 'Período');
   // Cuando no se puede saber la letra perdida, es preferible ocultar el símbolo
   // roto antes que mostrarlo en toda la aplicación o copiarlo a WhatsApp.
   txt = txt.replace(/\uFFFD+/g, '');
