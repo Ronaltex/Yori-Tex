@@ -4897,6 +4897,23 @@ function evCuposNecesarios(){
 function evCuentasNecesarias(){
   return Math.max(1, parseInt(document.getElementById('ev-cuentas-plan')?.value || '1') || 1);
 }
+function evDiasCoberturaObjetivo(venceValor){
+  const dias = diasHasta(venceValor);
+  return dias === null ? 0 : Math.max(0,dias);
+}
+function evValidarCoberturaCuentas(seleccion,diasObjetivo){
+  const cuentasUID=[...new Set((seleccion||[]).map(a=>a.cuentaUID).filter(Boolean))];
+  const resultados=cuentasUID.map(cuentaUID=>{
+    const cuenta=APP.cuentas.find(c=>c.uid===cuentaUID);
+    return {cuenta,resultado:cuenta?ccValidarCobertura(cuenta,diasObjetivo):{ok:false,nivel:'err',texto:'La cuenta seleccionada ya no existe.'}};
+  });
+  return {
+    ok:resultados.every(x=>x.resultado.ok),
+    errores:resultados.filter(x=>!x.resultado.ok),
+    advertencias:resultados.filter(x=>x.resultado.ok&&x.resultado.nivel==='warn'),
+    resultados
+  };
+}
 function evActualizarCuposNecesarios(){
   const srvUid = document.getElementById('ev-srv').value;
   const ventaUid = document.getElementById('ev-uid').value;
@@ -5030,6 +5047,13 @@ function evSelCuentaInv(){
       cupoSel.appendChild(o);
     }
   });
+  const opcionesElegibles=[...cupoSel.options].filter(o=>o.value!=='');
+  if(opcionesElegibles.length===1){
+    opcionesElegibles[0].selected=true;
+  }
+  const ventaVence=document.getElementById('ev-vence')?.value||v?.vence||'';
+  const cobertura=ccValidarCobertura(c,evDiasCoberturaObjetivo(ventaVence));
+  infoEl.textContent += ` · ${cobertura.texto}` + (opcionesElegibles.length===1?' · Cupo único seleccionado automáticamente':'');
   cupoWrap.style.display = 'block';
   ccActualizarVigenciaReposicion();
 }
@@ -5189,10 +5213,15 @@ async function editarVentaGuardar(abrirMensaje=false){
   const nuevoWA = sanitizarTexto(document.getElementById('ev-wa').value, 20);
   const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
   const seleccionInventario = origen === 'inventario' ? evSeleccionCupos() : [];
-  if(origen === 'inventario' && seleccionInventario.length){
+  const asignacionesAnteriores=asignacionesCuposVenta(v);
+  const cuentaAnteriorPrincipal=obtenerCuentaInventarioOVirtual(asignacionesAnteriores[0]?.cuentaUID||v.cuentaUID);
+  const cupoAnteriorPrincipal=parseInt(asignacionesAnteriores[0]?.cupoIdx??v.cupoIdx);
+  const venceAnteriorEdicion=v.vence;
+  const diasRestantesAntes=ccDiasRestantes(v);
+  if(origen === 'inventario'){
     const necesarios = evCuposNecesarios();
-    if(seleccionInventario.length < necesarios){
-      alert('Selecciona ' + necesarios + ' cupo' + (necesarios!==1?'s':'') + ' para esta venta.');
+    if(seleccionInventario.length !== necesarios){
+      alert('Selecciona exactamente ' + necesarios + ' cupo' + (necesarios!==1?'s':'') + ' para esta venta. Elegir solo la cuenta no ocupa el acceso.');
       return;
     }
     const conflictos = validarCuposDisponiblesLocalmente(seleccionInventario, v.uid);
@@ -5200,6 +5229,14 @@ async function editarVentaGuardar(abrirMensaje=false){
       alert('No se pueden guardar los cambios porque otro cliente ya ocupa:\n\n• ' + conflictos.join('\n• ') + '\n\nActualiza el inventario y elige otro cupo.');
       return;
     }
+    const venceObjetivo=document.getElementById('ev-vence').value||v.vence;
+    const diasObjetivo=evDiasCoberturaObjetivo(venceObjetivo);
+    const coberturas=evValidarCoberturaCuentas(seleccionInventario,diasObjetivo);
+    if(!coberturas.ok){
+      alert('⛔ No se puede asignar el acceso:\n\n'+coberturas.errores.map(x=>`${x.cuenta?.id||x.cuenta?.correo||'Cuenta'}: ${x.resultado.texto}`).join('\n'));
+      return;
+    }
+    if(coberturas.advertencias.length && !confirm('⚠️ Revisa la vigencia antes de guardar:\n\n'+coberturas.advertencias.map(x=>`${x.cuenta?.id||x.cuenta?.correo||'Cuenta'}: ${x.resultado.texto}`).join('\n')+'\n\n¿Confirmas que deseas continuar?')) return;
   }
   const snapshot = snapshotOperacionCritica();
   evSetGuardando(true);
@@ -5257,6 +5294,21 @@ async function editarVentaGuardar(abrirMensaje=false){
     v.cupoIdxs = v.cuposAsignados.filter(a => a.cuentaUID === v.cuentaUID).map(a => a.cupoIdx);
     const cuentaNueva = APP.cuentas.find(c => c.uid === v.cuentaUID);
     if(cuentaNueva && cuentaNueva.correo) v.correo = cuentaNueva.correo;
+    const clavesAntes=asignacionesAnteriores.map(a=>a.cuentaUID+':'+parseInt(a.cupoIdx)).sort().join('|');
+    const clavesAhora=v.cuposAsignados.map(a=>a.cuentaUID+':'+parseInt(a.cupoIdx)).sort().join('|');
+    if(clavesAntes!==clavesAhora){
+      ccRegistrarHistorial(v,{
+        cuentaAnterior:cuentaAnteriorPrincipal,
+        cuentaNueva,
+        cupoAnteriorIdx:isNaN(cupoAnteriorPrincipal)?0:cupoAnteriorPrincipal,
+        cupoNuevoIdx:v.cupoIdx,
+        venceAnterior:venceAnteriorEdicion,
+        diasRestantes:diasRestantesAntes,
+        diasCortesia:Math.max(0,evDiasCoberturaObjetivo(v.vence)-diasRestantesAntes),
+        tipo:'reasignacion_desde_editor',
+        nota:'Cuenta y cupo actualizados desde Editar venta'
+      });
+    }
   } else if(origen === 'manual' && v.cuentaUID){
     // Si cambió a manual, liberar cupo anterior
     if(confirm('¿Desvincular esta venta de la cuenta del inventario? El cupo quedará libre.')){
@@ -5299,7 +5351,7 @@ async function editarVentaGuardar(abrirMensaje=false){
   if(!confirmado){
     restaurarSnapshotOperacion(snapshot);
     evSetGuardando(false);
-    alert('No se guardaron los cambios porque la nube rechazó la operación o detectó un cupo ocupado. Tus datos locales volvieron al estado anterior.');
+    alert('No se guardaron los cambios y tus datos locales volvieron al estado anterior.\n\n'+(_ultimoErrorSync||'La nube rechazó la operación o detectó un cupo ocupado.'));
     return;
   }
   cerrarModal('modal-editar-venta');
