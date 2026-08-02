@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v27-20260731-editor-inventario';
+const CACHE_NAME = 'yoritex-v28-20260802-recuperacion-cupos';
 const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',

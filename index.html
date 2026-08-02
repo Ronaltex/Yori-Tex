@@ -4814,12 +4814,21 @@ function renderRegistro(){
   cont.innerHTML = bloque('Ventas nuevas', nuevas, 'var(--green)', true) + bloque('Renovaciones', renovaciones, 'var(--blue)', true);
 }
 
-function marcarVentaPagada(ventaUid){
+async function marcarVentaPagada(ventaUid){
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v || v.estado === 'pagado') return;
   if(!confirm(`¿Confirmar que ${v.cliente} pagó $${(parseFloat(v.precio)||0).toFixed(2)}?`)) return;
-  v.estado = 'pagado';
   const asignaciones = asignacionesCuposVenta(v);
+  const faltantes = asignaciones.filter(a => {
+    const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
+    return !cuenta?.cupos?.[parseInt(a.cupoIdx)];
+  });
+  if(faltantes.length){
+    alert('⚠️ No se marcó el pago porque el inventario local está incompleto. Actualiza o repara los cupos antes de guardar; así evitamos borrar datos en la nube.');
+    return;
+  }
+  const snapshot = snapshotOperacionCritica();
+  v.estado = 'pagado';
   asignaciones.forEach(a => {
     const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
     const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)];
@@ -4834,7 +4843,14 @@ function marcarVentaPagada(ventaUid){
   renderRegistro();
   renderInventario();
   renderDashboard();
-  sincronizarConSheets();
+  const confirmado = await sincronizarConSheets(true);
+  if(!confirmado){
+    restaurarSnapshotOperacion(snapshot);
+    renderRegistro();
+    renderInventario();
+    renderDashboard();
+    alert('⚠️ El pago no se cambió porque la nube rechazó la sincronización. No se perdió ni se sobrescribió el inventario.');
+  }
 }
 
 // ══════════════════════════════════════
