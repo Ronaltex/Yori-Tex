@@ -1776,6 +1776,45 @@ body.visual-v6 #sync-overlay{
   body.visual-v6 .nav-item .nl{font-size:7.5px}
   body.visual-v6 .row2{grid-template-columns:1fr}
 }
+
+/* Ventas -> Inventario y selector claro de cuentas al editar */
+.reg-inventory-links{display:grid;gap:5px;margin-top:7px}
+.reg-inventory-link{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;padding:7px 8px;border:1px solid rgba(66,178,255,.2);border-radius:9px;background:rgba(66,178,255,.065)}
+.reg-inventory-link.is-warning{border-color:var(--orange-border);background:var(--yellow-bg)}
+.reg-inventory-link.is-error{border-color:var(--red-border);background:var(--red-bg)}
+.reg-inventory-main{min-width:0}
+.reg-inventory-title{font-size:10.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reg-inventory-sub{margin-top:2px;font-size:9.5px;line-height:1.35;color:var(--text3);overflow-wrap:anywhere}
+.reg-inventory-btn{flex:0 0 auto;width:auto!important;min-height:29px;padding:5px 9px!important;border-color:rgba(66,178,255,.34)!important;color:#8fd0ff!important;background:rgba(66,178,255,.08)!important;white-space:nowrap}
+.reg-inventory-empty{margin-top:7px;font-size:10px;color:var(--text3)}
+
+.ev-account-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:3px 0 8px}
+.ev-account-heading strong{display:block;font-size:12px;color:var(--text)}
+.ev-account-heading span{font-size:10px;color:var(--text3)}
+.ev-account-count{flex:0 0 auto;padding:4px 8px;border-radius:99px;background:rgba(66,178,255,.09);border:1px solid rgba(66,178,255,.2);font-size:10px!important;font-weight:800;color:#8fd0ff!important}
+.ev-account-list{display:grid;gap:8px;margin-bottom:10px}
+.ev-account-card{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:13px;background:linear-gradient(145deg,rgba(25,40,60,.96),rgba(17,30,47,.96));color:var(--text);text-align:left;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.025);transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.ev-account-card:active{transform:scale(.993)}
+.ev-account-card.selected{border-color:var(--green-border);background:linear-gradient(145deg,rgba(16,67,60,.72),rgba(15,42,44,.84));box-shadow:0 0 0 1px rgba(41,215,137,.08),inset 0 1px rgba(255,255,255,.035)}
+.ev-account-card.warning:not(.selected){border-color:rgba(245,166,35,.3)}
+.ev-account-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.ev-account-id{font-size:13px;font-weight:850;color:var(--white)}
+.ev-account-email{margin-top:2px;font-size:10.5px;color:var(--text2);overflow-wrap:anywhere}
+.ev-account-badges{display:flex;justify-content:flex-end;gap:5px;flex-wrap:wrap}
+.ev-account-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(148,163,184,.1)}
+.ev-account-validity{font-size:10px;color:var(--orange)}
+.ev-account-cover{font-size:9.5px;color:var(--text3);text-align:right}
+.ev-account-card.selected .ev-account-cover{color:var(--green)}
+.ev-native-account{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.ev-cupo-panel{padding:11px 12px;border:1px solid rgba(66,178,255,.2);border-radius:13px;background:rgba(66,178,255,.055)}
+.ev-cupo-panel label{color:#a8d9ff!important}
+.ev-empty-accounts{padding:12px;border:1px dashed var(--orange-border);border-radius:12px;background:var(--yellow-bg);font-size:11px;line-height:1.45;color:var(--orange)}
+@media (max-width:420px){
+  .reg-inventory-link{align-items:flex-start}
+  .reg-inventory-btn{min-height:27px;padding:4px 7px!important;font-size:9.5px!important}
+  .ev-account-bottom{align-items:flex-start;flex-direction:column}
+  .ev-account-cover{text-align:left}
+}
 </style>
 </head>
 <body class="visual-v6">
@@ -2592,14 +2631,14 @@ body.visual-v6 #sync-overlay{
   </div>
   <!-- BLOQUE INVENTARIO -->
   <div id="ev-inv-bloque">
-    <div class="field"><label>Cuenta madre del inventario</label>
+    <div class="field ev-native-account"><label>Cuenta del inventario</label>
       <select id="ev-cuenta-inv" onchange="evSelCuentaInv()">
         <option value="">— Sin cuenta asignada —</option>
       </select>
     </div>
-    <div id="ev-lista-cuentas" style="display:none"></div>
+    <div id="ev-lista-cuentas"></div>
     <div id="ev-cuenta-info" style="display:none;background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:8px 11px;margin-bottom:8px;font-size:12px;color:var(--green)"></div>
-    <div class="field" id="ev-cupo-wrap" style="display:none"><label>Cupo / Perfil</label>
+    <div class="field ev-cupo-panel" id="ev-cupo-wrap" style="display:none"><label>Elige el cupo / perfil disponible</label>
       <select id="ev-cupo-inv"><option value="">— Selecciona cupo —</option></select>
     </div>
     <div id="ev-cupos-multi"></div>
@@ -2623,7 +2662,7 @@ body.visual-v6 #sync-overlay{
   </div>
   <div class="row2">
     <div class="field"><label>Fecha venta</label><input type="date" id="ev-fecha"/></div>
-    <div class="field"><label>Fecha vence</label><input type="date" id="ev-vence"/></div>
+    <div class="field"><label>Fecha vence</label><input type="date" id="ev-vence" onchange="evRenderCuentasMulti()"/></div>
   </div>
   <div class="field"><label>Estado</label>
     <select id="ev-estado">
@@ -4710,6 +4749,7 @@ function renderFilaRegistro(v, chips, chipLbl){
       <div class="hist-nombre">${esc(v.srvNom)} — ${esc(v.cliente)}</div>
       <div class="hist-sub">${esc(fmtFecha(v.fecha))} · Vence ${esc(fmtFecha(v.vence))} · ${esc(v.metodo)}</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><span class="chip ${tipoColor}" style="font-size:10px">${esc(etiquetaTipoRegistro(v))}</span>${v.wa ? `<a href="https://wa.me/${encodeURIComponent(v.wa.replace(/\D/g,''))}" target="_blank" rel="noopener noreferrer"><span class="chip verde" style="font-size:10px">📱 ${esc(v.wa)}</span></a>` : ''}</div>
+      ${resumenInventarioRegistro(v)}
     </div>
     <div class="hist-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
       <div class="hist-precio">$${(parseFloat(v.precio)||0).toFixed(2)}</div>
@@ -4873,6 +4913,9 @@ function evActSrv(){
   const srvUid = document.getElementById('ev-srv').value;
   const planSel = document.getElementById('ev-plan');
   const cuentaSel = document.getElementById('ev-cuenta-inv');
+  const ventaUid = document.getElementById('ev-uid').value;
+  const ventaActual = APP.ventas.find(v => v.uid === ventaUid);
+  const cuentaAnterior = cuentaSel.value || _evCuentaSelUID || ventaActual?.cuentaUID || '';
   planSel.innerHTML = '<option value="">— Elige plan —</option>';
   cuentaSel.innerHTML = '<option value="">— Sin cuenta asignada —</option>';
   document.getElementById('ev-lista-cuentas').style.display = 'none';
@@ -4887,7 +4930,6 @@ function evActSrv(){
   // Poblar cuentas del inventario para este servicio
   const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
   if(origen === 'inventario'){
-    const ventaUid = document.getElementById('ev-uid').value;
     cuentasDisponiblesServicio(srvUid, ventaUid).forEach(c => {
       const libres = c.cupos ? c.cupos.filter(cu => cu.estado === 'libre').length : 0;
       const o = document.createElement('option');
@@ -4895,7 +4937,9 @@ function evActSrv(){
       o.textContent = `${c.id}${c.correo?' · '+c.correo:''} (${libres} libre${libres!==1?'s':''}) · ${cuentaVigenciaTexto(c)}`;
       cuentaSel.appendChild(o);
     });
+    if(cuentaAnterior && [...cuentaSel.options].some(o => o.value === cuentaAnterior)) cuentaSel.value = cuentaAnterior;
     evRenderCuentasMulti();
+    if(cuentaSel.value && evCuentasNecesarias() <= 1) evSelCuentaInv();
   }
 }
 function evActPlan(){
@@ -4939,33 +4983,54 @@ function evActualizarCuposNecesarios(){
   _evCuentaSelUID = _evCuentaSelUIDs[0] || (v && v.cuentaUID) || null;
   if(srvUid) evActSrv();
 }
+function evCuentasElegibles(){
+  const srvUid = document.getElementById('ev-srv')?.value || '';
+  const ventaUid = document.getElementById('ev-uid')?.value || '';
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  const actuales = new Set(asignacionesCuposVenta(v).map(a => a.cuentaUID));
+  if(v?.cuentaUID) actuales.add(v.cuentaUID);
+  const vence = document.getElementById('ev-vence')?.value || v?.vence || '';
+  const diasObjetivo = evDiasCoberturaObjetivo(vence);
+  return cuentasDisponiblesServicio(srvUid, ventaUid)
+    .map(c => ({cuenta:c, cobertura:ccValidarCobertura(c,diasObjetivo), actual:actuales.has(c.uid)}))
+    .filter(x => x.actual || x.cobertura.ok)
+    .sort((a,b) => Number(b.actual)-Number(a.actual)
+      || ({ok:0,warn:1,err:2}[a.cobertura.nivel]??3)-({ok:0,warn:1,err:2}[b.cobertura.nivel]??3)
+      || cuentaDiasOrden(a.cuenta)-cuentaDiasOrden(b.cuenta)
+      || String(a.cuenta.id||'').localeCompare(String(b.cuenta.id||'')));
+}
+function evSeleccionarCuenta(uidCuenta){
+  if(evCuentasNecesarias() > 1){ evSelCuentaMulti(uidCuenta); return; }
+  const select = document.getElementById('ev-cuenta-inv');
+  if(!select) return;
+  select.value = uidCuenta;
+  _evCuentaSelUID = uidCuenta || null;
+  _evCuentaSelUIDs = uidCuenta ? [uidCuenta] : [];
+  evSelCuentaInv();
+}
 function evRenderCuentasMulti(){
   const wrap = document.getElementById('ev-lista-cuentas');
   const selectWrap = document.getElementById('ev-cuenta-inv')?.closest('.field');
   const cuentasNecesarias = evCuentasNecesarias();
-  if(cuentasNecesarias <= 1){
-    wrap.style.display = 'none';
-    wrap.innerHTML = '';
-    if(selectWrap) selectWrap.style.display = 'block';
-    return;
-  }
-  if(selectWrap) selectWrap.style.display = 'none';
+  if(selectWrap) selectWrap.style.display = 'block';
   wrap.style.display = 'block';
-  const srvUid = document.getElementById('ev-srv').value;
-  const ventaUid = document.getElementById('ev-uid').value;
-  const cuentas = cuentasDisponiblesServicio(srvUid, ventaUid);
-  if(!cuentas.length){
-    wrap.innerHTML = '<div class="aviso">Sin cuentas disponibles para este servicio.</div>';
+  const elegibles = evCuentasElegibles();
+  if(!elegibles.length){
+    wrap.innerHTML = '<div class="ev-empty-accounts">No hay cuentas con cupos libres y vigencia suficiente para esta venta. Puedes registrar un acceso manual o añadir una cuenta al inventario.</div>';
     return;
   }
-  wrap.innerHTML = cuentas.map(c => {
+  const seleccionadas = cuentasNecesarias > 1 ? _evCuentaSelUIDs : [document.getElementById('ev-cuenta-inv')?.value].filter(Boolean);
+  wrap.innerHTML = `<div class="ev-account-heading"><div><strong>Selecciona una cuenta disponible</strong><span>${cuentasNecesarias>1?'Elige '+cuentasNecesarias+' cuentas':'Solo aparecen opciones compatibles con esta venta'}</span></div><span class="ev-account-count">${elegibles.length} opcion${elegibles.length!==1?'es':''}</span></div><div class="ev-account-list">` + elegibles.map(item => {
+    const c = item.cuenta;
     const lib = (c.cupos || []).filter(cu => cu.estado === 'libre').length;
-    const sel = _evCuentaSelUIDs.includes(c.uid);
-    return `<div id="ev-cc-${esc(c.uid)}" onclick="evSelCuentaMulti('${esc(c.uid)}')" style="background:${sel?'var(--green-bg)':'var(--surface2)'};border:1px solid ${sel?'var(--green-border)':'var(--border)'};border-radius:9px;padding:10px 13px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center">
-      <div><div style="font-size:13px;font-weight:600;color:var(--white)">${esc(c.id)}</div><div style="font-size:11px;color:var(--text3)">${esc(c.correo || '')}</div><div style="font-size:10px;color:var(--orange);margin-top:2px">${esc(cuentaVigenciaTexto(c))}</div></div>
-      <span class="chip verde">${lib} libre${lib!==1?'s':''}</span>
-    </div>`;
-  }).join('');
+    const sel = seleccionadas.includes(c.uid);
+    const claseCobertura = item.cobertura.nivel === 'warn' || !item.cobertura.ok ? ' warning' : '';
+    const textoCobertura = item.actual && !item.cobertura.ok ? 'Cuenta actual · vigencia insuficiente para cambiar el plazo' : item.cobertura.texto;
+    return `<button type="button" id="ev-cc-${esc(c.uid)}" class="ev-account-card${sel?' selected':''}${claseCobertura}" onclick="evSeleccionarCuenta('${esc(c.uid)}')" aria-pressed="${sel?'true':'false'}">
+      <div class="ev-account-top"><div style="min-width:0"><div class="ev-account-id">${esc(c.id||'Cuenta')}</div><div class="ev-account-email">${esc(c.correo||'Sin correo registrado')}</div></div><div class="ev-account-badges">${item.actual?'<span class="chip azul">Actual</span>':''}<span class="chip verde">${lib} libre${lib!==1?'s':''}</span>${sel?'<span class="chip verde">✓ Elegida</span>':''}</div></div>
+      <div class="ev-account-bottom"><span class="ev-account-validity">${esc(cuentaVigenciaTexto(c))}</span><span class="ev-account-cover">${esc(textoCobertura)}</span></div>
+    </button>`;
+  }).join('') + '</div>';
   evRenderCuposMulti();
 }
 function evSelCuentaMulti(uidCuenta){
@@ -5072,6 +5137,7 @@ function evSelCuentaInv(){
   infoEl.textContent += ` · ${cobertura.texto}` + (opcionesElegibles.length===1?' · Cupo único seleccionado automáticamente':'');
   cupoWrap.style.display = 'block';
   ccActualizarVigenciaReposicion();
+  evRenderCuentasMulti();
 }
 function evRenderHistorialReposiciones(v){
   const box = document.getElementById('ev-historial-reposiciones');
@@ -5248,11 +5314,14 @@ async function editarVentaGuardar(abrirMensaje=false){
     const venceObjetivo=document.getElementById('ev-vence').value||v.vence;
     const diasObjetivo=evDiasCoberturaObjetivo(venceObjetivo);
     const coberturas=evValidarCoberturaCuentas(seleccionInventario,diasObjetivo);
-    if(!coberturas.ok){
-      alert('⛔ No se puede asignar el acceso:\n\n'+coberturas.errores.map(x=>`${x.cuenta?.id||x.cuenta?.correo||'Cuenta'}: ${x.resultado.texto}`).join('\n'));
-      return;
+    const avisosCobertura=[...coberturas.errores,...coberturas.advertencias];
+    if(avisosCobertura.length){
+      const detalle=avisosCobertura.map(x=>`${x.cuenta?.id||x.cuenta?.correo||'Cuenta'}: ${x.resultado.texto}`).join('\n');
+      const mensaje=!coberturas.ok
+        ? '⚠️ La fecha del cliente supera la vigencia registrada de la cuenta madre:\n\n'+detalle+'\n\nPuedes guardar si ya cobraste ese período, pero recuerda renovar o actualizar la cuenta madre para cubrirlo.\n\n¿Guardar de todas formas?'
+        : '⚠️ Revisa la vigencia antes de guardar:\n\n'+detalle+'\n\n¿Confirmas que deseas continuar?';
+      if(!confirm(mensaje)) return;
     }
-    if(coberturas.advertencias.length && !confirm('⚠️ Revisa la vigencia antes de guardar:\n\n'+coberturas.advertencias.map(x=>`${x.cuenta?.id||x.cuenta?.correo||'Cuenta'}: ${x.resultado.texto}`).join('\n')+'\n\n¿Confirmas que deseas continuar?')) return;
   }
   const snapshot = snapshotOperacionCritica();
   evSetGuardando(true);
@@ -7398,6 +7467,15 @@ function referenciasInventarioVenta(v){
     if(cuenta) refs.push({cuentaUID:cuenta.uid,id:cuenta.id||'Cuenta',correo:cuenta.correo||'',cupoIdx:isNaN(idx)?null:idx,perfil:cupo?.perfil||v.perfil||'',pin:cupo?.pin||v.pin||'',archivada:!!cuenta.archivada,conflicto:!!(cupo?.ventaUid&&cupo.ventaUid!==v.uid)});
   }
   return refs;
+}
+function resumenInventarioRegistro(v){
+  const refs = referenciasInventarioVenta(v);
+  if(!refs.length) return `<div class="reg-inventory-empty">Sin cuenta de inventario vinculada</div>`;
+  return `<div class="reg-inventory-links">${refs.map((r,i) => {
+    const estadoClase = r.conflicto ? ' is-error' : (r.archivada ? ' is-warning' : '');
+    const detalle = [r.correo||'Sin correo', r.cupoIdx!==null?'Cupo '+(r.cupoIdx+1):'', r.perfil?'Perfil '+r.perfil:''].filter(Boolean).join(' · ');
+    return `<div class="reg-inventory-link${estadoClase}"><div class="reg-inventory-main"><div class="reg-inventory-title">📦 ${esc(r.id)}${refs.length>1?' · acceso '+(i+1):''}${r.archivada?' · archivada':''}${r.conflicto?' · conflicto':''}</div><div class="reg-inventory-sub">${esc(detalle)}</div></div>${r.archivada||r.conflicto?`<button type="button" class="btn-sm reg-inventory-btn" onclick="event.stopPropagation();abrirRevisionIntegridad()">Revisar</button>`:`<button type="button" class="btn-sm reg-inventory-btn" onclick="event.stopPropagation();irACuentaInventario('${esc(r.cuentaUID)}')">Ver cuenta</button>`}</div>`;
+  }).join('')}</div>`;
 }
 function resumenInventarioVencimiento(v){
   const refs = referenciasInventarioVenta(v);
