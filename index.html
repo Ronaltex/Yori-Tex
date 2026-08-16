@@ -3372,14 +3372,17 @@ async function cargarSesionConCorreo(){
   }
   const pendienteLocal = pendienteLeido?.version === SYNC_PENDIENTE_VERSION &&
     pendienteLeido?.estado !== 'bloqueado' ? pendienteLeido : null;
+  const datosPendientesSaneados = pendienteLocal?.data
+    ? sanearPayloadReferenciasVirtuales(pendienteLocal.data)
+    : null;
   let pendienteEnviado = false;
   let pendientePuedeReintentarse = true;
   try{
-    if(pendienteLocal?.data){
+    if(datosPendientesSaneados){
       const sub = document.getElementById('sync-sub');
       if(sub) sub.textContent = 'Recuperando cambios pendientes de este dispositivo';
       try {
-        await apiCall({accion:'guardar', pin:'', data:pendienteLocal.data}, 120000);
+        await apiCall({accion:'guardar', pin:'', data:datosPendientesSaneados}, 120000);
         limpiarPendienteSync();
         pendienteEnviado = true;
       } catch(errPendiente) {
@@ -3395,13 +3398,13 @@ async function cargarSesionConCorreo(){
     }
     const res = await apiCall({accion:'cargar', pin:''}, 120000);
     if(!res?.ok || !res.data) throw new Error(res?.error || 'No se pudieron cargar los datos.');
-    if(pendienteLocal?.data && !pendienteEnviado && pendientePuedeReintentarse){
+    if(datosPendientesSaneados && !pendienteEnviado && pendientePuedeReintentarse){
       // No sobrescribir la versión local más reciente con una nube anterior.
-      cargarDesdeSheets(pendienteLocal.data);
-      guardarLocal(pendienteLocal.data);
-      _syncPendiente = pendienteLocal.data;
+      cargarDesdeSheets(datosPendientesSaneados);
+      guardarLocal(datosPendientesSaneados);
+      _syncPendiente = datosPendientesSaneados;
       _syncDirty = true;
-      guardarPendienteSync(pendienteLocal.data);
+      guardarPendienteSync(datosPendientesSaneados);
       _firmaNube = firmaDatos(res.data);
       _pinVerificado = true;
       setSyncStatus('Cambios locales pendientes', 'warn');
@@ -3422,6 +3425,7 @@ async function cargarSesionConCorreo(){
     if(!localData){
       try { localData = JSON.parse(localStorage.getItem('yoritex_local') || 'null')?.data || null; } catch(e) {}
     }
+    if(localData) localData = sanearPayloadReferenciasVirtuales(localData);
     if(localData){
       cargarDesdeSheets(localData);
       _syncPendiente = localData;
@@ -11523,15 +11527,69 @@ function configParaSync(){
   if(cfg.fondoImagen && String(cfg.fondoImagen).length > 48000) cfg.fondoImagen = null;
   return cfg;
 }
+function esUIDCuentaVirtual(valor){
+  return String(valor || '').startsWith('virtual-');
+}
+function asignacionesCrudasVenta(v){
+  if(Array.isArray(v?.cuposAsignados)) return v.cuposAsignados;
+  if(typeof v?.cuposAsignados === 'string' && v.cuposAsignados.trim()){
+    try {
+      const parsed = JSON.parse(v.cuposAsignados);
+      if(Array.isArray(parsed)) return parsed;
+    } catch(e){}
+  }
+  if(v?.cuentaUID && v.cupoIdx !== '' && v.cupoIdx !== null && v.cupoIdx !== undefined){
+    const indices = Array.isArray(v.cupoIdxs)
+      ? v.cupoIdxs
+      : (String(v.cupoIdxs || '').trim() ? String(v.cupoIdxs).split(',') : [v.cupoIdx]);
+    return indices.map(idx => ({cuentaUID:v.cuentaUID,cupoIdx:parseInt(idx)}));
+  }
+  return [];
+}
+function sanearVentaReferenciasVirtuales(v, serializar=false){
+  if(!v) return v;
+  const asignaciones = asignacionesCrudasVenta(v);
+  const teniaReferenciaVirtual = esUIDCuentaVirtual(v.cuentaUID) || asignaciones.some(a => esUIDCuentaVirtual(a?.cuentaUID));
+  if(!teniaReferenciaVirtual) return {...v};
+  const reales = asignaciones
+    .map(a => ({...a,cuentaUID:String(a?.cuentaUID||''),cupoIdx:parseInt(a?.cupoIdx)}))
+    .filter(a => a.cuentaUID && !esUIDCuentaVirtual(a.cuentaUID) && !isNaN(a.cupoIdx));
+  const principal = reales[0] || null;
+  const indicesPrincipal = principal
+    ? reales.filter(a => a.cuentaUID === principal.cuentaUID).map(a => a.cupoIdx)
+    : [];
+  return {
+    ...v,
+    cuentaUID: principal?.cuentaUID || '',
+    cupoIdx: principal?.cupoIdx ?? '',
+    cupoIdxs: serializar ? indicesPrincipal.join(',') : indicesPrincipal,
+    cuposAsignados: serializar ? JSON.stringify(reales) : reales
+  };
+}
+function sanearPayloadReferenciasVirtuales(data){
+  if(!data || typeof data !== 'object') return data;
+  return {
+    ...data,
+    ventas: Array.isArray(data.ventas)
+      ? data.ventas.map(v => sanearVentaReferenciasVirtuales(v, true))
+      : data.ventas,
+    cuentas: Array.isArray(data.cuentas)
+      ? data.cuentas.filter(c => c && !c.esVirtual && !esUIDCuentaVirtual(c.uid))
+      : data.cuentas
+  };
+}
 function construirPayload(){
   depurarInactivosAntiguos();
-  const ventasPayload = (APP.ventas || []).map(v => ({
-    ...v,
-    cupoIdxs: Array.isArray(v.cupoIdxs) ? v.cupoIdxs.join(',') : (v.cupoIdxs || ''),
-    cuposAsignados: Array.isArray(v.cuposAsignados) ? JSON.stringify(v.cuposAsignados) : (v.cuposAsignados || ''),
-    historialReposiciones: Array.isArray(v.historialReposiciones) ? JSON.stringify(v.historialReposiciones) : (v.historialReposiciones || '')
-  }));
-  return {
+  const ventasPayload = (APP.ventas || []).map(v => {
+    const limpia = sanearVentaReferenciasVirtuales(v, false);
+    return ({
+      ...limpia,
+      cupoIdxs: Array.isArray(limpia.cupoIdxs) ? limpia.cupoIdxs.join(',') : (limpia.cupoIdxs || ''),
+      cuposAsignados: Array.isArray(limpia.cuposAsignados) ? JSON.stringify(limpia.cuposAsignados) : (limpia.cuposAsignados || ''),
+      historialReposiciones: Array.isArray(limpia.historialReposiciones) ? JSON.stringify(limpia.historialReposiciones) : (limpia.historialReposiciones || '')
+    });
+  });
+  return sanearPayloadReferenciasVirtuales({
     ventas: ventasPayload, cuentas: APP.cuentas, costos: APP.costos,
     recargas: APP.recargas, reembolsos: APP.reembolsos, egresos: APP.egresos || [],
     movimientosBinance: APP.movimientosBinance || [],
@@ -11542,7 +11600,7 @@ function construirPayload(){
     cuentasEliminadas: APP.cuentasEliminadas || [],
     catalogoCategorias: CATALOGO_CATEGORIAS, catalogoServicios: CATALOGO_SERVICIOS,
     catalogoCatGastos: CATALOGO_CAT_GASTOS, plantillasWA: PLANTILLAS_WA, config: configParaSync()
-  };
+  });
 }
 
 function guardarLocal(payload){
@@ -11844,6 +11902,7 @@ function normalizarCuenta(c){
   return normalizada;
 }
 function normalizarVenta(v){
+  v = sanearVentaReferenciasVirtuales(v, false);
   const fecha = parsearFecha(v.fecha) || hoy();
   const vence = parsearFecha(v.vence) || fecha;
   const cupoIdxs = Array.isArray(v.cupoIdxs)
