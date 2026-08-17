@@ -8914,8 +8914,7 @@ function ccValidarCobertura(cuenta, diasCliente){
   const disponibles = ccDiasCuentaRestantes(cuenta);
   if(disponibles === null) return {ok:true,nivel:'warn',disponibles:null,deficit:0,texto:'La cuenta no tiene fecha final registrada. Revisa su vigencia antes de continuar.'};
   const deficit = Math.max(0, parseInt(diasCliente||0) - disponibles);
-  if(deficit >= 4) return {ok:false,nivel:'err',disponibles,deficit,texto:`La cuenta solo cubre ${disponibles} días y el cliente recibiría ${diasCliente}. Faltan ${deficit} días; selecciona otra cuenta.`};
-  if(deficit > 0) return {ok:true,nivel:'warn',disponibles,deficit,texto:`La cuenta cubre ${disponibles} días. Hay una tolerancia de ${deficit} día${deficit!==1?'s':''}; podrás continuar con confirmación.`};
+  if(deficit > 0) return {ok:true,nivel:'warn',disponibles,deficit,texto:`La cuenta cubre ${disponibles} días y el cliente recibiría ${diasCliente}. Faltan ${deficit} día${deficit!==1?'s':''}; puedes continuar si confirmas que renovarás la cuenta madre antes de que se venza.`};
   return {ok:true,nivel:'ok',disponibles,deficit:0,texto:`Cobertura completa: ${disponibles} días disponibles para ${diasCliente} días del cliente.`};
 }
 function ccRegistrarHistorial(venta, datos){
@@ -9144,7 +9143,7 @@ async function ccGuardar(prepararMensaje=false){
       if(!vig || vig.fecha===''){ alert('Selecciona una vigencia válida.'); return; }
       const cobertura = ccValidarCobertura(cuentaRepo,vig.dias);
       if(!cobertura.ok){ alert('⛔ ' + cobertura.texto); return; }
-      if(cobertura.deficit > 0 && !confirm('⚠️ ' + cobertura.texto + '\n\n¿Confirmas que aceptas esta tolerancia?')) return;
+      if(cobertura.nivel === 'warn' && !confirm('⚠️ ' + cobertura.texto + '\n\n¿Confirmas que renovarás la cuenta madre a tiempo y deseas continuar con la reposición?')) return;
       const venceAnterior = ventaAfectada.vence;
       const diasPlanOriginal = ccDiasPlanOriginal(ventaAfectada);
       ventaAfectada.vence=vig.fecha;
@@ -9192,7 +9191,7 @@ async function ccGuardar(prepararMensaje=false){
         : (ccFechaVigenciaReposicion()?.dias || ccDiasRestantes(ventaAfectada));
       const coberturaNueva = ccValidarCobertura(nuevaCuenta,diasObjetivoNueva);
       if(!coberturaNueva.ok){ alert('⛔ '+coberturaNueva.texto); return; }
-      if(coberturaNueva.nivel==='warn' && !confirm('⚠️ '+coberturaNueva.texto+'\n\n¿Confirmas que deseas continuar?')) return;
+       if(coberturaNueva.nivel==='warn' && !confirm('⚠️ '+coberturaNueva.texto+'\n\n¿Confirmas que renovarás la cuenta madre a tiempo y deseas continuar?')) return;
       APP.cuentas.push(nuevaCuenta);
       cuentaDestinoFinal=nuevaCuenta;
       // Actualizar venta relacionada
@@ -9335,8 +9334,11 @@ async function crmGuardar(){
     const cobertura = ccValidarCobertura(destino,ccDiasRestantes(a.venta)+a.extra);
     if(!cobertura.ok){ alert(`⛔ ${a.venta.cliente}: ${cobertura.texto}`); return; }
   }
-  const tolerancias = asignaciones.filter(a=>ccValidarCobertura(APP.cuentas.find(c=>c.uid===a.cuentaUID),ccDiasRestantes(a.venta)+a.extra).deficit>0);
-  if(tolerancias.length && !confirm(`⚠️ ${tolerancias.length} asignación(es) usan la tolerancia máxima de vigencia.\n\n¿Confirmas que deseas continuar?`)) return;
+  const tolerancias = asignaciones.map(a=>({a,cobertura:ccValidarCobertura(APP.cuentas.find(c=>c.uid===a.cuentaUID),ccDiasRestantes(a.venta)+a.extra)})).filter(x=>x.cobertura.nivel==='warn');
+  if(tolerancias.length){
+    const detalle=tolerancias.map(x=>`• ${x.a.venta.cliente}: ${x.cobertura.texto}`).join('\n');
+    if(!confirm(`⚠️ ${tolerancias.length} asignación(es) superan o no tienen definida la vigencia actual de la cuenta:\n\n${detalle}\n\n¿Confirmas que renovarás esas cuentas madre a tiempo y deseas continuar?`)) return;
+  }
 
   const snapshot = snapshotOperacionCritica();
   if(btn){btn.disabled=true;btn.textContent='🔒 Confirmando cupos en la nube...';}

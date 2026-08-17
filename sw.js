@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v30-20260816-saneamiento-cuentas-virtuales';
+const CACHE_NAME = 'yoritex-v31-20260817-reposicion-cuenta-renovable';
 const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
