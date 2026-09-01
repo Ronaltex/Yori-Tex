@@ -5175,8 +5175,8 @@ function evRenderHistorialReposiciones(v){
     }).join('')}
   </div>`;
 }
-function abrirEditarVenta(ventaUid){
-  const v = APP.ventas.find(x => x.uid === ventaUid);
+async function abrirEditarVenta(ventaUid){
+  const v = await cargarVentaActualDesdeNube(ventaUid, 'editar la venta');
   if(!v) return;
   evRenderHistorialReposiciones(v);
   document.getElementById('ev-uid').value = ventaUid;
@@ -5326,9 +5326,19 @@ async function editarVentaGuardar(abrirMensaje=false){
         : '⚠️ Revisa la vigencia antes de guardar:\n\n'+detalle+'\n\n¿Confirmas que deseas continuar?';
       if(!confirm(mensaje)) return;
     }
+    evSetGuardando(true);
+    const disponibilidadNube = await validarCuposDisponiblesEnNube(seleccionInventario, v.uid);
+    if(!disponibilidadNube.ok){
+      evSetGuardando(false);
+      const detalle = disponibilidadNube.conflictos.length
+        ? disponibilidadNube.conflictos.join('\n• ')
+        : disponibilidadNube.error;
+      alert('No se guardaron cambios. El inventario cambió en la nube mientras tenías abierto el formulario.\n\n• ' + detalle + '\n\nCierra y vuelve a abrir Editar venta para cargar los cupos actuales.');
+      return;
+    }
   }
   const snapshot = snapshotOperacionCritica();
-  evSetGuardando(true);
+  if(origen !== 'inventario') evSetGuardando(true);
   const nuevoCorreo = origen === 'manual'
     ? sanitizarTexto(document.getElementById('ev-correo-manual').value || document.getElementById('ev-correo').value, 200)
     : sanitizarTexto(document.getElementById('ev-correo').value, 200);
@@ -5720,6 +5730,53 @@ function validarCuposDisponiblesLocalmente(seleccion, ventaUidPermitida=''){
     }
   });
   return conflictos;
+}
+async function cargarVentaActualDesdeNube(ventaUid, accionTexto='continuar'){
+  if(_syncGuardando) await esperarSyncLibre();
+  if(_syncGuardando || _syncDirty || _syncPendiente){
+    alert('Todavía hay una sincronización pendiente. Espera a que el indicador muestre que terminó antes de ' + accionTexto + '.');
+    return null;
+  }
+  mostrarSync('🔄', 'Actualizando inventario...', 'Comprobando los cupos más recientes antes de ' + accionTexto);
+  try {
+    const res = await apiCall({accion:'cargar', pin:_pinGuardado}, 120000);
+    if(!res?.ok || !res.data) throw new Error(res?.error || 'La nube no devolvió los datos actuales.');
+    cargarDesdeSheets(res.data);
+    _firmaNube = firmaDatos(res.data);
+    _ultimaSync = Date.now();
+    const venta = APP.ventas.find(x => x.uid === ventaUid);
+    if(!venta) alert('La venta ya no está activa en la versión más reciente de la nube. Actualiza la búsqueda y vuelve a intentarlo.');
+    return venta || null;
+  } catch(err){
+    alert('No se abrió la operación porque no fue posible comprobar primero el inventario en la nube.\n\n' + (err?.message || 'Revisa internet e intenta otra vez.'));
+    return null;
+  } finally {
+    ocultarSync();
+  }
+}
+async function validarCuposDisponiblesEnNube(seleccion, ventaUidPermitida=''){
+  try {
+    const res = await apiCall({accion:'cargar', pin:_pinGuardado}, 120000);
+    if(!res?.ok || !res.data) throw new Error(res?.error || 'La nube no devolvió el inventario actual.');
+    const conflictos = [];
+    (seleccion || []).forEach(a => {
+      const cuenta = (res.data.cuentas || []).find(c => String(c.uid || '') === String(a.cuentaUID || ''));
+      const idx = parseInt(a.cupoIdx);
+      const cupo = cuenta?.cupos?.[idx];
+      if(!cuenta || !cupo){
+        conflictos.push(`${cuenta?.id || 'Cuenta'} · cupo no encontrado en la nube`);
+        return;
+      }
+      const ocupadoPorOtro = String(cupo.estado || '') !== 'libre' &&
+        (!ventaUidPermitida || String(cupo.ventaUid || '') !== String(ventaUidPermitida));
+      if(ocupadoPorOtro){
+        conflictos.push(`${cuenta.id || cuenta.correo || 'Cuenta'} · Cupo ${idx+1}${cupo.cliente ? ' · ya pertenece a '+cupo.cliente : ' · ocupado'}`);
+      }
+    });
+    return {ok:conflictos.length===0, conflictos, error:''};
+  } catch(err){
+    return {ok:false, conflictos:[], error:err?.message || 'No se pudo consultar la nube.'};
+  }
 }
 function snapshotOperacionCritica(){
   return {
@@ -7667,11 +7724,13 @@ function renActSrv(){
   (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = planNombre(p); planSel.appendChild(o); });
   const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
   if(origen === 'inventario'){
-    APP.cuentas.filter(c => c.srvUid === srvUid).forEach(c => {
+    const ventaBase = APP.ventas.find(x => x.uid === document.getElementById('ren-venta-uid')?.value);
+    APP.cuentas.filter(c => c.srvUid === srvUid && ((c.cupos || []).some(cu => cu.estado === 'libre') || String(c.uid) === String(ventaBase?.cuentaUID || ''))).forEach(c => {
       const libres = c.cupos ? c.cupos.filter(cu => cu.estado === 'libre').length : 0;
       const o = document.createElement('option');
       o.value = c.uid;
-      o.textContent = `${c.id}${c.correo?' · '+c.correo:''} (${libres} libre${libres!==1?'s':''})`;
+      const actual = String(c.uid) === String(ventaBase?.cuentaUID || '');
+      o.textContent = `${c.id}${c.correo?' · '+c.correo:''} (${actual?'cuenta actual · ':''}${libres} libre${libres!==1?'s':''})`;
       cuentaSel.appendChild(o);
     });
   }
@@ -7695,8 +7754,8 @@ function renSelCupo(){
   const cu = c.cupos[cupoIdx];
   document.getElementById('ren-correo').value = c.correo || '';
 }
-function abrirRenovar(ventaUid){
-  const v = APP.ventas.find(x => x.uid === ventaUid);
+async function abrirRenovar(ventaUid){
+  const v = await cargarVentaActualDesdeNube(ventaUid, 'renovar');
   if(!v) return;
   document.getElementById('ren-wa-preview-wrap').style.display = 'none';
   document.getElementById('ren-venta-uid').value = ventaUid;
@@ -7798,12 +7857,17 @@ function renSelCuenta(){
   if(!selVal){ infoEl.style.display = 'none'; costoEl.value = ''; return; }
   const c = APP.cuentas.find(x => x.uid === selVal);
   if(!c){ infoEl.style.display = 'none'; return; }
+  const ventaBase = APP.ventas.find(x => x.uid === document.getElementById('ren-venta-uid').value);
   document.getElementById('ren-correo').value = c.correo || '';
-  // Mostrar cupos libres
+  // Mostrar cupos libres y también el cupo que ya pertenece a esta venta.
   c.cupos.forEach((cu, i) => {
-    if(cu.estado === 'libre'){
+    const esCupoActual = !!ventaBase && String(c.uid) === String(ventaBase.cuentaUID || '') &&
+      parseInt(i) === parseInt(ventaBase.cupoIdx) && String(cu.ventaUid || '') === String(ventaBase.uid || '');
+    if(cu.estado === 'libre' || esCupoActual){
       const o = document.createElement('option');
-      o.value = i; o.textContent = `Cupo ${i+1} — Libre`;
+      o.value = i;
+      o.textContent = esCupoActual ? `Cupo ${i+1} — Actual de ${ventaBase.cliente || 'este cliente'}` : `Cupo ${i+1} — Libre`;
+      if(esCupoActual) o.selected = true;
       cupoSel.appendChild(o);
     }
   });
@@ -7843,6 +7907,18 @@ function renVentaFormulario(){
     precio:parseFloat(document.getElementById('ren-precio').value) || base.precio,
     estado:document.getElementById('ren-estado').value || base.estado
   };
+}
+function resolverCupoRenovacion(cuentaNuevaUID,cupoSeleccionado,cuentaAnteriorUID,cupoAnteriorIdx){
+  if(cupoSeleccionado !== '' && cupoSeleccionado !== null && cupoSeleccionado !== undefined){
+    const elegido = parseInt(cupoSeleccionado);
+    return isNaN(elegido) ? null : elegido;
+  }
+  if(String(cuentaNuevaUID || '') === String(cuentaAnteriorUID || '') &&
+    cupoAnteriorIdx !== '' && cupoAnteriorIdx !== null && cupoAnteriorIdx !== undefined){
+    const actual = parseInt(cupoAnteriorIdx);
+    return isNaN(actual) ? null : actual;
+  }
+  return null;
 }
 function renPrevisualizarWA(){
   const v = renVentaFormulario();
@@ -7910,15 +7986,33 @@ async function renGuardar(){
   const mensajeRenPreparado = document.getElementById('ren-wa-preview-wrap')?.style.display !== 'none' ? document.getElementById('ren-wa-texto')?.value : '';
   const cuentaInvUID = origen === 'inventario' ? document.getElementById('ren-cuenta-inv').value : '';
   const cupoInvIdx = origen === 'inventario' && document.getElementById('ren-cupo-inv') ? document.getElementById('ren-cupo-inv').value : '';
-  if(cuentaInvUID && cupoInvIdx !== ''){
-    const conflictos = validarCuposDisponiblesLocalmente([{cuentaUID:cuentaInvUID,cupoIdx:parseInt(cupoInvIdx)}], v.uid);
+  let cupoRenovacionIdx = null;
+  if(cuentaInvUID){
+    cupoRenovacionIdx = resolverCupoRenovacion(cuentaInvUID,cupoInvIdx,cuentaAnteriorUID,cupoAnteriorIdx);
+    if(cupoRenovacionIdx === null || isNaN(cupoRenovacionIdx)){
+      alert('Selecciona el cupo exacto de la cuenta nueva. La renovación no reutilizará automáticamente el número del cupo anterior.');
+      return;
+    }
+    const seleccionRenovacion = [{cuentaUID:cuentaInvUID,cupoIdx:cupoRenovacionIdx}];
+    const conflictos = validarCuposDisponiblesLocalmente(seleccionRenovacion, v.uid);
     if(conflictos.length){
       alert('No se puede renovar en ese cupo porque otro cliente ya lo ocupa:\n\n• ' + conflictos.join('\n• ') + '\n\nActualiza el inventario y elige otro.');
       return;
     }
+    renSetGuardando(true);
+    const disponibilidadNube = await validarCuposDisponiblesEnNube(seleccionRenovacion, v.uid);
+    if(!disponibilidadNube.ok){
+      renSetGuardando(false);
+      const detalle = disponibilidadNube.conflictos.length
+        ? disponibilidadNube.conflictos.join('\n• ')
+        : disponibilidadNube.error;
+      alert('No se inició la renovación porque el inventario cambió en la nube.\n\n• ' + detalle + '\n\nCierra y vuelve a abrir Renovar para cargar los cupos actuales.');
+      return;
+    }
+  } else {
+    renSetGuardando(true);
   }
   const snapshot = snapshotOperacionCritica();
-  renSetGuardando(true);
 
   // Leer correo según origen
   const nuevoCorreo = origen === 'manual'
@@ -7957,7 +8051,7 @@ async function renGuardar(){
   // Manejar cuenta de inventario
   if(origen === 'inventario' && cuentaInvUID){
     nuevaVenta.cuentaUID = cuentaInvUID;
-    if(cupoInvIdx !== '') nuevaVenta.cupoIdx = parseInt(cupoInvIdx);
+    nuevaVenta.cupoIdx = cupoRenovacionIdx;
     if(cuentaAnteriorUID && (cuentaAnteriorUID !== cuentaInvUID || String(cupoAnteriorIdx) !== String(nuevaVenta.cupoIdx))){
       liberarCupoAnterior(cuentaAnteriorUID, cupoAnteriorIdx, v.uid);
     }
@@ -8055,7 +8149,7 @@ async function renGuardar(){
   if(!confirmado){
     restaurarSnapshotOperacion(snapshot);
     renSetGuardando(false);
-    alert('No se guardó la renovación porque la nube rechazó la operación o detectó un cupo ocupado. Tus datos volvieron al estado anterior.');
+    alert('No se guardó la renovación y tus datos volvieron al estado anterior.\n\n' + (_ultimoErrorSync || 'La nube rechazó la operación o detectó un cupo ocupado.'));
     return;
   }
   cerrarModal('modal-renovar');
