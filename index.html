@@ -3261,7 +3261,12 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
   <div class="sec">Mensajes predeterminados del producto</div>
   <div class="field"><label>Entrega de cuenta</label><textarea id="srv-entrega" style="height:115px" placeholder="Mensaje que se enviará al entregar este producto."></textarea></div>
   <div class="field"><label>Renovación</label><textarea id="srv-renovacion-mensaje" style="height:105px" placeholder="Mensaje que se enviará al renovar este producto."></textarea></div>
-  <div class="field"><label>Garantía</label><textarea id="srv-garantia" style="height:105px" placeholder="Ej: La garantía cubre fallas de acceso hasta [VENCE]. No cubre cambios realizados por el cliente."></textarea><div style="font-size:11px;color:var(--text3);margin-top:5px">Puedes usar [CLIENTE], [SERVICIO], [VENCE], [ACCESOS] y [FIRMA]. Si omites [FIRMA], YORI-TEX la agregará automáticamente al final.</div></div>
+  <div class="field"><label>Garantía de este producto</label><select id="srv-garantia-modo" onchange="srvToggleGarantia()"><option value="propia">Garantía propia de este producto</option><option value="general">Usar garantía general</option><option value="ninguna">Este producto no tiene garantía</option></select></div>
+  <div id="srv-garantia-propia">
+    <div class="field"><label>Texto específico</label><textarea id="srv-garantia" style="height:105px" placeholder="Ej: La garantía cubre fallas de acceso hasta [VENCE]. No cubre cambios realizados por el cliente."></textarea><div style="font-size:11px;color:var(--text3);margin-top:5px">Solo se usará en este producto. Puedes usar [CLIENTE], [SERVICIO], [VENCE], [ACCESOS] y [FIRMA].</div></div>
+    <button type="button" class="btn btn-red" style="margin-bottom:10px" onclick="srvEliminarGarantiaFormulario()">🗑️ Eliminar garantía de este producto</button>
+  </div>
+  <div id="srv-garantia-estado" class="aviso" style="margin-bottom:10px"></div>
   <div class="divider"></div>
   <button class="btn btn-primary" onclick="srvGuardar()">💾 Guardar servicio</button>
 </div>
@@ -6174,9 +6179,18 @@ function asegurarFirmaPlantilla(texto){
   if(!limpio) return '';
   return /\[FIRMA\]/i.test(limpio) ? limpio : limpio + '\n\n[FIRMA]';
 }
+function garantiaModoServicio(srvOrUid){
+  const srv = typeof srvOrUid === 'string' ? getSrv(srvOrUid) : srvOrUid;
+  if(!srv) return 'general';
+  if(['propia','general','ninguna'].includes(srv.garantiaModo)) return srv.garantiaModo;
+  return String(srv.garantiaTexto || '').trim() ? 'propia' : 'general';
+}
 function plantillaBaseServicio(contexto, srvUid){
   const srv = getSrv(srvUid);
   if(!srv) return null;
+  const garantiaModo = garantiaModoServicio(srv);
+  if(contexto === 'garantia' && garantiaModo === 'ninguna') return null;
+  if(contexto === 'garantia' && garantiaModo === 'propia' && !String(srv.garantiaTexto || '').trim()) return null;
   const datosAcceso = srv.tieneInvitacion
     ? '📩 Invitación enviada a: [INVITACION]'
     : '🔐 Datos de acceso:\n[ACCESOS]';
@@ -6184,7 +6198,7 @@ function plantillaBaseServicio(contexto, srvUid){
     venta_nueva: asegurarFirmaPlantilla(srv.entregaTexto) || '¡Hola [CLIENTE]! 👋\n\nTu acceso a *[SERVICIO]* está listo ✅\n\n' + datosAcceso + '\n\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
     renovacion: asegurarFirmaPlantilla(srv.renovacionTexto) || '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + (srv.tieneInvitacion ? datosAcceso + '\n\n' : '') + '📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
     cobro_pendiente: 'Hola [CLIENTE] 👋\n\nQueda pendiente el pago de *$[PRECIO]* por tu servicio *[SERVICIO]*.\n\n📅 Vencimiento: [VENCE]\n\n[FIRMA]',
-    garantia: String(srv.garantiaTexto || '').trim() || '🛡️ *Garantía de [SERVICIO]*\n\nConserva este mensaje. Si tienes un inconveniente con el acceso, escríbenos indicando el nombre del servicio y el problema. La garantía aplica hasta el vencimiento registrado: *[VENCE]*.\n\n[FIRMA]',
+    garantia: garantiaModo === 'propia' ? String(srv.garantiaTexto || '').trim() : '🛡️ *Garantía de [SERVICIO]*\n\nConserva este mensaje. Si tienes un inconveniente con el acceso, escríbenos indicando el nombre del servicio y el problema. La garantía aplica hasta el vencimiento registrado: *[VENCE]*.\n\n[FIRMA]',
     vencimiento: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]',
     cuenta_caida: 'Hola [CLIENTE] 👋\n\nTu acceso de *[SERVICIO]* fue reemplazado correctamente.\n\n[ACCESOS]\n📅 Nuevo vencimiento: [VENCE]\n[DIAS_CORTESIA]\n\n[FIRMA]',
     reembolso: 'Hola [CLIENTE] 👋\n\nLamento el inconveniente con tu acceso de *[SERVICIO]*.\n\nReembolso calculado: *$[REEMBOLSO_CALCULADO]*\nMonto reconocido: *$[REEMBOLSO]*\nEstado: *[REEMBOLSO_ESTADO]*\n\n[FIRMA]'
@@ -6193,11 +6207,17 @@ function plantillaBaseServicio(contexto, srvUid){
   return {uid:'base-' + contexto + '-' + srvUid, nombre:'Base automática', texto, contexto, srvUid, baseDinamica:true};
 }
 function plantillasDisponibles(contexto, srvUid){
+  const srv = getSrv(srvUid);
+  const garantiaModo = garantiaModoServicio(srv);
+  if(contexto === 'garantia' && garantiaModo === 'ninguna') return [];
   const exactas = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === srvUid);
   const generales = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === 'todos');
   const otras = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === 'general' && ['todos',srvUid].includes(p.srvUid || 'todos'));
   const base = plantillaBaseServicio(contexto, srvUid);
-  return [...exactas, ...generales, ...otras, base].filter(Boolean).filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
+  const candidatas = contexto === 'garantia'
+    ? (garantiaModo === 'propia' ? [...exactas,base] : [...exactas,...generales,base])
+    : [...exactas,...generales,...otras,base];
+  return candidatas.filter(Boolean).filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
 }
 function llenarSelectPlantillas(selectId, contexto, srvUid){
   const sel = document.getElementById(selectId);
@@ -8252,6 +8272,16 @@ function abrirGarantiaVenta(ventaUid){
   const venta = APP.ventas.find(v => v.uid === ventaUid);
   if(!venta) return;
   if(!venta.wa){ alert('Agrega el WhatsApp del cliente en Editar venta antes de preparar la garantía.'); return; }
+  const srv = getSrv(venta.srvUid || '');
+  const modo = garantiaModoServicio(srv);
+  if(modo === 'ninguna'){
+    alert('Este producto está configurado sin garantía. Puedes cambiarlo desde Configuración → Catálogos → Editar servicio.');
+    return;
+  }
+  if(modo === 'propia' && !String(srv?.garantiaTexto || '').trim()){
+    alert('Este producto está configurado con garantía propia, pero el texto está vacío. Complétalo en la configuración del servicio.');
+    return;
+  }
   mostrarMensajePostVenta(venta, 'garantia');
   postCambiarTipo('garantia');
 }
@@ -8270,6 +8300,14 @@ function mostrarMensajePostVenta(v, contexto){
   abrirModal('modal-mensaje-wa');
 }
 function postCambiarTipo(modo){
+  if(modo === 'garantia'){
+    const ventaUid = document.getElementById('modal-mensaje-wa')?.dataset.ventaUid || '';
+    const venta = APP.ventas.find(v => v.uid === ventaUid);
+    if(venta && garantiaModoServicio(venta.srvUid || '') === 'ninguna'){
+      alert('Este producto está configurado sin garantía.');
+      return;
+    }
+  }
   const campo = document.getElementById('post-wa-modo');
   if(campo) campo.value = modo === 'garantia' ? 'garantia' : 'principal';
   const entrega = document.getElementById('post-btn-entrega');
@@ -11221,7 +11259,8 @@ function renderCatalogos(){
       s.tienePin ? '🔢 PIN' : null,
       s.tieneInvitacion ? '📨 Invitación' : null,
       s.tienePass ? '🔑 Pass' : null,
-      (s.entregaTexto || s.renovacionTexto || s.garantiaTexto) ? '💬 Mensajes propios' : null
+      (s.entregaTexto || s.renovacionTexto) ? '💬 Mensajes propios' : null,
+      garantiaModoServicio(s) === 'propia' ? '🛡️ Garantía propia' : (garantiaModoServicio(s) === 'ninguna' ? '🚫 Sin garantía' : '🛡️ Garantía general')
     ].filter(Boolean).join(', ') || 'Sin comportamiento';
     return `<div class="catalog-item">
       <div class="catalog-left">
@@ -11273,8 +11312,10 @@ function abrirNuevoServicio(){
   ['srv-perfil','srv-pin','srv-invitacion','srv-pass','srv-cuenta-madre','srv-madre-vendible','srv-direccion'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
   document.getElementById('srv-tipo-acceso').value = 'perfil';
   document.getElementById('srv-accesos-base').value = 1;
+  document.getElementById('srv-garantia-modo').value = 'general';
   poblarSrvCatSelect();
   srvToggleModeloAcceso();
+  srvToggleGarantia();
   abrirModal('modal-nuevo-servicio');
 }
 function srvGuardar(){
@@ -11283,6 +11324,9 @@ function srvGuardar(){
   if(!catUid || !nombre){ alert('Completa categoría y nombre'); return; }
   const planesRaw = document.getElementById('srv-planes').value.trim();
   const planes = planesRaw.split('\n').map(p=>p.trim()).filter(Boolean);
+  const garantiaModo = document.getElementById('srv-garantia-modo')?.value || 'general';
+  const garantiaTexto = sanitizarTexto(document.getElementById('srv-garantia').value, 3000);
+  if(garantiaModo === 'propia' && !garantiaTexto){ alert('Escribe la garantía propia de este producto o selecciona “Usar garantía general”.'); return; }
   const datos = {
     catUid, nombre, emoji: document.getElementById('srv-emoji').value || '📺',
     planes: planes.length ? planes : ['Plan único'],
@@ -11297,7 +11341,8 @@ function srvGuardar(){
     requiereDireccion: document.getElementById('srv-direccion').checked,
     entregaTexto: sanitizarTexto(document.getElementById('srv-entrega').value, 3000),
     renovacionTexto: sanitizarTexto(document.getElementById('srv-renovacion-mensaje').value, 3000),
-    garantiaTexto: sanitizarTexto(document.getElementById('srv-garantia').value, 3000)
+    garantiaModo,
+    garantiaTexto: garantiaModo === 'propia' ? garantiaTexto : ''
   };
   const editUID = document.getElementById('srv-edit-uid').value;
   if(editUID){ const i = CATALOGO_SERVICIOS.findIndex(s=>s.uid===editUID); if(i>-1) CATALOGO_SERVICIOS[i]={...CATALOGO_SERVICIOS[i],...datos}; }
@@ -11314,6 +11359,26 @@ function srvToggleModeloAcceso(){
   const bloque = document.getElementById('srv-modelo-acceso');
   if(bloque) bloque.style.display = activo ? '' : 'none';
   if(!activo && document.getElementById('srv-madre-vendible')) document.getElementById('srv-madre-vendible').checked = false;
+}
+function srvToggleGarantia(){
+  const modo = document.getElementById('srv-garantia-modo')?.value || 'general';
+  const propia = document.getElementById('srv-garantia-propia');
+  const estado = document.getElementById('srv-garantia-estado');
+  if(propia) propia.style.display = modo === 'propia' ? '' : 'none';
+  if(estado){
+    estado.innerHTML = modo === 'propia'
+      ? '<b>Garantía específica:</b> este texto solo aparecerá en este producto.'
+      : modo === 'ninguna'
+        ? '<b>Sin garantía:</b> no se podrá preparar ni enviar una garantía para este producto.'
+        : '<b>Garantía general:</b> utilizará el texto general, sin copiarlo a otros productos.';
+  }
+}
+function srvEliminarGarantiaFormulario(){
+  if(!confirm('¿Eliminar la garantía propia únicamente de este producto? No se modificarán los demás productos.')) return;
+  document.getElementById('srv-garantia').value = '';
+  document.getElementById('srv-garantia-modo').value = 'ninguna';
+  srvToggleGarantia();
+  alert('La garantía quedó marcada para eliminarse. Pulsa “Guardar servicio” para confirmar el cambio.');
 }
 function abrirEditarServicio(suid){
   const s = CATALOGO_SERVICIOS.find(x=>x.uid===suid);
@@ -11339,7 +11404,9 @@ function abrirEditarServicio(suid){
     document.getElementById('srv-entrega').value = s.entregaTexto || '';
     document.getElementById('srv-renovacion-mensaje').value = s.renovacionTexto || '';
     document.getElementById('srv-garantia').value = s.garantiaTexto || '';
+    document.getElementById('srv-garantia-modo').value = garantiaModoServicio(s);
     srvToggleModeloAcceso();
+    srvToggleGarantia();
   }, 50);
   abrirModal('modal-nuevo-servicio');
 }
@@ -11604,7 +11671,17 @@ function convertirMensajeEnPlantilla(texto, ctx){
   return resultado;
 }
 function eliminarPlantilla(puid){
-  if(!confirm('¿Eliminar esta plantilla?')) return;
+  const plantilla = PLANTILLAS_WA.find(p => p.uid === puid);
+  if(!plantilla) return;
+  const esGarantia = contextoPlantillaNormalizado(plantilla) === 'garantia';
+  const esGlobal = (plantilla.srvUid || 'todos') === 'todos';
+  const producto = esGlobal ? '' : (getSrv(plantilla.srvUid)?.nombre || plantilla.srvUid);
+  const aviso = esGarantia
+    ? (esGlobal
+      ? '⚠️ Esta es una garantía GLOBAL y puede aparecer en todos los productos que usan garantía general.\n\n¿Eliminarla de todos modos?'
+      : `¿Eliminar la plantilla de garantía únicamente de “${producto}”? Los demás productos no cambiarán.`)
+    : '¿Eliminar esta plantilla?';
+  if(!confirm(aviso)) return;
   PLANTILLAS_WA = PLANTILLAS_WA.filter(p=>p.uid!==puid);
   renderPlantillas();
   sincronizarConSheets();
