@@ -1815,6 +1815,59 @@ body.visual-v6 #sync-overlay{
   .ev-account-bottom{align-items:flex-start;flex-direction:column}
   .ev-account-cover{text-align:left}
 }
+
+/* Ventas responsive v35: la información nunca compite con las acciones */
+.reg-sale-row{
+  display:block!important;
+  min-width:0;
+  padding:14px 15px!important;
+}
+.reg-sale-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start;min-width:0}
+.reg-sale-info{min-width:0}
+.reg-sale-info .hist-nombre{overflow-wrap:normal;word-break:normal}
+.reg-sale-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.reg-sale-chips a{min-width:0;max-width:100%;text-decoration:none}
+.reg-sale-chips .chip{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reg-sale-summary{display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-left:0!important;white-space:nowrap}
+.reg-sale-account{width:100%;min-width:0}
+.reg-sale-account .reg-inventory-links{width:100%;margin-top:10px}
+.reg-inventory-main{flex:1;min-width:0;overflow:hidden}
+.reg-inventory-sub{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis;overflow-wrap:normal!important;word-break:normal!important}
+.reg-sale-actions{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(148,163,184,.1)}
+.reg-actions-primary,.reg-actions-secondary{display:flex;align-items:center;gap:7px;min-width:0}
+body.visual-v6 .reg-action-main{
+  width:auto!important;min-width:108px!important;height:38px!important;padding:7px 12px!important;
+  border-radius:11px!important;font-size:11px!important;font-weight:850!important
+}
+body.visual-v6 .reg-action-delivery{color:var(--green)!important;border-color:var(--green-border)!important;background:var(--green-bg)!important}
+body.visual-v6 .reg-action-warranty{color:var(--orange)!important;border-color:var(--orange-border)!important;background:var(--yellow-bg)!important}
+body.visual-v6 .reg-action-pay{width:auto!important;min-width:72px!important;height:34px!important;padding:5px 9px!important;color:var(--green)!important;border-color:var(--green-border)!important;background:var(--green-bg)!important;font-size:10.5px!important;white-space:nowrap}
+body.visual-v6 .reg-icon-action{display:inline-flex;align-items:center;justify-content:center;width:34px!important;min-width:34px!important;height:34px!important;padding:0!important;font-size:15px!important}
+body.visual-v6 .reg-icon-alert{color:var(--orange)!important}
+body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
+
+@media (max-width:560px){
+  .reg-sale-row{padding:13px 12px!important}
+  .reg-sale-head{gap:10px}
+  .reg-sale-actions{display:grid;grid-template-columns:1fr;gap:8px}
+  .reg-actions-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  body.visual-v6 .reg-action-main{width:100%!important;min-width:0!important}
+  .reg-actions-secondary{justify-content:flex-end;width:100%}
+  .reg-inventory-link{align-items:center}
+  .reg-inventory-sub{max-width:100%}
+}
+
+@media (min-width:800px){
+  body.visual-v6{max-width:1060px;padding-bottom:104px}
+  body.visual-v6::before{max-width:1060px}
+  body.visual-v6 .app-header{max-width:1060px;padding-left:24px;padding-right:24px}
+  body.visual-v6 .screen{padding-left:24px;padding-right:24px}
+  body.visual-v6 .bottom-nav{width:calc(100% - 48px);max-width:940px}
+  body.visual-v6 .modal-sheet{max-width:620px}
+  .reg-sale-row{padding:16px 18px!important}
+  .reg-sale-actions{justify-content:flex-start}
+  .reg-actions-secondary{margin-left:auto}
+}
 </style>
 </head>
 <body class="visual-v6">
@@ -4821,23 +4874,29 @@ function etiquetaTipoRegistro(v){
 function renderFilaRegistro(v, chips, chipLbl){
   const tipo = tipoRegistroVenta(v);
   const tipoColor = tipo === 'venta_nueva' ? 'verde' : (tipo === 'reposicion_credito' ? 'amarillo' : (tipo === 'reposicion_tecnica_fusionada' ? 'gris' : 'azul'));
-  return `<div class="hist-row" id="reg-${esc(v.uid)}">
-    <div class="hist-left">
-      <div class="hist-nombre">${esc(v.srvNom)} — ${esc(v.cliente)}</div>
-      <div class="hist-sub">${esc(fmtFecha(v.fecha))} · Vence ${esc(fmtFecha(v.vence))} · ${esc(v.metodo)}</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><span class="chip ${tipoColor}" style="font-size:10px">${esc(etiquetaTipoRegistro(v))}</span>${v.wa ? `<a href="https://wa.me/${encodeURIComponent(v.wa.replace(/\D/g,''))}" target="_blank" rel="noopener noreferrer"><span class="chip verde" style="font-size:10px">📱 ${esc(v.wa)}</span></a>` : ''}</div>
-      ${resumenInventarioRegistro(v)}
+  return `<div class="hist-row reg-sale-row" id="reg-${esc(v.uid)}">
+    <div class="reg-sale-head">
+      <div class="hist-left reg-sale-info">
+        <div class="hist-nombre">${esc(v.srvNom)} — ${esc(v.cliente)}</div>
+        <div class="hist-sub">${esc(fmtFecha(v.fecha))} · Vence ${esc(fmtFecha(v.vence))} · ${esc(v.metodo)}</div>
+        <div class="reg-sale-chips"><span class="chip ${tipoColor}" style="font-size:10px">${esc(etiquetaTipoRegistro(v))}</span>${v.wa ? `<a href="https://wa.me/${encodeURIComponent(v.wa.replace(/\D/g,''))}" target="_blank" rel="noopener noreferrer"><span class="chip verde" style="font-size:10px">📱 ${esc(v.wa)}</span></a>` : ''}</div>
+      </div>
+      <div class="hist-right reg-sale-summary">
+        <div class="hist-precio">$${(parseFloat(v.precio)||0).toFixed(2)}</div>
+        <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
+      </div>
     </div>
-    <div class="hist-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-      <div class="hist-precio">$${(parseFloat(v.precio)||0).toFixed(2)}</div>
-      <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
-      <div style="display:flex;gap:4px;align-items:center">
-        ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 8px;color:var(--green);border-color:var(--green-border)" title="Marcar como pagada">Pagó</button>` : ''}
-        <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 7px;color:var(--green);border-color:var(--green-border)" title="Preparar entrega o renovación">📤 Entrega</button>
-        <button onclick="abrirGarantiaVenta('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 7px;color:var(--orange);border-color:var(--orange-border)" title="Preparar garantía">🛡 Garantía</button>
-        <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
-        <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
-        <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
+    <div class="reg-sale-account">${resumenInventarioRegistro(v)}</div>
+    <div class="reg-sale-actions">
+      <div class="reg-actions-primary">
+        <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" class="btn-sm reg-action-main reg-action-delivery" title="Preparar entrega o renovación">📤 <span>Entrega</span></button>
+        <button onclick="abrirGarantiaVenta('${esc(v.uid)}')" class="btn-sm reg-action-main reg-action-warranty" title="Preparar garantía">🛡️ <span>Garantía</span></button>
+      </div>
+      <div class="reg-actions-secondary">
+        ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm reg-action-pay" title="Marcar como pagada">✓ Pagó</button>` : ''}
+        <button onclick="abrirEditarVenta('${esc(v.uid)}')" class="btn-sm reg-icon-action" title="Editar venta">✏️</button>
+        <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" class="btn-sm reg-icon-action reg-icon-alert" title="Cuenta caída">⚡</button>
+        <button onclick="eliminarVenta('${esc(v.uid)}')" class="btn-sm reg-icon-action reg-icon-delete" title="Eliminar venta">🗑️</button>
       </div>
     </div>
   </div>`;
@@ -9983,7 +10042,8 @@ function actualizarBadgeNotificaciones(){
   const pendientes = (APP.notificaciones||[]).filter(n=>!n.leida).length;
   const badge = document.getElementById('notif-badge');
   if(!badge) return;
-  badge.textContent = pendientes;
+  badge.textContent = pendientes > 99 ? '99+' : pendientes;
+  badge.title = pendientes ? `${pendientes} notificaciones pendientes` : '';
   badge.style.display = pendientes ? 'flex' : 'none';
 }
 async function mostrarNotificacionSistema(titulo, cuerpo, notificacionUid, urlDirecta){

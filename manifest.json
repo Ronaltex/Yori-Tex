@@ -6,7 +6,7 @@
   "scope": "./",
   "display": "standalone",
   "background_color": "#0d1b2a",
-  "theme_color": "#f5a623",
+  "theme_color": "#08111d",
   "lang": "es-EC",
   "icons": [
     {"src": "logo-yori-tex-plano.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable"}

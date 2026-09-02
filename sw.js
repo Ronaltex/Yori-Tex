@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v34-20260901-firma-segmentos-completo';
+const CACHE_NAME = 'yoritex-v35-20260902-responsive-ventas';
 const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
