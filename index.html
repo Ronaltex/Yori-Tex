@@ -2254,6 +2254,7 @@ body.visual-v6 #sync-overlay{
   <!-- PLANTILLAS -->
   <div id="cfg-tab-plantillas" style="display:none">
     <div class="aviso">💡 Usa variables como <span class="var-tag">[CLIENTE]</span> <span class="var-tag">[SERVICIO]</span> <span class="var-tag">[VENCE]</span> <span class="var-tag">[PRECIO]</span> <span class="var-tag">[CUENTA]</span> <span class="var-tag">[CORREO]</span> <span class="var-tag">[PASS]</span> <span class="var-tag">[PERFIL]</span> <span class="var-tag">[PIN]</span> <span class="var-tag">[ACCESOS]</span>. Se reemplazan automáticamente cuando hay contexto de venta.</div>
+    <button class="btn btn-primary" onclick="abrirMensajesSegmentados()" style="margin-bottom:10px">🎯 Preparar mensajes por segmento</button>
     <div id="plantillas-lista"></div>
     <button class="btn btn-ghost" onclick="abrirNuevaPlantilla()" style="margin-top:4px">＋ Nueva plantilla</button>
   </div>
@@ -2361,7 +2362,7 @@ body.visual-v6 #sync-overlay{
   <div class="modal-handle"></div>
   <div class="modal-title">➕ Nueva Venta <button class="modal-close" onclick="cerrarModal('modal-nueva-venta')">×</button></div>
   <div class="id-badge"><span class="il">ID Venta</span><span class="iv" id="mv-id">#VTA-0001</span></div>
-  <div class="field"><label>Fecha</label><input type="date" id="mv-fecha"/></div>
+  <div class="field"><label>Fecha</label><input type="date" id="mv-fecha" onchange="mvCalcVence()"/></div>
   <div class="divider"></div>
   <div class="sec">Cliente</div>
   <div class="row2">
@@ -2422,8 +2423,8 @@ body.visual-v6 #sync-overlay{
   <div id="mv-perfil-bloque" style="display:none">
     <div class="divider"></div><div class="sec">Perfil / acceso</div>
     <div class="row2">
-      <div class="field" id="mv-perfil-f"><label>Nombre perfil</label><input type="text" id="mv-perfil" placeholder="Ej: María"/></div>
-      <div class="field" id="mv-pin-f"><label>PIN</label><input type="text" id="mv-pin" placeholder="1234" maxlength="4"/></div>
+      <div class="field" id="mv-perfil-f"><label><input type="checkbox" id="mv-capturar-perfil" onchange="mvToggleDatosAcceso()" checked> Asignar perfil ahora</label><div id="mv-perfil-input-wrap"><input type="text" id="mv-perfil" placeholder="Ej: María"/></div></div>
+      <div class="field" id="mv-pin-f"><label><input type="checkbox" id="mv-capturar-pin" onchange="mvToggleDatosAcceso()" checked> Asignar PIN ahora</label><div id="mv-pin-input-wrap"><input type="text" id="mv-pin" placeholder="1234" maxlength="8"/></div></div>
     </div>
     <div id="mv-perfiles-multi"></div>
   </div>
@@ -2439,10 +2440,12 @@ body.visual-v6 #sync-overlay{
   <div class="sec">Pago y vencimiento</div>
   <div class="row3">
     <div class="field"><label>Precio ($)</label><input type="number" id="mv-precio" placeholder="0.00" step="0.01" oninput="mvCalcVence()"/></div>
-    <div class="field"><label>Duración</label>
-      <select id="mv-dur" onchange="mvCalcVence()">
-        <option value="30">30 días</option><option value="90">3 meses</option><option value="180">6 meses</option><option value="365">1 año</option>
-      </select>
+    <div class="field"><label>Plazo</label>
+      <div style="display:grid;grid-template-columns:1fr 1.35fr;gap:6px">
+        <input type="number" id="mv-plazo-cantidad" min="1" max="365" value="1" oninput="mvCalcVence()"/>
+        <select id="mv-plazo-unidad" onchange="mvCalcVence()"><option value="meses">Meses calendario</option><option value="dias">Días</option><option value="anos">Años</option></select>
+      </div>
+      <input type="hidden" id="mv-dur" value="30"/>
     </div>
     <div class="field"><label>Método</label>
       <select id="mv-metodo"><option>Efectivo</option><option>Transferencia</option><option>Binance</option><option>Deuna</option><option>Tarjeta</option></select>
@@ -2453,7 +2456,7 @@ body.visual-v6 #sync-overlay{
       <option value="pagado">✅ Pagado</option><option value="por_cobrar">🕐 Por cobrar</option><option value="parcial">⚠️ Parcial</option><option value="pendiente">🔴 Pendiente</option><option value="por_revisar">🔎 Por revisar</option>
     </select>
   </div>
-  <div id="mv-vence-box" class="vence-box" style="display:none"><span>📅 Vence el</span><span id="mv-vence-val">—</span></div>
+  <div id="mv-vence-box" class="vence-box" style="display:none"><span>📅 Vence el</span><input type="date" id="mv-vence-fecha" onchange="mvVenceManual()" style="width:auto;max-width:170px;padding:7px 9px"/><span id="mv-vence-val" style="display:none">—</span></div>
   <div class="field" style="margin-top:10px"><label>Notas</label><textarea id="mv-notas" placeholder="Observaciones..."></textarea></div>
   <button class="btn btn-primary" id="mv-guardar-btn" onclick="mvGuardar()">💾 Guardar venta</button>
 </div>
@@ -2482,8 +2485,9 @@ body.visual-v6 #sync-overlay{
     <label>Contraseña</label>
     <div class="pass-wrap"><input type="password" id="nc-pass" placeholder="••••••••"/><button class="eye-btn" onclick="togglePass('nc-pass',this)">👁</button></div>
   </div>
-  <div class="field"><label>Número de cupos / perfiles máx.</label><input type="number" id="nc-cupos" placeholder="5" min="1" max="30"/></div>
+  <div class="field"><label>Número de cupos / perfiles máx.</label><input type="number" id="nc-cupos" placeholder="5" min="1" max="30" oninput="ncRenderAccesosIniciales()"/></div>
   <div id="nc-modelo-acceso" class="aviso" style="display:none"></div>
+  <div id="nc-accesos-iniciales" style="display:none;margin-bottom:10px"></div>
   <div class="field" id="nc-direccion-wrap" style="display:none">
     <label>Dirección del plan familiar</label>
     <textarea id="nc-direccion" placeholder="Dirección exacta registrada en Spotify" style="height:72px"></textarea>
@@ -2580,8 +2584,12 @@ body.visual-v6 #sync-overlay{
   </div>
   <div class="field"><label>Cliente</label><input type="text" id="ec-cliente" placeholder="Nombre del cliente"/></div>
   <div class="field"><label>WhatsApp</label><input type="tel" id="ec-wa" placeholder="+593..."/></div>
-  <div class="field"><label>Nombre perfil / cupo</label><input type="text" id="ec-perfil" placeholder="Ej: María, Perfil 1..."/></div>
-  <div class="field"><label>PIN</label><input type="text" id="ec-pin" placeholder="1234" maxlength="4"/></div>
+  <div id="ec-datos-acceso" style="display:none">
+    <div class="row2">
+      <div class="field" id="ec-perfil-f"><label>Nombre perfil / cupo</label><input type="text" id="ec-perfil" placeholder="Ej: María, Perfil 1..."/></div>
+      <div class="field" id="ec-pin-f"><label>PIN</label><input type="text" id="ec-pin" placeholder="1234" maxlength="8"/></div>
+    </div>
+  </div>
   <div class="field" id="ec-inv-correo-field"><label>✉️ Correo invitación enviada a</label><input type="email" id="ec-inv-correo" placeholder="correo@cliente.com"/></div>
   <div class="field"><label>Plan / tipo de acceso</label><input type="text" id="ec-plan" placeholder="Ej: Familiar 1 mes, Individual 3 meses..."/></div>
   <div class="field"><label>Fecha de vencimiento</label><input type="date" id="ec-vence"/></div>
@@ -2650,8 +2658,13 @@ body.visual-v6 #sync-overlay{
   <!-- Correo (siempre visible, se autocompleta desde inventario) -->
   <div class="field"><label>📧 Correo resultante</label><input type="text" id="ev-correo" placeholder="correo@ejemplo.com" readonly style="background:var(--surface);color:var(--text2)"/></div>
   <div id="ev-acceso-actual" class="msg-preview" style="display:none;margin-bottom:10px"></div>
-  <div class="field" id="ev-perfil-f"><label>Perfil</label><input type="text" id="ev-perfil" placeholder="Perfil asignado"/></div>
-  <div class="field" id="ev-pin-f"><label>PIN</label><input type="text" id="ev-pin" placeholder="PIN de acceso"/></div>
+  <div id="ev-datos-acceso" style="display:none">
+    <div class="sec">Datos de acceso del producto</div>
+    <div class="row2">
+      <div class="field" id="ev-perfil-f"><label>Perfil</label><input type="text" id="ev-perfil" placeholder="Perfil asignado"/></div>
+      <div class="field" id="ev-pin-f"><label>PIN</label><input type="text" id="ev-pin" placeholder="PIN de acceso"/></div>
+    </div>
+  </div>
   <div class="divider"></div>
   <div class="sec">Pago y vencimiento</div>
   <div class="row2">
@@ -2662,8 +2675,9 @@ body.visual-v6 #sync-overlay{
   </div>
   <div class="row2">
     <div class="field"><label>Fecha venta</label><input type="date" id="ev-fecha"/></div>
-    <div class="field"><label>Fecha vence</label><input type="date" id="ev-vence" onchange="evRenderCuentasMulti()"/></div>
+    <div class="field"><label>Fecha vence</label><input type="date" id="ev-vence" onchange="evVenceManual();evRenderCuentasMulti()"/></div>
   </div>
+  <div class="field"><label>Plazo rápido</label><div style="display:grid;grid-template-columns:1fr 1.45fr auto;gap:6px"><input type="number" id="ev-plazo-cantidad" min="1" value="1"/><select id="ev-plazo-unidad"><option value="meses">Meses calendario</option><option value="dias">Días</option><option value="anos">Años</option></select><button class="btn btn-navy" style="width:auto;padding:8px 11px" onclick="evAplicarPlazo()">Aplicar</button></div><div style="font-size:11px;color:var(--text3);margin-top:5px">Calcula desde la fecha de venta; después puedes ajustar el calendario manualmente.</div></div>
   <div class="field"><label>Estado</label>
     <select id="ev-estado">
       <option value="pagado">✅ Pagado</option>
@@ -2714,7 +2728,7 @@ body.visual-v6 #sync-overlay{
     <select id="ren-srv" onchange="renActSrv()"><option value="">— Elige categoría —</option></select>
   </div>
   <div class="field"><label>Plan</label>
-    <select id="ren-plan"><option value="">— Elige servicio —</option></select>
+    <select id="ren-plan" onchange="renActPlan()"><option value="">— Elige servicio —</option></select>
   </div>
   <!-- SECCIÓN: Origen de cuenta -->
   <div class="sec">Cuenta / Origen</div>
@@ -2749,9 +2763,20 @@ body.visual-v6 #sync-overlay{
   <!-- Correo resultante (readonly, se autocompleta desde inventario o manual) -->
   <div class="field"><label>📧 Correo resultante</label><input type="text" id="ren-correo" placeholder="correo@ejemplo.com" readonly style="background:var(--surface);color:var(--text2)"/></div>
   <div class="field"><label>📱 WhatsApp</label><input type="tel" id="ren-wa" placeholder="+593..."/></div>
-  <div class="field"><label>Perfil / PIN (dejar vacío si no cambia)</label><input type="text" id="ren-perfil" placeholder="Dejar vacío si es el mismo"/></div>
-  <!-- Fecha vencimiento -->
-  <div class="field"><label>Nueva fecha de vencimiento</label><input type="date" id="ren-vence"/></div>
+  <div id="ren-datos-acceso" style="display:none">
+    <div class="divider"></div><div class="sec">Datos de acceso</div>
+    <div class="row2">
+      <div class="field" id="ren-perfil-f" style="display:none"><label>Perfil (vacío conserva el actual)</label><input type="text" id="ren-perfil" placeholder="Dejar vacío si no cambia"/></div>
+      <div class="field" id="ren-pin-f" style="display:none"><label>PIN (vacío conserva el actual)</label><input type="text" id="ren-pin" placeholder="Dejar vacío si no cambia"/></div>
+    </div>
+  </div>
+  <!-- Plazo y fecha de vencimiento -->
+  <div class="sec">Nuevo plazo</div>
+  <div class="row2">
+    <div class="field"><label>Cantidad y unidad</label><div style="display:grid;grid-template-columns:1fr 1.45fr;gap:6px"><input type="number" id="ren-plazo-cantidad" min="1" value="1" oninput="renCalcularVence()"/><select id="ren-plazo-unidad" onchange="renCalcularVence()"><option value="meses">Meses calendario</option><option value="dias">Días</option><option value="anos">Años</option></select></div></div>
+    <div class="field"><label>Contar desde</label><select id="ren-base-plazo" onchange="renCalcularVence()"><option value="vencimiento">Vencimiento anterior</option><option value="hoy">Hoy</option></select></div>
+  </div>
+  <div class="field"><label>Nueva fecha de vencimiento (editable)</label><input type="date" id="ren-vence" onchange="renVenceManual()"/></div>
   <div class="row2">
     <div class="field"><label>Precio cobrado ($)</label><input type="number" id="ren-precio" placeholder="0.00" step="0.01"/></div>
     <div class="field"><label>Método pago</label><select id="ren-metodo"><option>Efectivo</option><option selected>Transferencia</option><option>Binance</option><option>Deuna</option></select></div>
@@ -2925,7 +2950,7 @@ body.visual-v6 #sync-overlay{
         </select>
       </div>
       <div class="row2">
-        <div class="field"><label>Días extra / nuevo plazo</label><input type="number" id="cc-repo-dias" min="0" step="1" placeholder="0" oninput="ccActualizarVigenciaReposicion()"/></div>
+        <div class="field"><label>Plazo extra / nuevo</label><div style="display:grid;grid-template-columns:1fr 1.35fr;gap:6px"><input type="number" id="cc-repo-dias" min="0" step="1" placeholder="0" oninput="ccActualizarVigenciaReposicion()"/><select id="cc-repo-unidad" onchange="ccActualizarVigenciaReposicion()"><option value="dias">Días</option><option value="meses">Meses calendario</option><option value="anos">Años</option></select></div></div>
         <div class="field"><label>Fecha final del cliente</label><input type="date" id="cc-repo-vence-final" onchange="ccActualizarVigenciaReposicion()"/></div>
       </div>
       <div id="cc-repo-resumen" class="aviso">Selecciona el cliente y la cuenta para calcular la nueva vigencia.</div>
@@ -3167,7 +3192,8 @@ body.visual-v6 #sync-overlay{
   <div class="field"><label>Planes (uno por línea)</label><textarea id="srv-planes" placeholder="Perfil 1 mes&#10;Netflix combo | cupos=3 | cuentas=2 | dias=30 | precio=7&#10;Plan familiar | cupos=1" style="height:80px"></textarea></div>
   <div class="aviso">Para combos usa: <b>Nombre | cupos=3 | cuentas=2 | dias=30 | precio=7</b>. Asi la venta sabra cuantos cupos y cuentas debe pedir.</div>
   <div class="sec">Comportamiento del servicio</div>
-  <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Perfil y PIN</div><div class="ts">Como Netflix, Disney: cada cliente tiene su perfil</div></div><label class="toggle"><input type="checkbox" id="srv-perfil"><span class="toggle-slider"></span></label></div>
+  <div class="toggle-row"><div class="toggle-info"><div class="tl">Usa perfil</div><div class="ts">Muestra y permite entregar un nombre de perfil</div></div><label class="toggle"><input type="checkbox" id="srv-perfil"><span class="toggle-slider"></span></label></div>
+  <div class="toggle-row"><div class="toggle-info"><div class="tl">Usa PIN</div><div class="ts">Muestra y permite entregar un PIN; puede usarse con o sin perfil</div></div><label class="toggle"><input type="checkbox" id="srv-pin"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere Correo de Invitación</div><div class="ts">Como Spotify, Canva, Google One: se invita al cliente</div></div><label class="toggle"><input type="checkbox" id="srv-invitacion"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Acceso con Correo/Contraseña directa</div><div class="ts">Se comparte el correo y pass al cliente</div></div><label class="toggle"><input type="checkbox" id="srv-pass"><span class="toggle-slider"></span></label></div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Usa cuenta madre</div><div class="ts">La cuenta contiene perfiles, invitaciones u otros accesos</div></div><label class="toggle"><input type="checkbox" id="srv-cuenta-madre" onchange="srvToggleModeloAcceso()"><span class="toggle-slider"></span></label></div>
@@ -3179,6 +3205,10 @@ body.visual-v6 #sync-overlay{
     </div>
   </div>
   <div class="toggle-row"><div class="toggle-info"><div class="tl">Requiere dirección familiar</div><div class="ts">La dirección se guarda y copia desde inventario</div></div><label class="toggle"><input type="checkbox" id="srv-direccion"><span class="toggle-slider"></span></label></div>
+  <div class="sec">Mensajes predeterminados del producto</div>
+  <div class="field"><label>Entrega de cuenta</label><textarea id="srv-entrega" style="height:115px" placeholder="Mensaje que se enviará al entregar este producto."></textarea></div>
+  <div class="field"><label>Renovación</label><textarea id="srv-renovacion-mensaje" style="height:105px" placeholder="Mensaje que se enviará al renovar este producto."></textarea></div>
+  <div class="field"><label>Garantía</label><textarea id="srv-garantia" style="height:105px" placeholder="Ej: La garantía cubre fallas de acceso hasta [VENCE]. No cubre cambios realizados por el cliente."></textarea><div style="font-size:11px;color:var(--text3);margin-top:5px">Puedes usar [CLIENTE], [SERVICIO], [VENCE], [ACCESOS] y [FIRMA]. Si omites [FIRMA], YORI-TEX la agregará automáticamente al final.</div></div>
   <div class="divider"></div>
   <button class="btn btn-primary" onclick="srvGuardar()">💾 Guardar servicio</button>
 </div>
@@ -3223,6 +3253,7 @@ body.visual-v6 #sync-overlay{
       <option value="cobro_pendiente">Cobro pendiente</option>
       <option value="vencimiento">Vencimiento</option>
       <option value="renovacion">Renovación</option>
+      <option value="garantia">Garantía del producto</option>
       <option value="no_renovo">No renovó</option>
       <option value="cuenta_caida">Cuenta caída</option>
       <option value="reembolso">Reembolso</option>
@@ -3244,6 +3275,15 @@ body.visual-v6 #sync-overlay{
   <input type="hidden" id="post-wa-numero"/>
   <input type="hidden" id="post-wa-contexto"/>
   <input type="hidden" id="post-wa-servicio"/>
+  <div class="aviso" style="margin-bottom:10px"><b>Envíos separados:</b> prepara primero la entrega y después la garantía. Ambos incluyen tu firma automáticamente.</div>
+  <div class="row2" style="margin-bottom:10px"><button class="btn btn-primary" id="post-btn-entrega" onclick="postCambiarTipo('principal')">📤 Entrega / operación</button><button class="btn btn-navy" id="post-btn-garantia" onclick="postCambiarTipo('garantia')">🛡️ Garantía</button></div>
+  <input type="hidden" id="post-wa-modo" value="principal"/>
+  <div id="post-opciones-acceso" class="aviso" style="display:none;margin-bottom:10px">
+    <div style="font-weight:800;margin-bottom:7px">Datos que se incluirán</div>
+    <label id="post-pass-wrap" style="display:none;margin-right:12px"><input type="checkbox" id="post-enviar-pass" onchange="postActualizarMensajePlantilla()"> Contraseña</label>
+    <label id="post-perfil-wrap" style="display:none;margin-right:12px"><input type="checkbox" id="post-enviar-perfil" onchange="postActualizarMensajePlantilla()"> Perfil</label>
+    <label id="post-pin-wrap" style="display:none"><input type="checkbox" id="post-enviar-pin" onchange="postActualizarMensajePlantilla()"> PIN</label>
+  </div>
   <div class="field"><label>Plantilla</label><select id="post-wa-plantilla" onchange="postActualizarMensajePlantilla()"></select></div>
   <div class="field"><label>Puedes modificarlo antes de enviar</label><textarea id="post-wa-texto" style="height:220px"></textarea></div>
   <div class="row2">
@@ -3260,6 +3300,19 @@ body.visual-v6 #sync-overlay{
   <div class="modal-title">Notificaciones <button class="modal-close" onclick="cerrarModal('modal-notificaciones')">×</button></div>
   <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-navy" style="width:auto;padding:6px 10px;font-size:11px" onclick="marcarTodasNotificacionesLeidas()">Marcar leídas</button></div>
   <div id="notif-lista"></div>
+</div>
+</div>
+
+<!-- MENSAJES POR SEGMENTO -->
+<div class="modal-overlay" id="modal-mensajes-segmentados">
+<div class="modal-sheet">
+  <div class="modal-handle"></div>
+  <div class="modal-title">🎯 Mensajes por segmento <button class="modal-close" onclick="cerrarModal('modal-mensajes-segmentados')">×</button></div>
+  <div class="aviso">Filtra clientes y prepara mensajes individuales. Nada se envía en masa: tú revisas y abres cada WhatsApp.</div>
+  <div class="row2"><div class="field"><label>Producto</label><select id="seg-servicio" onchange="segRender()"><option value="todos">Todos</option></select></div><div class="field"><label>Tipo de mensaje</label><select id="seg-contexto" onchange="segRender()"><option value="vencimiento">Vencimiento</option><option value="cobro_pendiente">Cobro pendiente</option><option value="garantia">Garantía</option><option value="venta_nueva">Entrega</option><option value="renovacion">Renovación</option></select></div></div>
+  <div class="row2"><div class="field"><label>Pago</label><select id="seg-pago" onchange="segRender()"><option value="todos">Todos</option><option value="pagado">Pagados</option><option value="pendiente">Con saldo pendiente</option></select></div><div class="field"><label>Vigencia</label><select id="seg-vigencia" onchange="segRender()"><option value="todos">Todos</option><option value="activos">Activos</option><option value="proximos7">Vencen en 7 días</option><option value="vencidos">Vencidos</option></select></div></div>
+  <div id="seg-resumen" class="aviso" style="margin-bottom:8px"></div>
+  <div id="seg-lista"></div>
 </div>
 </div>
 
@@ -3812,9 +3865,9 @@ let PLANTILLAS_WA = [
 ];
 const PLANTILLAS_BASE_WA = PLANTILLAS_WA.map(p => ({...p}));
 function asegurarPlantillasBase(){
-  PLANTILLAS_BASE_WA.forEach(base => {
-    if(!PLANTILLAS_WA.some(p => p.uid === base.uid)) PLANTILLAS_WA.push({...base});
-  });
+  // Solo crea las plantillas iniciales cuando no existe ninguna. Si el usuario
+  // elimina una plantilla oficial, se respeta la eliminación y no reaparece.
+  if(!PLANTILLAS_WA.length) PLANTILLAS_WA.push(...PLANTILLAS_BASE_WA.map(base => ({...base})));
 }
 function normalizarPlantillasDanadas(){
   PLANTILLAS_WA.forEach(p => {
@@ -3945,6 +3998,26 @@ function togglePass(inputId, btn){
 }
 function numVenta(){ return '#VTA-' + String(APP._ventaCounter).padStart(4,'0'); }
 function getSrv(uid){ return CATALOGO_SERVICIOS.find(s => s.uid === uid); }
+function capacidadesServicio(srvOrUid){
+  const srv = typeof srvOrUid === 'string' ? getSrv(srvOrUid) : srvOrUid;
+  return {
+    perfil: srv?.tienePerfil === true,
+    pin: srv?.tienePin === true,
+    pass: srv?.tienePass === true,
+    invitacion: srv?.tieneInvitacion === true,
+    direccion: srv?.requiereDireccion === true
+  };
+}
+function aplicarCamposAccesoServicio(prefijo, srvOrUid){
+  const cap = capacidadesServicio(srvOrUid);
+  const bloque = document.getElementById(prefijo + '-datos-acceso');
+  const perfil = document.getElementById(prefijo + '-perfil-f');
+  const pin = document.getElementById(prefijo + '-pin-f');
+  if(bloque) bloque.style.display = cap.perfil || cap.pin ? 'block' : 'none';
+  if(perfil) perfil.style.display = cap.perfil ? 'block' : 'none';
+  if(pin) pin.style.display = cap.pin ? 'block' : 'none';
+  return cap;
+}
 function getCat(uid){ return CATALOGO_CATEGORIAS.find(c => c.uid === uid); }
 function getCatGasto(uid){ return CATALOGO_CAT_GASTOS.find(c => c.uid === uid); }
 function planNombre(plan){
@@ -4760,7 +4833,8 @@ function renderFilaRegistro(v, chips, chipLbl){
       <div class="hist-badge"><span class="chip ${esc(chips[v.estado]||'gris')}" style="font-size:10px">${esc(chipLbl[v.estado]||v.estado)}</span></div>
       <div style="display:flex;gap:4px;align-items:center">
         ${v.estado !== 'pagado' ? `<button onclick="marcarVentaPagada('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 8px;color:var(--green);border-color:var(--green-border)" title="Marcar como pagada">Pagó</button>` : ''}
-        <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.85;line-height:1" title="Preparar mensaje de ${esRenovacionVenta(v)?'renovación':'entrega'}">💬</button>
+        <button onclick="abrirMensajeEntregaVenta('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 7px;color:var(--green);border-color:var(--green-border)" title="Preparar entrega o renovación">📤 Entrega</button>
+        <button onclick="abrirGarantiaVenta('${esc(v.uid)}')" class="btn-sm" style="width:auto;padding:3px 7px;color:var(--orange);border-color:var(--orange-border)" title="Preparar garantía">🛡 Garantía</button>
         <button onclick="abrirEditarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1" title="Editar venta">✏️</button>
         <button onclick="abrirCuentaCaida('${esc(v.cuentaUID||'')}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.7;line-height:1;color:var(--red)" title="Cuenta caída">⚡</button>
         <button onclick="eliminarVenta('${esc(v.uid)}')" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;opacity:0.55;line-height:1" title="Eliminar venta">🗑️</button>
@@ -4927,9 +5001,10 @@ function evActSrv(){
   document.getElementById('ev-cupos-multi').innerHTML = '';
   document.getElementById('ev-cuenta-info').style.display = 'none';
   document.getElementById('ev-cupo-wrap').style.display = 'none';
-  if(!srvUid) return;
+  if(!srvUid){ aplicarCamposAccesoServicio('ev', null); return; }
   const srv = getSrv(srvUid);
   if(!srv) return;
+  aplicarCamposAccesoServicio('ev', srv);
   (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = planNombre(p); planSel.appendChild(o); });
   // Poblar cuentas del inventario para este servicio
   const origen = document.querySelector('input[name="ev-origen"]:checked')?.value || 'inventario';
@@ -5178,6 +5253,7 @@ function evRenderHistorialReposiciones(v){
 async function abrirEditarVenta(ventaUid){
   const v = await cargarVentaActualDesdeNube(ventaUid, 'editar la venta');
   if(!v) return;
+  const capVenta = capacidadesServicio(v.srvUid || '');
   evRenderHistorialReposiciones(v);
   document.getElementById('ev-uid').value = ventaUid;
   document.getElementById('ev-cliente').value = v.cliente || '';
@@ -5188,6 +5264,9 @@ async function abrirEditarVenta(ventaUid){
   document.getElementById('ev-metodo').value = v.metodo || 'Transferencia';
   document.getElementById('ev-fecha').value = v.fecha || hoy();
   document.getElementById('ev-vence').value = v.vence || '';
+  const diasPlazoActual = Math.max(1, diasEntre(v.fecha || hoy(), v.vence || sumarDias(v.fecha || hoy(),30)) || 30);
+  document.getElementById('ev-plazo-cantidad').value = Math.max(1, parseInt(v.plazoCantidad) || (diasPlazoActual >= 28 && diasPlazoActual <= 31 ? 1 : diasPlazoActual));
+  document.getElementById('ev-plazo-unidad').value = v.plazoUnidad || (diasPlazoActual >= 28 && diasPlazoActual <= 31 ? 'meses' : 'dias');
   document.getElementById('ev-estado').value = v.estado || 'pagado';
   document.getElementById('ev-notas').value = v.notas || '';
   document.getElementById('ev-correo').value = v.correo || '';
@@ -5200,7 +5279,13 @@ async function abrirEditarVenta(ventaUid){
       const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
       const cupo = cuenta?.cupos?.[parseInt(a.cupoIdx)] || {};
       if(!cuenta && !v.correo) return '';
-      return `<div style="margin-bottom:${idx === asignacionesActuales.length-1 ? 0 : 8}px"><strong>${esc(cuenta?.id || 'Acceso manual')}</strong><br>Correo: ${esc(cuenta?.correo || v.correo || '—')}<br>Contraseña: ${esc(cuenta?.pass || 'No registrada')}<br>Perfil: ${esc(a.perfil || cupo.perfil || v.perfil || '—')} · PIN: ${esc(a.pin || cupo.pin || v.pin || '—')}</div>`;
+      const detalles = [
+        `Correo: ${esc(cuenta?.correo || v.correo || '—')}`,
+        capVenta.pass ? `Contraseña: ${esc(cuenta?.pass || 'No registrada')}` : '',
+        capVenta.perfil ? `Perfil: ${esc(a.perfil || cupo.perfil || v.perfil || '—')}` : '',
+        capVenta.pin ? `PIN: ${esc(a.pin || cupo.pin || v.pin || '—')}` : ''
+      ].filter(Boolean).join('<br>');
+      return `<div style="margin-bottom:${idx === asignacionesActuales.length-1 ? 0 : 8}px"><strong>${esc(cuenta?.id || 'Acceso manual')}</strong><br>${detalles}</div>`;
     }).filter(Boolean).join('');
     accesoActualEl.innerHTML = accesosInfo;
     accesoActualEl.style.display = accesosInfo ? 'block' : 'none';
@@ -5221,6 +5306,7 @@ async function abrirEditarVenta(ventaUid){
 
   // Si la venta tiene servicio, preseleccionar categoría y servicio
   const srv = v.srvUid ? getSrv(v.srvUid) : null;
+  aplicarCamposAccesoServicio('ev', srv);
   if(srv){
     catSel.value = srv.catUid;
     evActCat();
@@ -5289,6 +5375,23 @@ async function abrirEditarVenta(ventaUid){
     }
   }
   abrirModal('modal-editar-venta');
+}
+function evAplicarPlazo(){
+  const fecha = document.getElementById('ev-fecha')?.value || hoy();
+  const cantidad = Math.max(1, parseInt(document.getElementById('ev-plazo-cantidad')?.value) || 1);
+  const unidad = document.getElementById('ev-plazo-unidad')?.value || 'meses';
+  const vence = sumarPlazoCalendario(fecha,cantidad,unidad);
+  if(document.getElementById('ev-vence')) document.getElementById('ev-vence').value = vence;
+  evRenderCuentasMulti();
+}
+function evVenceManual(){
+  const fecha = document.getElementById('ev-fecha')?.value || hoy();
+  const vence = document.getElementById('ev-vence')?.value || '';
+  const dias = diasEntre(fecha,vence);
+  if(dias !== null && dias > 0){
+    document.getElementById('ev-plazo-cantidad').value = dias;
+    document.getElementById('ev-plazo-unidad').value = 'dias';
+  }
 }
 
 async function editarVentaGuardar(abrirMensaje=false){
@@ -5361,6 +5464,9 @@ async function editarVentaGuardar(abrirMensaje=false){
   v.metodo = document.getElementById('ev-metodo').value;
   v.fecha = document.getElementById('ev-fecha').value || v.fecha;
   v.vence = document.getElementById('ev-vence').value || v.vence;
+  v.dias = Math.max(1, Math.round((new Date(v.vence+'T12:00:00')-new Date(v.fecha+'T12:00:00'))/86400000) || v.dias || 30);
+  v.plazoCantidad = Math.max(1, parseInt(document.getElementById('ev-plazo-cantidad').value) || v.dias);
+  v.plazoUnidad = document.getElementById('ev-plazo-unidad').value || 'dias';
   v.estado = document.getElementById('ev-estado').value;
   v.notas = sanitizarTexto(document.getElementById('ev-notas').value, 500);
 
@@ -5494,6 +5600,8 @@ function abrirNuevaVenta(){
   document.getElementById('mv-id').textContent = numVenta();
   document.getElementById('mv-fecha').value = hoy();
   document.getElementById('mv-dur').value = '30';
+  document.getElementById('mv-plazo-cantidad').value = '1';
+  document.getElementById('mv-plazo-unidad').value = 'meses';
   document.getElementById('mv-metodo').value = 'Efectivo';
   document.getElementById('mv-estado').value = 'pagado';
   document.getElementById('mv-cupos-plan').value = 1;
@@ -5567,7 +5675,14 @@ function mvActPlan(){
   document.getElementById('mv-plan-cupos-row').style.display = 'grid';
   document.getElementById('mv-cupos-plan').value = planCfg.cupos || 1;
   document.getElementById('mv-cuentas-plan').value = planCfg.cuentas || 1;
-  if(planCfg.duracion) document.getElementById('mv-dur').value = String(planCfg.duracion);
+  if(planCfg.duracion){
+    const d = parseInt(planCfg.duracion) || 30;
+    const cantidad = document.getElementById('mv-plazo-cantidad');
+    const unidad = document.getElementById('mv-plazo-unidad');
+    if(d === 365){ cantidad.value = 1; unidad.value = 'anos'; }
+    else if(d >= 30 && d % 30 === 0){ cantidad.value = d / 30; unidad.value = 'meses'; }
+    else { cantidad.value = d; unidad.value = 'dias'; }
+  }
   if(planCfg.precio !== null) document.getElementById('mv-precio').value = planCfg.precio;
   mvCalcVence();
   document.getElementById('mv-inv-bloque').style.display = 'block';
@@ -5579,6 +5694,9 @@ function mvActPlan(){
   } else {
     document.getElementById('mv-perfil-bloque').style.display = 'none';
   }
+  if(document.getElementById('mv-capturar-perfil')) document.getElementById('mv-capturar-perfil').checked = !!srv.tienePerfil;
+  if(document.getElementById('mv-capturar-pin')) document.getElementById('mv-capturar-pin').checked = !!srv.tienePin;
+  mvToggleDatosAcceso();
   // Invitacion block
   if(srv.tieneInvitacion){
     document.getElementById('mv-invitacion-bloque').style.display = 'block';
@@ -5867,24 +5985,42 @@ function renSetGuardando(activo){
     btn.textContent = activo ? '🔒 Confirmando renovación...' : '✅ Confirmar renovación';
   }
 }
+function mvToggleDatosAcceso(){
+  const cap = capacidadesServicio(document.getElementById('mv-srv')?.value || '');
+  const usarPerfil = cap.perfil && !!document.getElementById('mv-capturar-perfil')?.checked;
+  const usarPin = cap.pin && !!document.getElementById('mv-capturar-pin')?.checked;
+  const perfilWrap = document.getElementById('mv-perfil-input-wrap');
+  const pinWrap = document.getElementById('mv-pin-input-wrap');
+  if(perfilWrap) perfilWrap.style.display = usarPerfil ? 'block' : 'none';
+  if(pinWrap) pinWrap.style.display = usarPin ? 'block' : 'none';
+  mvRenderPerfilesMulti();
+}
 function mvRenderPerfilesMulti(){
   const wrap = document.getElementById('mv-perfiles-multi');
   const picks = mvSeleccionCupos();
-  if(picks.length <= 1){ wrap.innerHTML = ''; return; }
-  wrap.innerHTML = `<div class="aviso" style="margin-top:8px">Configura perfil y PIN por cada cupo del combo.</div>` + picks.map((p, idx) => {
+  const baseCap = capacidadesServicio(document.getElementById('mv-srv')?.value || '');
+  const cap = {
+    perfil:baseCap.perfil && !!document.getElementById('mv-capturar-perfil')?.checked,
+    pin:baseCap.pin && !!document.getElementById('mv-capturar-pin')?.checked
+  };
+  if(picks.length <= 1 || (!cap.perfil && !cap.pin)){ wrap.innerHTML = ''; return; }
+  const campos = [cap.perfil ? 'perfil' : '', cap.pin ? 'PIN' : ''].filter(Boolean).join(' y ');
+  wrap.innerHTML = `<div class="aviso" style="margin-top:8px">Configura ${campos} por cada acceso del combo.</div>` + picks.map((p, idx) => {
     const cuenta = APP.cuentas.find(c => c.uid === p.cuentaUID);
-    return `<div class="row2" style="margin-top:7px">
-      <div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · ${esc(cuenta ? etiquetaAccesoCuenta(cuenta,cuenta.cupos[p.cupoIdx]||{},p.cupoIdx,getSrv(cuenta.srvUid)) : 'Acceso')} perfil</label><input type="text" class="mv-perfil-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="Perfil ${idx+1}"/></div>
-      <div class="field"><label>PIN</label><input type="text" class="mv-pin-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="1234" maxlength="4"/></div>
+    return `<div class="${cap.perfil && cap.pin ? 'row2' : ''}" style="margin-top:7px">
+      ${cap.perfil ? `<div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · ${esc(cuenta ? etiquetaAccesoCuenta(cuenta,cuenta.cupos[p.cupoIdx]||{},p.cupoIdx,getSrv(cuenta.srvUid)) : 'Acceso')} perfil</label><input type="text" class="mv-perfil-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="Perfil ${idx+1}"/></div>` : ''}
+      ${cap.pin ? `<div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · PIN</label><input type="text" class="mv-pin-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="1234" maxlength="8"/></div>` : ''}
     </div>`;
   }).join('');
 }
 function mvAccesosSeleccionadosParaMensaje(){
   if(!_mvInvMode) return [];
+  const usarPerfil = !!document.getElementById('mv-capturar-perfil')?.checked;
+  const usarPin = !!document.getElementById('mv-capturar-pin')?.checked;
   const picks = mvSeleccionCupos();
   if(!picks.length && _mvCuentaSelUID){
     const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
-    return cuenta ? [{ cuenta, cupoIdx: null, perfil: document.getElementById('mv-perfil')?.value || '', pin: document.getElementById('mv-pin')?.value || '' }] : [];
+    return cuenta ? [{ cuenta, cupoIdx: null, perfil: usarPerfil ? (document.getElementById('mv-perfil')?.value || '') : '', pin: usarPin ? (document.getElementById('mv-pin')?.value || '') : '' }] : [];
   }
   return picks.map(p => {
     const cuenta = APP.cuentas.find(c => c.uid === p.cuentaUID);
@@ -5893,8 +6029,8 @@ function mvAccesosSeleccionadosParaMensaje(){
     return {
       cuenta,
       cupoIdx: p.cupoIdx,
-      perfil: perfilEl?.value || document.getElementById('mv-perfil')?.value || '',
-      pin: pinEl?.value || document.getElementById('mv-pin')?.value || ''
+      perfil: usarPerfil ? (perfilEl?.value || document.getElementById('mv-perfil')?.value || '') : '',
+      pin: usarPin ? (pinEl?.value || document.getElementById('mv-pin')?.value || '') : ''
     };
   }).filter(x => x.cuenta);
 }
@@ -5913,13 +6049,39 @@ function mvToggleInv(){
   document.getElementById('mv-cactus-wrap').style.display = _mvInvMode ? 'none' : 'block';
 }
 function mvCalcVence(){
-  const dur = document.getElementById('mv-dur').value;
   const fecha = document.getElementById('mv-fecha').value;
-  if(fecha && dur){
-    const v = sumarDias(fecha, dur);
+  const cantidad = Math.max(1, parseInt(document.getElementById('mv-plazo-cantidad')?.value || '1') || 1);
+  const unidad = document.getElementById('mv-plazo-unidad')?.value || 'meses';
+  if(fecha){
+    const v = sumarPlazoCalendario(fecha, cantidad, unidad);
+    const dias = Math.max(1, diasEntre(fecha, v) || 1);
+    document.getElementById('mv-dur').value = String(dias);
+    document.getElementById('mv-vence-fecha').value = v;
     document.getElementById('mv-vence-val').textContent = fmtFecha(v);
     document.getElementById('mv-vence-box').style.display = 'flex';
   }
+}
+function sumarPlazoCalendario(fecha, cantidad, unidad){
+  const base = new Date((normalizarFechaValor(fecha) || hoy()) + 'T12:00:00');
+  const diaOriginal = base.getDate();
+  if(unidad === 'dias') base.setDate(base.getDate() + cantidad);
+  else {
+    const meses = unidad === 'anos' ? cantidad * 12 : cantidad;
+    base.setDate(1);
+    base.setMonth(base.getMonth() + meses);
+    const ultimoDia = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    base.setDate(Math.min(diaOriginal, ultimoDia));
+  }
+  return base.getFullYear() + '-' + String(base.getMonth()+1).padStart(2,'0') + '-' + String(base.getDate()).padStart(2,'0');
+}
+function mvVenceManual(){
+  const fecha = document.getElementById('mv-fecha').value || hoy();
+  const vence = document.getElementById('mv-vence-fecha').value;
+  if(!vence) return;
+  const dias = diasEntre(fecha, vence);
+  if(dias === null || dias < 1){ alert('La fecha de vencimiento debe ser posterior a la venta.'); mvCalcVence(); return; }
+  document.getElementById('mv-dur').value = String(dias);
+  document.getElementById('mv-vence-val').textContent = fmtFecha(vence);
 }
 function enviarWA(numero, msg){
   const wa = String(numero).replace(/\D/g,'');
@@ -5948,6 +6110,11 @@ function contextoPlantillaNormalizado(p){
   if(p?.uid === 'plt-no-renovacion') return 'no_renovo';
   return 'general';
 }
+function asegurarFirmaPlantilla(texto){
+  const limpio = String(texto || '').trim();
+  if(!limpio) return '';
+  return /\[FIRMA\]/i.test(limpio) ? limpio : limpio + '\n\n[FIRMA]';
+}
 function plantillaBaseServicio(contexto, srvUid){
   const srv = getSrv(srvUid);
   if(!srv) return null;
@@ -5955,13 +6122,15 @@ function plantillaBaseServicio(contexto, srvUid){
     ? '📩 Invitación enviada a: [INVITACION]'
     : '🔐 Datos de acceso:\n[ACCESOS]';
   const textos = {
-    venta_nueva: '¡Hola [CLIENTE]! 👋\n\nTu acceso a *[SERVICIO]* está listo ✅\n\n' + datosAcceso + '\n\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
-    renovacion: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + (srv.tieneInvitacion ? datosAcceso + '\n\n' : '') + '📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
+    venta_nueva: asegurarFirmaPlantilla(srv.entregaTexto) || '¡Hola [CLIENTE]! 👋\n\nTu acceso a *[SERVICIO]* está listo ✅\n\n' + datosAcceso + '\n\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
+    renovacion: asegurarFirmaPlantilla(srv.renovacionTexto) || '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + (srv.tieneInvitacion ? datosAcceso + '\n\n' : '') + '📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
+    cobro_pendiente: 'Hola [CLIENTE] 👋\n\nQueda pendiente el pago de *$[PRECIO]* por tu servicio *[SERVICIO]*.\n\n📅 Vencimiento: [VENCE]\n\n[FIRMA]',
+    garantia: String(srv.garantiaTexto || '').trim() || '🛡️ *Garantía de [SERVICIO]*\n\nConserva este mensaje. Si tienes un inconveniente con el acceso, escríbenos indicando el nombre del servicio y el problema. La garantía aplica hasta el vencimiento registrado: *[VENCE]*.\n\n[FIRMA]',
     vencimiento: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]',
     cuenta_caida: 'Hola [CLIENTE] 👋\n\nTu acceso de *[SERVICIO]* fue reemplazado correctamente.\n\n[ACCESOS]\n📅 Nuevo vencimiento: [VENCE]\n[DIAS_CORTESIA]\n\n[FIRMA]',
     reembolso: 'Hola [CLIENTE] 👋\n\nLamento el inconveniente con tu acceso de *[SERVICIO]*.\n\nReembolso calculado: *$[REEMBOLSO_CALCULADO]*\nMonto reconocido: *$[REEMBOLSO]*\nEstado: *[REEMBOLSO_ESTADO]*\n\n[FIRMA]'
   };
-  const texto = textos[contexto] || textos.venta_nueva;
+  const texto = asegurarFirmaPlantilla(textos[contexto] || textos.venta_nueva);
   return {uid:'base-' + contexto + '-' + srvUid, nombre:'Base automática', texto, contexto, srvUid, baseDinamica:true};
 }
 function plantillasDisponibles(contexto, srvUid){
@@ -5969,7 +6138,7 @@ function plantillasDisponibles(contexto, srvUid){
   const generales = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === 'todos');
   const otras = PLANTILLAS_WA.filter(p => contextoPlantillaNormalizado(p) === 'general' && ['todos',srvUid].includes(p.srvUid || 'todos'));
   const base = plantillaBaseServicio(contexto, srvUid);
-  return [base, ...exactas, ...generales, ...otras].filter(Boolean).filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
+  return [...exactas, ...generales, ...otras, base].filter(Boolean).filter((p, i, arr) => arr.findIndex(x => x.uid === p.uid) === i);
 }
 function llenarSelectPlantillas(selectId, contexto, srvUid){
   const sel = document.getElementById(selectId);
@@ -5994,11 +6163,13 @@ function accesosDeVentaParaMensaje(v){
 }
 function ctxMensajeVenta(v, extra={}){
   const srv = getSrv(v.srvUid);
+  const cap = capacidadesServicio(srv);
   return {
     cliente:limpiarTextoParaMensaje(v.cliente || 'Cliente'),
     servicio:nombreServicioLimpio(v.srvNom || '', srv),
     vence:fmtFecha(v.vence), precio:(parseFloat(v.precio)||0).toFixed(2), correo:v.correo || '',
-    perfil:v.perfil || '', pin:v.pin || '', invitacion:v.invCorreo || '', enviarPass:!!v.enviarPass,
+    perfil:v.perfil || '', pin:v.pin || '', invitacion:cap.invitacion ? (v.invCorreo || '') : '',
+    enviarPass:cap.pass && !!v.enviarPass, enviarPerfil:cap.perfil, enviarPin:cap.pin,
     estadoPago:v.estado === 'pagado' ? 'Pagado' : (v.estado === 'parcial' ? 'Pago parcial' : 'Por pagar'),
     pagoPendiente:v.estado !== 'pagado', accesos:accesosDeVentaParaMensaje(v), ...extra
   };
@@ -6012,12 +6183,13 @@ function mensajeAutomatico(contexto, ctx){
 function resolverMensajeSeleccionado(contexto, srvUid, selectId, ctx){
   const puid = document.getElementById(selectId)?.value;
   const p = plantillasDisponibles(contexto, srvUid).find(x => x.uid === puid) || plantillasDisponibles(contexto, srvUid)[0];
-  return p ? resolverPlantilla(p.texto, ctx) : mensajeAutomatico(contexto, ctx);
+  return p ? resolverPlantilla(asegurarFirmaPlantilla(p.texto), ctx) : mensajeAutomatico(contexto, ctx);
 }
 function mvContextoFormulario(){
   const nombre = document.getElementById('mv-nombre').value || 'Cliente';
   const srvUid = document.getElementById('mv-srv').value;
   const srv = getSrv(srvUid);
+  const cap = capacidadesServicio(srv);
   const srvNom = srv ? srv.emoji + ' ' + srv.nombre : document.getElementById('mv-srv').options[document.getElementById('mv-srv').selectedIndex]?.text || 'Servicio';
   const accesos = mvAccesosSeleccionadosParaMensaje();
   const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
@@ -6026,10 +6198,10 @@ function mvContextoFormulario(){
   const pin = document.getElementById('mv-pin')?.value || '';
   const vence = document.getElementById('mv-vence-val').textContent || '\u2014';
   const precio = document.getElementById('mv-precio').value || '\u2014';
-  const enviarPass = !!document.getElementById('mv-enviar-pass')?.checked;
+  const enviarPass = cap.pass && !!document.getElementById('mv-enviar-pass')?.checked;
   const accesoManual = !_mvInvMode && correo ? [{cuenta:{correo,pass:document.getElementById('mv-cactus-pass')?.value || ''},perfil,pin,cupoIdx:0}] : [];
-  const invitacion = document.getElementById('mv-inv-correo')?.value || '';
-  return {srvUid, ctx:{cliente:nombre,servicio:srvNom,vence,precio,correo,perfil,pin,invitacion,enviarPass,accesos:accesos.length ? accesos : accesoManual}};
+  const invitacion = cap.invitacion ? (document.getElementById('mv-inv-correo')?.value || '') : '';
+  return {srvUid, ctx:{cliente:nombre,servicio:srvNom,vence,precio,correo,perfil,pin,invitacion,enviarPass,enviarPerfil:cap.perfil && !!document.getElementById('mv-capturar-perfil')?.checked,enviarPin:cap.pin && !!document.getElementById('mv-capturar-pin')?.checked,accesos:accesos.length ? accesos : accesoManual}};
 }
 function mvGenWA(){
   const {srvUid,ctx} = mvContextoFormulario();
@@ -6051,13 +6223,13 @@ async function mvGuardar(){
   const srvUid = document.getElementById('mv-srv').value;
   if(!srvUid || srvUid.startsWith('—')){ alert('Selecciona el servicio'); return; }
   const srv = getSrv(srvUid);
-  const dur = parseInt(document.getElementById('mv-dur').value) || 30;
   const fechaVenta = document.getElementById('mv-fecha').value || hoy();
-  const vence = sumarDias(fechaVenta, dur);
+  const vence = document.getElementById('mv-vence-fecha').value || sumarDias(fechaVenta, parseInt(document.getElementById('mv-dur').value) || 30);
+  const dur = Math.max(1, diasEntre(fechaVenta, vence) || parseInt(document.getElementById('mv-dur').value) || 30);
   const waInput = sanitizarTexto(document.getElementById('mv-wa').value, 20);
   const precioVenta = sanitizarNumero(document.getElementById('mv-precio').value);
   const estadoVenta = sanitizarTexto(document.getElementById('mv-estado').value, 50);
-  const enviarPassVenta = !!document.getElementById('mv-enviar-pass')?.checked;
+  const enviarPassVenta = capacidadesServicio(srv).pass && !!document.getElementById('mv-enviar-pass')?.checked;
   const ventaUidNueva = uid();
   const ventaIdNueva = numVenta();
   let costoAdqVenta = 0;
@@ -6089,8 +6261,8 @@ async function mvGuardar(){
     cupoIdxs = cuposAsignados.filter(x => x.cuentaUID === cuentaUID).map(x => x.cupoIdx);
     const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
     correo = cuenta ? cuenta.correo : '';
-    const perfilGlobal = sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50);
-    const pinGlobal = sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10);
+    const perfilGlobal = document.getElementById('mv-capturar-perfil')?.checked ? sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50) : '';
+    const pinGlobal = document.getElementById('mv-capturar-pin')?.checked ? sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10) : '';
     const precioPorCupoAsignado = cuposAsignados.length ? (precioVenta / cuposAsignados.length) : precioVenta;
     cuposAsignados.forEach(asig => {
       const cuentaAsig = APP.cuentas.find(c => c.uid === asig.cuentaUID);
@@ -6123,6 +6295,8 @@ async function mvGuardar(){
     });
   } else if(!_mvInvMode){
     correo = sanitizarTexto(document.getElementById('mv-cactus-correo').value, 200);
+    const perfilManual = document.getElementById('mv-capturar-perfil')?.checked ? sanitizarTexto(document.getElementById('mv-perfil')?.value||'',50) : '';
+    const pinManual = document.getElementById('mv-capturar-pin')?.checked ? sanitizarTexto(document.getElementById('mv-pin')?.value||'',10) : '';
     const costoAdq = sanitizarNumero(document.getElementById('mv-cactus-costo').value);
     const metodoAdq = document.getElementById('mv-cactus-metodo-adq')?.value || 'Efectivo';
     costoAdqVenta = costoAdq;
@@ -6131,7 +6305,7 @@ async function mvGuardar(){
       const nc = { uid:uid(), srvUid, srvNom: srv ? srv.nombre : srvUid, id:`${(srv?.nombre||'SRV').toUpperCase().slice(0,3)}-C${APP._ventaCounter}`,
         correo, pass:sanitizarTexto(document.getElementById('mv-cactus-pass').value, 200),
         costo: costoAdq, metodoPago: metodoAdq,
-        cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:'',pin:'',vence,pendienteCobro:estadoVenta !== 'pagado',periodoDesde:fechaVenta,periodoHasta:vence,ventaUid:ventaUidNueva,montoVenta:precioVenta}]
+        cupos:[{estado:'ocupado',cliente:nombre,wa:waInput,perfil:perfilManual,pin:pinManual,vence,pendienteCobro:estadoVenta !== 'pagado',periodoDesde:fechaVenta,periodoHasta:vence,ventaUid:ventaUidNueva,montoVenta:precioVenta}]
       };
       APP.cuentas.push(nc); cuentaUID = nc.uid; cupoIdx = 0;
     }
@@ -6175,12 +6349,14 @@ async function mvGuardar(){
   const venta = {
     uid: ventaUidNueva, id: ventaIdNueva, fecha: fechaVenta, vence,
     dias: dur,
+    plazoCantidad:Math.max(1,parseInt(document.getElementById('mv-plazo-cantidad').value)||1),
+    plazoUnidad:document.getElementById('mv-plazo-unidad').value||'meses',
     cliente: nombre, wa: waInput,
     srvUid, srvNom: srv ? srv.emoji + ' ' + srv.nombre : srvUid,
     plan: sanitizarTexto(document.getElementById('mv-plan').value, 100),
-    correo, perfil: sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50),
-    pin: sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10),
-    invCorreo: sanitizarTexto(document.getElementById('mv-inv-correo')?.value||'', 200),
+    correo, perfil: document.getElementById('mv-capturar-perfil')?.checked ? sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50) : '',
+    pin: document.getElementById('mv-capturar-pin')?.checked ? sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10) : '',
+    invCorreo: capacidadesServicio(srv).invitacion ? sanitizarTexto(document.getElementById('mv-inv-correo')?.value||'', 200) : '',
     precio: precioVenta,
     metodo: sanitizarTexto(document.getElementById('mv-metodo').value, 50),
     estado: estadoVenta,
@@ -6611,6 +6787,7 @@ function abrirEditarCuenta(cuentaUID){
         document.getElementById('nc-srv').value = c.srvUid;
         ncActSrv();
         document.getElementById('nc-cupos').value = c.cupos.length;
+        ncRenderAccesosIniciales();
       }, 50);
     }
     document.getElementById('nc-id').value = c.id;
@@ -6773,6 +6950,7 @@ function abrirEditarCupo(cuentaUID, cupoIdx){
   cuenta.cupos = normalizarRolesCuposCuenta(cuenta, getSrv(cuenta.srvUid), cuenta.cupos, false);
   const cupo = cuenta.cupos[cupoIdx];
   const srv = getSrv(cuenta.srvUid);
+  aplicarCamposAccesoServicio('ec', srv);
   _editCupoUID = cuentaUID; _editCupoIdx = cupoIdx;
   document.getElementById('ec-titulo').innerHTML = `✏️ Cupo ${cupoIdx+1} — ${cuenta.id} <button class="modal-close" onclick="cerrarModal('modal-editar-cupo')">×</button>`;
   document.getElementById('ec-cuenta-uid').value = cuentaUID;
@@ -6858,6 +7036,7 @@ function ncSetModo(modo){
   });
   const idWrap = document.getElementById('nc-id')?.closest('.field');
   if(idWrap) idWrap.querySelector('label').textContent = modo === 'masivo' ? 'Prefijo ID (ej: NET)' : 'ID de cuenta (ej: NET-01)';
+  ncRenderAccesosIniciales();
   ncBulkPreview();
 }
 function ncBulkTogglePass(){
@@ -6901,6 +7080,7 @@ function abrirNuevaCuenta(){
   poblarSelectAdelantos('nc-adelanto');
   if(document.getElementById('nc-adelanto')) document.getElementById('nc-adelanto').value = '';
   ncPoblarCategorias();
+  ncRenderAccesosIniciales();
   abrirModal('modal-nueva-cuenta');
 }
 function abrirNuevaCuentaMasiva(){
@@ -6972,8 +7152,31 @@ function etiquetaAccesoCuenta(cuenta, cupo, indice, srv){
 }
 function crearCuposModelo(srv, cantidad, anteriores=[]){
   const cuentaTemporal = {correo:document.getElementById('nc-correo')?.value || '',cupos:[]};
-  const cupos = Array.from({length:cantidad}, (_,i) => ({...(anteriores[i] || {estado:'libre'})}));
+  const cupos = Array.from({length:cantidad}, (_,i) => ({
+    ...(anteriores[i] || {estado:'libre'}),
+    perfil:document.getElementById('nc-acceso-perfil-' + i)?.value ?? anteriores[i]?.perfil ?? '',
+    pin:document.getElementById('nc-acceso-pin-' + i)?.value ?? anteriores[i]?.pin ?? ''
+  }));
   return normalizarRolesCuposCuenta(cuentaTemporal,srv,cupos,anteriores.length===0);
+}
+function ncRenderAccesosIniciales(){
+  const box = document.getElementById('nc-accesos-iniciales');
+  if(!box) return;
+  const srv = getSrv(document.getElementById('nc-srv')?.value || '');
+  const cap = capacidadesServicio(srv);
+  const modo = document.getElementById('nc-modo')?.value || 'individual';
+  const cantidad = Math.max(1, Math.min(30, parseInt(document.getElementById('nc-cupos')?.value) || 1));
+  if(modo !== 'individual' || (!cap.perfil && !cap.pin)){
+    box.style.display = 'none'; box.innerHTML = ''; return;
+  }
+  const editUID = document.getElementById('nc-edit-uid')?.value || '';
+  const existentes = APP.cuentas.find(c => c.uid === editUID)?.cupos || [];
+  const borrador = Array.from({length:cantidad}, (_,i) => ({
+    perfil:document.getElementById('nc-acceso-perfil-' + i)?.value ?? existentes[i]?.perfil ?? '',
+    pin:document.getElementById('nc-acceso-pin-' + i)?.value ?? existentes[i]?.pin ?? ''
+  }));
+  box.style.display = '';
+  box.innerHTML = `<div class="sec">Perfiles y PIN por cupo</div><div class="aviso" style="margin-bottom:8px">Déjalos vacíos si prefieres completarlos al hacer la venta.</div>` + borrador.map((dato,i) => `<div class="card" style="padding:10px;margin-bottom:7px"><div style="font-size:12px;font-weight:800;margin-bottom:7px">${esc(etiquetaTipoAcceso(modeloAccesoServicio(srv).tipoAcceso,i,modeloAccesoServicio(srv).madreVendible))}</div><div class="row2">${cap.perfil ? `<div class="field" style="margin:0"><label>Perfil</label><input id="nc-acceso-perfil-${i}" value="${esc(dato.perfil)}" placeholder="Perfil ${i+1}"/></div>` : ''}${cap.pin ? `<div class="field" style="margin:0"><label>PIN</label><input id="nc-acceso-pin-${i}" value="${esc(dato.pin)}" placeholder="PIN" maxlength="10"/></div>` : ''}</div></div>`).join('');
 }
 function ncActSrv(){
   const srv = getSrv(document.getElementById('nc-srv')?.value);
@@ -6996,6 +7199,7 @@ function ncActSrv(){
   if(direccionWrap) direccionWrap.style.display = requiereDireccion ? '' : 'none';
   const editando = !!document.getElementById('nc-edit-uid')?.value;
   if(!editando && document.getElementById('nc-cupos')) document.getElementById('nc-cupos').value = modelo.totalSugerido;
+  ncRenderAccesosIniciales();
 }
 function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, fecha, adelantoUID){
   if(costoCuenta <= 0) return true;
@@ -7718,9 +7922,10 @@ function renActSrv(){
   cuentaSel.innerHTML = '<option value="">— Sin cuenta asignada —</option>';
   document.getElementById('ren-cuenta-info').style.display = 'none';
   document.getElementById('ren-cupo-wrap').style.display = 'none';
-  if(!srvUid) return;
+  if(!srvUid){ aplicarCamposAccesoServicio('ren', null); return; }
   const srv = getSrv(srvUid);
   if(!srv) return;
+  aplicarCamposAccesoServicio('ren', srv);
   (srv.planes||[]).forEach(p => { const o = document.createElement('option'); o.textContent = planNombre(p); planSel.appendChild(o); });
   const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
   if(origen === 'inventario'){
@@ -7745,6 +7950,18 @@ function renToggleOrigen(){
     document.getElementById('ren-correo').readOnly = false;
   }
 }
+function renActPlan(){
+  const srvUid = document.getElementById('ren-srv')?.value;
+  const plan = document.getElementById('ren-plan')?.value;
+  if(!srvUid || !plan) return;
+  const cfg = getPlanConfig(srvUid,plan);
+  if(!cfg.duracion) return;
+  const d = parseInt(cfg.duracion) || 30;
+  if(d === 365){ document.getElementById('ren-plazo-cantidad').value=1; document.getElementById('ren-plazo-unidad').value='anos'; }
+  else if(d >= 30 && d % 30 === 0){ document.getElementById('ren-plazo-cantidad').value=d/30; document.getElementById('ren-plazo-unidad').value='meses'; }
+  else { document.getElementById('ren-plazo-cantidad').value=d; document.getElementById('ren-plazo-unidad').value='dias'; }
+  renCalcularVence();
+}
 function renSelCupo(){
   const cuentaUID = document.getElementById('ren-cuenta-inv').value;
   const cupoIdx = document.getElementById('ren-cupo-inv').value;
@@ -7754,6 +7971,30 @@ function renSelCupo(){
   const cu = c.cupos[cupoIdx];
   document.getElementById('ren-correo').value = c.correo || '';
 }
+function renBasePlazoFecha(){
+  const v = APP.ventas.find(x => x.uid === document.getElementById('ren-venta-uid')?.value) || {};
+  return document.getElementById('ren-base-plazo')?.value === 'hoy' ? hoy() : (normalizarFechaValor(v.vence) || hoy());
+}
+function renCalcularVence(){
+  const cantidad = Math.max(1, parseInt(document.getElementById('ren-plazo-cantidad')?.value || '1') || 1);
+  const unidad = document.getElementById('ren-plazo-unidad')?.value || 'meses';
+  const base = renBasePlazoFecha();
+  const vence = sumarPlazoCalendario(base,cantidad,unidad);
+  document.getElementById('ren-vence').value = vence;
+  renVenceManual();
+}
+function renVenceManual(){
+  const vence = document.getElementById('ren-vence')?.value;
+  const base = renBasePlazoFecha();
+  const dias = diasEntre(base,vence);
+  const previewEl = document.getElementById('ren-vence-preview');
+  if(!vence || dias === null || dias < 1){
+    if(previewEl){ previewEl.textContent = '⚠️ La fecha debe ser posterior a la fecha base.'; previewEl.style.display = 'block'; }
+    return false;
+  }
+  if(previewEl){ previewEl.textContent = `📅 ${fmtFecha(base)} → ${fmtFecha(vence)} · ${dias} días reales`; previewEl.style.display = 'block'; }
+  return true;
+}
 async function abrirRenovar(ventaUid){
   const v = await cargarVentaActualDesdeNube(ventaUid, 'renovar');
   if(!v) return;
@@ -7761,16 +8002,22 @@ async function abrirRenovar(ventaUid){
   document.getElementById('ren-venta-uid').value = ventaUid;
   document.getElementById('ren-info').textContent = `${v.cliente} · ${v.srvNom||'?'} · ${v.id}`;
   document.getElementById('ren-perfil').value = '';
+  document.getElementById('ren-pin').value = '';
   document.getElementById('ren-precio').value = v.precio;
   document.getElementById('ren-wa').value = v.wa || '';
 
-  // Calcular nueva fecha de vencimiento
-  const diasSuscripcion = v.dias || 30;
-  const baseDate = v.vence && v.vence > hoy() ? v.vence : v.vence || hoy();
-  const nuevaFechaCalculada = sumarDias(baseDate, diasSuscripcion);
-  document.getElementById('ren-vence').value = nuevaFechaCalculada;
-  const previewEl = document.getElementById('ren-vence-preview');
-  if(previewEl){ previewEl.textContent = `📅 Calculado: ${fmtFecha(nuevaFechaCalculada)} (${diasSuscripcion} días)`; previewEl.style.display = 'block'; }
+  // Plazo flexible: conserva la duración anterior como sugerencia, pero permite
+  // elegir varios meses/años y ajustar el calendario manualmente.
+  const diasSuscripcion = parseInt(v.dias) || 30;
+  document.getElementById('ren-base-plazo').value = 'vencimiento';
+  if(v.plazoCantidad && ['dias','meses','anos'].includes(v.plazoUnidad)){
+    document.getElementById('ren-plazo-cantidad').value = Math.max(1,parseInt(v.plazoCantidad)||1);
+    document.getElementById('ren-plazo-unidad').value = v.plazoUnidad;
+  }
+  else if(diasSuscripcion === 365){ document.getElementById('ren-plazo-cantidad').value = 1; document.getElementById('ren-plazo-unidad').value = 'anos'; }
+  else if(diasSuscripcion >= 30 && diasSuscripcion % 30 === 0){ document.getElementById('ren-plazo-cantidad').value = diasSuscripcion / 30; document.getElementById('ren-plazo-unidad').value = 'meses'; }
+  else { document.getElementById('ren-plazo-cantidad').value = diasSuscripcion; document.getElementById('ren-plazo-unidad').value = 'dias'; }
+  renCalcularVence();
 
   // Poblar categorías
   const catSel = document.getElementById('ren-cat');
@@ -7781,6 +8028,7 @@ async function abrirRenovar(ventaUid){
 
   // Preseleccionar servicio si la venta lo tiene
   const srv = v.srvUid ? getSrv(v.srvUid) : null;
+  aplicarCamposAccesoServicio('ren', srv);
   if(srv){
     catSel.value = srv.catUid;
     renActCat();
@@ -7903,6 +8151,7 @@ function renVentaFormulario(){
     correo,
     wa:document.getElementById('ren-wa').value || base.wa,
     perfil:document.getElementById('ren-perfil').value || base.perfil,
+    pin:document.getElementById('ren-pin').value || base.pin,
     vence:document.getElementById('ren-vence').value || base.vence,
     precio:parseFloat(document.getElementById('ren-precio').value) || base.precio,
     estado:document.getElementById('ren-estado').value || base.estado
@@ -7940,6 +8189,13 @@ function abrirMensajeEntregaVenta(ventaUid){
   const tipo = tipoRegistroVenta(venta);
   mostrarMensajePostVenta(venta, tipo === 'venta_nueva' ? 'venta_nueva' : (tipo === 'reposicion_credito' ? 'cuenta_caida' : 'renovacion'));
 }
+function abrirGarantiaVenta(ventaUid){
+  const venta = APP.ventas.find(v => v.uid === ventaUid);
+  if(!venta) return;
+  if(!venta.wa){ alert('Agrega el WhatsApp del cliente en Editar venta antes de preparar la garantía.'); return; }
+  mostrarMensajePostVenta(venta, 'garantia');
+  postCambiarTipo('garantia');
+}
 function mostrarMensajePostVenta(v, contexto){
   if(!v) return;
   document.getElementById('modal-mensaje-wa').dataset.ccExtra = '';
@@ -7947,9 +8203,21 @@ function mostrarMensajePostVenta(v, contexto){
   document.getElementById('post-wa-contexto').value = contexto;
   document.getElementById('post-wa-servicio').value = v.srvUid || '';
   document.getElementById('modal-mensaje-wa').dataset.ventaUid = v.uid || '';
+  document.getElementById('post-wa-modo').value = 'principal';
+  configurarOpcionesMensajePost(v);
   llenarSelectPlantillas('post-wa-plantilla',contexto,v.srvUid || '');
-  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v));
+  document.getElementById('post-wa-plantilla').dataset.contexto = contexto;
+  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajePost(v));
   abrirModal('modal-mensaje-wa');
+}
+function postCambiarTipo(modo){
+  const campo = document.getElementById('post-wa-modo');
+  if(campo) campo.value = modo === 'garantia' ? 'garantia' : 'principal';
+  const entrega = document.getElementById('post-btn-entrega');
+  const garantia = document.getElementById('post-btn-garantia');
+  if(entrega) entrega.className = 'btn ' + (modo === 'garantia' ? 'btn-navy' : 'btn-primary');
+  if(garantia) garantia.className = 'btn ' + (modo === 'garantia' ? 'btn-primary' : 'btn-navy');
+  postActualizarMensajePlantilla();
 }
 function mostrarMensajeCuentaCaida(v, contexto, extra={}){
   if(!v || !v.wa){ alert('El registro se guardó, pero falta el WhatsApp del cliente para preparar el mensaje.'); return; }
@@ -7958,24 +8226,98 @@ function mostrarMensajeCuentaCaida(v, contexto, extra={}){
   document.getElementById('post-wa-numero').value=v.wa||'';
   document.getElementById('post-wa-contexto').value=contexto;
   document.getElementById('post-wa-servicio').value=v.srvUid||'';
+  document.getElementById('post-wa-modo').value='principal';
+  configurarOpcionesMensajePost(v);
   llenarSelectPlantillas('post-wa-plantilla',contexto,v.srvUid||'');
-  document.getElementById('post-wa-texto').value=resolverMensajeSeleccionado(contexto,v.srvUid||'','post-wa-plantilla',ctxMensajeVenta(v,extra));
+  document.getElementById('post-wa-plantilla').dataset.contexto=contexto;
+  document.getElementById('post-wa-texto').value=resolverMensajeSeleccionado(contexto,v.srvUid||'','post-wa-plantilla',ctxMensajePost(v,extra));
   abrirModal('modal-mensaje-wa');
+}
+function configurarOpcionesMensajePost(v){
+  const cap = capacidadesServicio(v?.srvUid || '');
+  const bloque = document.getElementById('post-opciones-acceso');
+  const opciones = [['pass',cap.pass,!!v?.enviarPass],['perfil',cap.perfil,true],['pin',cap.pin,true]];
+  opciones.forEach(([nombre,visible,marcado]) => {
+    document.getElementById('post-' + nombre + '-wrap').style.display = visible ? 'inline-block' : 'none';
+    document.getElementById('post-enviar-' + nombre).checked = visible && marcado;
+  });
+  bloque.style.display = opciones.some(x => x[1]) ? 'block' : 'none';
+}
+function ctxMensajePost(v, extra={}){
+  return ctxMensajeVenta(v, {
+    ...extra,
+    enviarPass:!!document.getElementById('post-enviar-pass')?.checked,
+    enviarPerfil:!!document.getElementById('post-enviar-perfil')?.checked,
+    enviarPin:!!document.getElementById('post-enviar-pin')?.checked
+  });
 }
 function postActualizarMensajePlantilla(){
   const uidVenta = document.getElementById('modal-mensaje-wa').dataset.ventaUid;
   const v = APP.ventas.find(x => x.uid === uidVenta);
   if(!v) return;
   const contexto = document.getElementById('post-wa-contexto').value;
+  const modo = document.getElementById('post-wa-modo')?.value || 'principal';
+  const contextoPlantilla = modo === 'garantia' ? 'garantia' : contexto;
+  const selector = document.getElementById('post-wa-plantilla');
+  if(selector?.dataset.contexto !== contextoPlantilla){
+    llenarSelectPlantillas('post-wa-plantilla',contextoPlantilla,v.srvUid || '');
+    selector.dataset.contexto = contextoPlantilla;
+  }
   let extra={}; try{extra=JSON.parse(document.getElementById('modal-mensaje-wa').dataset.ccExtra||'{}');}catch(e){}
-  document.getElementById('post-wa-texto').value = resolverMensajeSeleccionado(contexto,v.srvUid || '','post-wa-plantilla',ctxMensajeVenta(v,extra));
+  const ctx = ctxMensajePost(v,extra);
+  const principal = resolverMensajeSeleccionado(contextoPlantilla,v.srvUid || '','post-wa-plantilla',ctx);
+  document.getElementById('post-wa-texto').value = principal;
 }
 function postEnviarWA(){
   enviarWA(document.getElementById('post-wa-numero').value, document.getElementById('post-wa-texto').value);
 }
 
+function abrirMensajesSegmentados(){
+  const sel = document.getElementById('seg-servicio');
+  sel.innerHTML = '<option value="todos">Todos los productos</option>' + CATALOGO_SERVICIOS.map(s => `<option value="${esc(s.uid)}">${esc(s.emoji)} ${esc(s.nombre)}</option>`).join('');
+  segRender();
+  abrirModal('modal-mensajes-segmentados');
+}
+function segVentasFiltradas(){
+  const srvUid = document.getElementById('seg-servicio')?.value || 'todos';
+  const pago = document.getElementById('seg-pago')?.value || 'todos';
+  const vigencia = document.getElementById('seg-vigencia')?.value || 'todos';
+  return APP.ventas.filter(v => {
+    if(!v.wa) return false;
+    if(srvUid !== 'todos' && v.srvUid !== srvUid) return false;
+    if(pago === 'pagado' && v.estado !== 'pagado') return false;
+    if(pago === 'pendiente' && v.estado === 'pagado') return false;
+    const d = diasHasta(v.vence);
+    if(vigencia === 'activos' && (d === null || d < 0)) return false;
+    if(vigencia === 'proximos7' && (d === null || d < 0 || d > 7)) return false;
+    if(vigencia === 'vencidos' && (d === null || d >= 0)) return false;
+    return true;
+  }).sort((a,b) => String(a.vence||'').localeCompare(String(b.vence||'')) || String(a.cliente||'').localeCompare(String(b.cliente||'')));
+}
+function segMensajeVenta(v,contexto){
+  const plantilla = plantillasDisponibles(contexto,v.srvUid || '')[0];
+  const texto = plantilla?.texto || plantillaBaseServicio(contexto,v.srvUid || '')?.texto || '';
+  return texto ? resolverPlantilla(asegurarFirmaPlantilla(texto),ctxMensajeVenta(v)) : mensajeAutomatico(contexto,ctxMensajeVenta(v));
+}
+function segEnviar(ventaUid){
+  const v = APP.ventas.find(x => x.uid === ventaUid);
+  if(!v) return;
+  const contexto = document.getElementById('seg-contexto')?.value || 'vencimiento';
+  enviarWA(v.wa,segMensajeVenta(v,contexto));
+}
+function segRender(){
+  const lista = document.getElementById('seg-lista');
+  const resumen = document.getElementById('seg-resumen');
+  if(!lista || !resumen) return;
+  const ventas = segVentasFiltradas();
+  const contexto = document.getElementById('seg-contexto')?.value || 'vencimiento';
+  resumen.innerHTML = `<b>${ventas.length}</b> cliente${ventas.length!==1?'s':''} con WhatsApp. Se abrirá un mensaje de <b>${esc(contexto.replace('_',' '))}</b> por cliente.`;
+  lista.innerHTML = ventas.length ? ventas.map(v => `<div class="card" style="padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div style="font-weight:800">${esc(v.cliente)}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${esc(v.srvNom)} · vence ${esc(fmtFecha(v.vence))} · ${v.estado==='pagado'?'Pagado':'Pendiente'}</div></div><button class="btn btn-wa" style="width:auto;padding:8px 12px" onclick="segEnviar('${esc(v.uid)}')">📱 Preparar</button></div></div>`).join('') : '<div class="empty"><div class="e-ico">🎯</div><div>No hay clientes en este segmento</div></div>';
+}
+
 async function renGuardar(){
   if(_renGuardando) return;
+  if(!renVenceManual()){ alert('Corrige la nueva fecha de vencimiento antes de renovar.'); return; }
   const ventaUid = document.getElementById('ren-venta-uid').value;
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v) return;
@@ -7988,6 +8330,15 @@ async function renGuardar(){
   const cupoInvIdx = origen === 'inventario' && document.getElementById('ren-cupo-inv') ? document.getElementById('ren-cupo-inv').value : '';
   let cupoRenovacionIdx = null;
   if(cuentaInvUID){
+    const cuentaElegida = APP.cuentas.find(c => c.uid === cuentaInvUID);
+    const venceCliente = document.getElementById('ren-vence').value;
+    const faltanCuenta = cuentaElegida?.hasta ? diasEntre(cuentaElegida.hasta, venceCliente) : null;
+    if(faltanCuenta !== null && faltanCuenta > 0){
+      const continuar = confirm(`⚠️ La cuenta ${cuentaElegida.id || cuentaElegida.correo || ''} está registrada hasta ${fmtFecha(cuentaElegida.hasta)}, pero el cliente quedará hasta ${fmtFecha(venceCliente)}.\n\nFaltan ${faltanCuenta} día${faltanCuenta!==1?'s':''} de cobertura.\n\n¿Confirmas que renovarás la cuenta madre a tiempo y deseas continuar?`);
+      if(!continuar) return;
+    } else if(cuentaElegida && !cuentaElegida.hasta){
+      if(!confirm('⚠️ Esta cuenta no tiene una fecha final registrada. ¿Confirmas que revisarás o renovarás la cuenta madre y deseas continuar?')) return;
+    }
     cupoRenovacionIdx = resolverCupoRenovacion(cuentaInvUID,cupoInvIdx,cuentaAnteriorUID,cupoAnteriorIdx);
     if(cupoRenovacionIdx === null || isNaN(cupoRenovacionIdx)){
       alert('Selecciona el cupo exacto de la cuenta nueva. La renovación no reutilizará automáticamente el número del cupo anterior.');
@@ -8028,7 +8379,10 @@ async function renGuardar(){
   const nuevaVenta = {
     ...v, uid:uid(), id:numVenta(), fecha:hoy(),
     vence: document.getElementById('ren-vence').value || sumarDias(v.vence || hoy(), v.dias || 30),
-    dias: v.dias || 30,
+    dias: Math.max(1, diasEntre(renBasePlazoFecha(), document.getElementById('ren-vence').value) || v.dias || 30),
+    plazoCantidad: Math.max(1, parseInt(document.getElementById('ren-plazo-cantidad').value) || 1),
+    plazoUnidad: document.getElementById('ren-plazo-unidad').value || 'meses',
+    plazoBase: document.getElementById('ren-base-plazo').value || 'vencimiento',
     precio: parseFloat(document.getElementById('ren-precio').value) || v.precio,
     metodo: document.getElementById('ren-metodo').value,
     wa: nuevoWA || v.wa,
@@ -8043,6 +8397,7 @@ async function renGuardar(){
   if(planVal && planVal !== '— Elige plan —' && planVal !== '— Elige servicio —') nuevaVenta.plan = planVal;
 
   if(document.getElementById('ren-perfil').value) nuevaVenta.perfil = document.getElementById('ren-perfil').value;
+  if(document.getElementById('ren-pin').value) nuevaVenta.pin = document.getElementById('ren-pin').value;
 
   // Conservar el historial original; solo se actualizan datos de contacto compartidos.
   v.wa = nuevoWA || v.wa;
@@ -8063,7 +8418,7 @@ async function renGuardar(){
       if(nuevaVenta.cupoIdx !== null && nuevaVenta.cupoIdx !== undefined){
         cuenta.cupos[nuevaVenta.cupoIdx] = {
           estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
-          perfil: nuevaVenta.perfil || v.perfil || '', pin: v.pin || '',
+          perfil: nuevaVenta.perfil || v.perfil || '', pin: nuevaVenta.pin || v.pin || '',
           vence: nuevaVenta.vence,
           pendienteCobro: nuevaVenta.estado !== 'pagado',
           periodoDesde: nuevaVenta.fecha || hoy(),
@@ -8082,6 +8437,7 @@ async function renGuardar(){
         cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
         if(nuevoWA) cuenta.cupos[v.cupoIdx].wa = nuevoWA;
         if(nuevaVenta.perfil) cuenta.cupos[v.cupoIdx].perfil = nuevaVenta.perfil;
+        if(nuevaVenta.pin) cuenta.cupos[v.cupoIdx].pin = nuevaVenta.pin;
         cuenta.cupos[v.cupoIdx].pendienteCobro = nuevaVenta.estado !== 'pagado';
         cuenta.cupos[v.cupoIdx].periodoDesde = nuevaVenta.fecha || hoy();
         cuenta.cupos[v.cupoIdx].periodoHasta = nuevaVenta.vence || '';
@@ -8846,6 +9202,7 @@ function ccRepoInicializar(c){
   ccRepoActCuentas();
   document.getElementById('cc-repo-vigencia').value = 'original';
   document.getElementById('cc-repo-dias').value = '';
+  if(document.getElementById('cc-repo-unidad')) document.getElementById('cc-repo-unidad').value = 'dias';
   document.getElementById('cc-repo-vence-final').value = '';
 }
 function ccRepoActProductos(){
@@ -9073,8 +9430,10 @@ function ccActualizarReembolso(){
 }
 function ccFechaVigenciaReposicion(){
   const info=ccVentaAfectada();if(!info)return null;const modo=document.getElementById('cc-repo-vigencia')?.value||'original',faltan=ccDiasRestantes(info.venta);let dias=faltan;
-  if(modo==='extra')dias=faltan+(parseInt(document.getElementById('cc-repo-dias')?.value)||0);
-  if(modo==='reiniciar')dias=parseInt(document.getElementById('cc-repo-dias')?.value)||ccDiasPlanOriginal(info.venta);
+  const cantidad=parseInt(document.getElementById('cc-repo-dias')?.value)||0,unidad=document.getElementById('cc-repo-unidad')?.value||'dias';
+  const diasFlexibles=(n,u)=>Math.max(0,diasEntre(hoy(),sumarPlazoCalendario(hoy(),Math.max(1,n),u))||0);
+  if(modo==='extra')dias=faltan+(cantidad?(unidad==='dias'?cantidad:diasFlexibles(cantidad,unidad)):0);
+  if(modo==='reiniciar')dias=cantidad?(unidad==='dias'?cantidad:diasFlexibles(cantidad,unidad)):ccDiasPlanOriginal(info.venta);
   if(modo==='manual'){const f=document.getElementById('cc-repo-vence-final')?.value||'';return{dias:f?Math.max(0,Math.ceil((new Date(f+'T12:00:00')-new Date(hoy()+'T12:00:00'))/86400000)):0,fecha:f,faltan};}
   return{dias,fecha:sumarDias(hoy(),dias),faltan};
 }
@@ -10798,9 +11157,11 @@ function renderCatalogos(){
   srvEl.innerHTML = CATALOGO_SERVICIOS.length ? CATALOGO_SERVICIOS.map(s => {
     const cat = getCat(s.catUid);
     const comportamiento = [
-      s.tienePerfil ? '👤 Perfil/PIN' : null,
+      s.tienePerfil ? '👤 Perfil' : null,
+      s.tienePin ? '🔢 PIN' : null,
       s.tieneInvitacion ? '📨 Invitación' : null,
-      s.tienePass ? '🔑 Pass' : null
+      s.tienePass ? '🔑 Pass' : null,
+      (s.entregaTexto || s.renovacionTexto || s.garantiaTexto) ? '💬 Mensajes propios' : null
     ].filter(Boolean).join(', ') || 'Sin comportamiento';
     return `<div class="catalog-item">
       <div class="catalog-left">
@@ -10848,8 +11209,8 @@ function poblarSrvCatSelect(){
 function abrirNuevoServicio(){
   document.getElementById('srv-edit-uid').value = '';
   document.getElementById('srv-modal-titulo').innerHTML = '📺 Nuevo servicio <button class="modal-close" onclick="cerrarModal(\'modal-nuevo-servicio\')">×</button>';
-  ['srv-nombre','srv-emoji','srv-planes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  ['srv-perfil','srv-invitacion','srv-pass','srv-cuenta-madre','srv-madre-vendible','srv-direccion'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
+  ['srv-nombre','srv-emoji','srv-planes','srv-entrega','srv-renovacion-mensaje','srv-garantia'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['srv-perfil','srv-pin','srv-invitacion','srv-pass','srv-cuenta-madre','srv-madre-vendible','srv-direccion'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
   document.getElementById('srv-tipo-acceso').value = 'perfil';
   document.getElementById('srv-accesos-base').value = 1;
   poblarSrvCatSelect();
@@ -10866,14 +11227,17 @@ function srvGuardar(){
     catUid, nombre, emoji: document.getElementById('srv-emoji').value || '📺',
     planes: planes.length ? planes : ['Plan único'],
     tienePerfil: document.getElementById('srv-perfil').checked,
-    tienePin: document.getElementById('srv-perfil').checked,
+    tienePin: document.getElementById('srv-pin').checked,
     tieneInvitacion: document.getElementById('srv-invitacion').checked,
     tienePass: document.getElementById('srv-pass').checked,
     usaCuentaMadre: document.getElementById('srv-cuenta-madre').checked,
     madreVendible: document.getElementById('srv-cuenta-madre').checked && document.getElementById('srv-madre-vendible').checked,
     tipoAcceso: document.getElementById('srv-tipo-acceso').value || 'cupo',
     accesosBase: Math.max(1, parseInt(document.getElementById('srv-accesos-base').value) || 1),
-    requiereDireccion: document.getElementById('srv-direccion').checked
+    requiereDireccion: document.getElementById('srv-direccion').checked,
+    entregaTexto: sanitizarTexto(document.getElementById('srv-entrega').value, 3000),
+    renovacionTexto: sanitizarTexto(document.getElementById('srv-renovacion-mensaje').value, 3000),
+    garantiaTexto: sanitizarTexto(document.getElementById('srv-garantia').value, 3000)
   };
   const editUID = document.getElementById('srv-edit-uid').value;
   if(editUID){ const i = CATALOGO_SERVICIOS.findIndex(s=>s.uid===editUID); if(i>-1) CATALOGO_SERVICIOS[i]={...CATALOGO_SERVICIOS[i],...datos}; }
@@ -10904,6 +11268,7 @@ function abrirEditarServicio(suid){
     document.getElementById('srv-emoji').value = s.emoji;
     document.getElementById('srv-planes').value = (s.planes || []).map(p => typeof p === 'object' ? `${planNombre(p)} | cupos=${p.cupos || 1} | cuentas=${p.cuentas || 1}` : p).join('\n');
     document.getElementById('srv-perfil').checked = s.tienePerfil;
+    document.getElementById('srv-pin').checked = s.tienePin === true;
     document.getElementById('srv-invitacion').checked = s.tieneInvitacion;
     document.getElementById('srv-pass').checked = s.tienePass;
     document.getElementById('srv-cuenta-madre').checked = modelo.usaCuentaMadre;
@@ -10911,6 +11276,9 @@ function abrirEditarServicio(suid){
     document.getElementById('srv-tipo-acceso').value = modelo.tipoAcceso;
     document.getElementById('srv-accesos-base').value = modelo.accesosBase;
     document.getElementById('srv-direccion').checked = s.requiereDireccion === true || s.uid === 'srv-spotify' || /spotify\s+familiar/i.test(String(s.nombre || ''));
+    document.getElementById('srv-entrega').value = s.entregaTexto || '';
+    document.getElementById('srv-renovacion-mensaje').value = s.renovacionTexto || '';
+    document.getElementById('srv-garantia').value = s.garantiaTexto || '';
     srvToggleModeloAcceso();
   }, 50);
   abrirModal('modal-nuevo-servicio');
@@ -10994,13 +11362,15 @@ function resolverPlantilla(texto, ctx = {}){
   const acceso = accesos[0] || {};
   const cuenta = acceso.cuenta || ctx.cuenta || {};
   const enviarPass = !!ctx.enviarPass;
+  const enviarPerfil = !!ctx.enviarPerfil;
+  const enviarPin = !!ctx.enviarPin;
   const lineaAcceso = (a, i) => {
     const c = a.cuenta || {};
     const partes = [
       (i + 1) + '. ' + (c.correo || ctx.correo || ''),
       enviarPass && (c.pass || ctx.pass) ? 'Pass: ' + (c.pass || ctx.pass) : '',
-      a.perfil ? 'Perfil: ' + a.perfil : '',
-      a.pin ? 'PIN: ' + a.pin : ''
+      enviarPerfil && a.perfil ? 'Perfil: ' + a.perfil : '',
+      enviarPin && a.pin ? 'PIN: ' + a.pin : ''
     ].filter(Boolean);
     return partes.join(' | ');
   };
@@ -11012,8 +11382,8 @@ function resolverPlantilla(texto, ctx = {}){
     CUENTA: cuenta.id || ctx.cuentaId || '',
     CORREO: cuenta.correo || ctx.correo || '',
     PASS: enviarPass ? (cuenta.pass || ctx.pass || '') : '',
-    PERFIL: acceso.perfil || ctx.perfil || '',
-    PIN: acceso.pin || ctx.pin || '',
+    PERFIL: enviarPerfil ? (acceso.perfil || ctx.perfil || '') : '',
+    PIN: enviarPin ? (acceso.pin || ctx.pin || '') : '',
     INVITACION: ctx.invitacion || '',
     REEMBOLSO: ctx.reembolso || '',
     REEMBOLSO_CALCULADO: ctx.reembolsoCalculado || '',
@@ -11109,11 +11479,14 @@ function insertVar(v){
 }
 function pltGuardar(){
   const nombre = document.getElementById('plt-nombre').value.trim();
-  const texto = document.getElementById('plt-texto').value.trim();
+  let texto = document.getElementById('plt-texto').value.trim();
   if(!nombre || !texto){ alert('Completa nombre y texto'); return; }
   const contexto = document.getElementById('plt-contexto')?.value || 'general';
+  texto = asegurarFirmaPlantilla(texto);
   const srvUid = document.getElementById('plt-servicio')?.value || 'todos';
   const editUID = document.getElementById('plt-edit-uid').value;
+  const duplicada = PLANTILLAS_WA.find(p => p.uid !== editUID && String(p.nombre||'').trim().toLowerCase() === nombre.toLowerCase() && contextoPlantillaNormalizado(p) === contexto && (p.srvUid || 'todos') === srvUid);
+  if(duplicada && !confirm('Ya existe una plantilla con este nombre para el mismo producto y momento. ¿Guardar otra de todos modos?')) return;
   if(editUID){ const i = PLANTILLAS_WA.findIndex(p=>p.uid===editUID); if(i>-1) PLANTILLAS_WA[i]={...PLANTILLAS_WA[i],nombre,texto,contexto,srvUid}; }
   else PLANTILLAS_WA.push({ uid:uid(), nombre, texto, contexto, srvUid });
   document.getElementById('plt-edit-uid').value = '';
@@ -11143,6 +11516,8 @@ function guardarMensajeActualComoPlantilla(contexto, textareaId, srvUid){
   if(!servicio && contexto === 'renovacion') servicio = document.getElementById('ren-srv')?.value || 'todos';
   const ctx = contextoMensajeParaGuardar(textareaId);
   const textoPlantilla = convertirMensajeEnPlantilla(texto, ctx);
+  const duplicada = PLANTILLAS_WA.find(p => String(p.nombre||'').trim().toLowerCase() === String(nombre).trim().toLowerCase() && contextoPlantillaNormalizado(p) === (contexto||'general') && (p.srvUid||'todos') === (servicio||'todos'));
+  if(duplicada && !confirm('Ya existe una plantilla con ese nombre para este producto. ¿Crear otra?')) return;
   PLANTILLAS_WA.push({uid:uid(),nombre:sanitizarTexto(nombre,80),texto:textoPlantilla,contexto:contexto||'general',srvUid:servicio||'todos'});
   renderPlantillas();
   sincronizarConSheets();
