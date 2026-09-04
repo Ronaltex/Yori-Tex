@@ -3429,7 +3429,8 @@ const SYNC_PENDIENTE_KEY = 'yoritex_sync_pendiente';
 const SYNC_RECUPERACION_KEY = 'yoritex_sync_recuperacion';
 const SYNC_PENDIENTE_VERSION = 2;
 
-// La sesión es temporal: se pide nuevamente al abrir la app o tras 15 minutos sin actividad.
+// Una sesión recordada permanece abierta en el dispositivo personal. Solo las
+// sesiones no recordadas se cierran después de 15 minutos sin actividad.
 const AUTH_INACTIVIDAD_MS = 15 * 60 * 1000;
 const AUTH_MARCADOR_SESION = 'yoritex_auth_activa';
 const AUTH_RECORDAR_KEY = 'yoritex_auth_recordar';
@@ -3610,6 +3611,12 @@ function limpiarAccesoEnMemoria(){
 }
 async function bloquearPorInactividad(){
   if(_authBloqueando || !_firebaseUsuario) return;
+  // Al volver desde WhatsApp/otra aplicación, visibilitychange también pasa
+  // por aquí. Una sesión recordada no debe cerrarse por ese cambio de ventana.
+  if(authSesionRecordada()){
+    detenerTiempoInactividad();
+    return;
+  }
   if(Date.now() - _authUltimaActividad < AUTH_INACTIVIDAD_MS - 1000){
     reiniciarTiempoInactividad();
     return;
@@ -3632,6 +3639,12 @@ function iniciarVigilanciaInactividad(){
   });
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState !== 'visible' || !_firebaseUsuario) return;
+    // En una sesión persistente no se consulta _authUltimaActividad: su valor
+    // se deja en cero precisamente porque no existe cierre por inactividad.
+    if(authSesionRecordada()){
+      detenerTiempoInactividad();
+      return;
+    }
     if(Date.now() - _authUltimaActividad >= AUTH_INACTIVIDAD_MS) bloquearPorInactividad();
     else reiniciarTiempoInactividad();
   });

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#08111d">
-  <title>Asistente YORI-TEX</title>
+  <title>Asistente local YORI-TEX</title>
   <style>
     :root{--bg:#07111e;--panel:#0e1d2e;--panel2:#13263b;--line:#233b55;--text:#f4f7fb;--muted:#91a7bf;--gold:#ffb52e;--green:#27d980;--red:#ff6670;--blue:#58b8ff;--purple:#b58cff}
     *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -20%,#17334f 0,#07111e 43%);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -29,7 +29,7 @@
   <section id="login" class="login">
     <div class="login-card">
       <div class="brand">✨ YORI<span>-TEX</span></div>
-      <div class="login-sub">Asistente administrativo conectado a tus datos actuales</div>
+      <div class="login-sub">Consultas administrativas sin consumo de API</div>
       <form id="login-form" autocomplete="on">
         <label class="field" for="email">Correo</label>
         <input class="input" id="email" name="username" type="email" autocomplete="username" inputmode="email" autocapitalize="none" required>
@@ -44,12 +44,12 @@
 
   <section id="app" class="app hidden">
     <header>
-      <div class="head-brand"><img class="logo" src="./logo-yori-tex-plano.png" alt="YORI-TEX"><div><div class="head-title">YORI<span>-TEX</span> · Asistente</div><div class="head-sub">Consulta amplia · cambios protegidos</div></div></div>
+      <div class="head-brand"><img class="logo" src="./logo-yori-tex-plano.png" alt="YORI-TEX"><div><div class="head-title">YORI<span>-TEX</span> · Asistente</div><div class="head-sub">Consultas sin costo · cambios protegidos</div></div></div>
       <div class="head-actions"><a class="icon-btn hide-mobile" href="./index.html">Abrir aplicación</a><button class="icon-btn" id="logout" title="Cerrar sesión">Salir</button></div>
     </header>
     <main id="main">
       <div class="welcome" id="welcome">
-        <div class="hero"><h1>¿Qué necesitas saber hoy?</h1><p>Puedo cruzar ventas, inventario, cupos, cobros, vencimientos y finanzas. Para cambios sencillos te mostraré una confirmación; las operaciones delicadas seguirán dentro de YORI‑TEX.</p></div>
+        <div class="hero"><h1>¿Qué necesitas saber hoy?</h1><p>Consulto ventas, inventario, cupos, cobros, vencimientos y finanzas directamente en YORI‑TEX, sin una API de IA y sin costo por pregunta. Para cambios sencillos te mostraré una confirmación.</p></div>
         <div class="chips">
           <button class="chip">¿Qué debo cobrar hoy?</button>
           <button class="chip">Dame un informe de Spotify por cuenta</button>
@@ -62,7 +62,7 @@
     </main>
     <div class="composer-wrap">
       <div class="composer"><textarea id="prompt" rows="1" placeholder="Pregúntame cualquier cosa sobre YORI-TEX…"></textarea><button class="send" id="send" title="Enviar">➤</button></div>
-      <div class="composer-note">La IA no recibe contraseñas ni PIN. Verifica los cambios antes de confirmarlos.</div>
+      <div class="composer-note">El asistente funciona por reglas locales y no consume API. Verifica los cambios antes de confirmarlos.</div>
     </div>
   </section>
 
@@ -106,7 +106,14 @@
         const btn=document.createElement('button');btn.className='action-btn'+(extra.action==='no_renovo_liberar'?' danger':'');btn.textContent=extra.action==='marcar_pagado'?'Confirmar pago':extra.action==='marcar_pendiente'?'Marcar por cobrar':'Confirmar: no renovó y liberar cupo';
         btn.addEventListener('click',()=>executeAction(extra,btn));card.append(title,desc,btn);bubble.append(card);
       }
-      const meta=document.createElement('div');meta.className='meta';meta.textContent=new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});bubble.append(meta);row.append(bubble);$('messages').append(row);$('main').scrollTop=$('main').scrollHeight;return row;
+      const meta=document.createElement('div');meta.className='meta';
+      const metaParts=[new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'})];
+      if(role==='assistant'&&extra.diagnostic){
+        const d=extra.diagnostic;metaParts.push(String(d.registrosAnalizados||0)+' registros pertinentes');
+        if(Number(d.costoEstimadoUSD)===0)metaParts.push('sin costo de API');
+        else if(Number.isFinite(Number(d.costoEstimadoUSD)))metaParts.push('aprox. $'+Number(d.costoEstimadoUSD).toFixed(4));
+      }
+      meta.textContent=metaParts.join(' · ');bubble.append(meta);row.append(bubble);$('messages').append(row);$('main').scrollTop=$('main').scrollHeight;return row;
     }
     function addTyping(){const row=document.createElement('div');row.className='msg';row.id='typing';row.innerHTML='<div class="avatar">✨</div><div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div>';$('messages').append(row);$('main').scrollTop=$('main').scrollHeight}
     function removeTyping(){$('typing')?.remove()}
@@ -124,7 +131,7 @@
       state.busy=true;$('send').disabled=true;$('prompt').value='';addMessage('user',question);state.history.push({rol:'user',texto:question});addTyping();
       try{
         const result=await api({accion:'asistente',pregunta:question,historial:state.history.slice(-8)});removeTyping();
-        const answer=result?.respuesta||'No pude preparar una respuesta.';addMessage('assistant',answer,{action:result?.accion,ventaUid:result?.ventaUid,confirmation:result?.confirmacion});state.history.push({rol:'assistant',texto:answer});state.history=state.history.slice(-10);
+        const answer=result?.respuesta||'No pude preparar una respuesta.';addMessage('assistant',answer,{action:result?.accion,ventaUid:result?.ventaUid,confirmation:result?.confirmacion,diagnostic:result?.diagnostico});state.history.push({rol:'assistant',texto:answer});state.history=state.history.slice(-8);
       }catch(err){removeTyping();const msg=err.name==='AbortError'?'La consulta tardó demasiado. Intenta nuevamente.':String(err.message||'No se pudo consultar el asistente.');addMessage('error',msg);if(/NO_AUTORIZADO/.test(msg))await auth.signOut()}
       finally{state.busy=false;$('send').disabled=false;$('prompt').focus()}
     }
