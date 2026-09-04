@@ -1877,9 +1877,15 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
     <div style="font-size:40px;text-align:center;margin-bottom:8px">🔐</div>
     <div style="font-size:22px;font-weight:800;color:#fff;text-align:center">YORI<span style="color:var(--orange)">-TEX</span></div>
     <div style="font-size:13px;color:#8fa8c8;text-align:center;margin:7px 0 24px">Ingresa con tu correo y contraseña</div>
-    <div class="field"><label>Correo</label><input type="email" id="auth-email" autocomplete="email" placeholder="tu-correo@ejemplo.com" onkeydown="if(event.key==='Enter') authIniciarSesion()"></div>
-    <div class="field"><label>Contraseña</label><input type="password" id="auth-password" autocomplete="current-password" placeholder="Tu contraseña" onkeydown="if(event.key==='Enter') authIniciarSesion()"></div>
-    <button class="btn btn-primary" id="auth-login-btn" onclick="authIniciarSesion()">Ingresar</button>
+    <form id="auth-form" autocomplete="on" onsubmit="event.preventDefault();authIniciarSesion()">
+      <div class="field"><label for="auth-email">Correo</label><input type="email" id="auth-email" name="username" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="tu-correo@ejemplo.com" required></div>
+      <div class="field"><label for="auth-password">Contraseña</label><input type="password" id="auth-password" name="password" autocomplete="current-password" placeholder="Tu contraseña" required></div>
+      <label style="display:flex;align-items:flex-start;gap:9px;margin:-2px 0 14px;color:#b9c9dc;font-size:12px;line-height:1.35;cursor:pointer">
+        <input type="checkbox" id="auth-recordar" checked style="width:17px;height:17px;margin:0;accent-color:var(--orange)">
+        <span><strong style="color:#fff">Mantener sesión iniciada</strong><br>Úsalo solamente en tu dispositivo personal.</span>
+      </label>
+      <button type="submit" class="btn btn-primary" id="auth-login-btn">Ingresar</button>
+    </form>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="authRecuperarClave()">Olvidé mi contraseña</button>
     <div id="auth-error" style="min-height:36px;margin-top:14px;text-align:center;font-size:12px;color:var(--red);line-height:1.4"></div>
   </div>
@@ -2316,6 +2322,7 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
   <div id="cfg-tab-backup" style="display:none">
     <div class="cfg-section">
       <div class="cfg-section-title">☁️ Google Sheets</div>
+      <div class="cfg-row" onclick="window.open('./asistente.html','_blank','noopener')"><div class="cfg-left"><div class="cfg-ico" style="background:var(--purple-bg)">✨</div><div><div class="cfg-label" style="color:var(--purple)">Asistente YORI‑TEX</div><div class="cfg-sub">Consulta informes y realiza acciones simples con confirmación</div></div></div><div class="cfg-arrow">›</div></div>
       <div class="cfg-row" onclick="sincronizarManual()"><div class="cfg-left"><div class="cfg-ico" style="background:var(--green-bg)">🔄</div><div><div class="cfg-label" style="color:var(--green)">Sincronizar ahora</div><div class="cfg-sub">Forzar guardado en Google Sheets</div></div></div><div class="cfg-arrow">›</div></div>
       <div class="cfg-row" onclick="abrirRevisionIntegridad()"><div class="cfg-left"><div class="cfg-ico" style="background:var(--yellow-bg)">🛡️</div><div><div class="cfg-label" style="color:var(--orange)">Revisar relaciones e inventario</div><div class="cfg-sub">Detecta cupos duplicados, vínculos rotos y reposiciones de $0</div></div></div><div class="cfg-arrow">›</div></div>
       <div class="cfg-row" onclick="cerrarSesion()"><div class="cfg-left"><div class="cfg-ico" style="background:var(--red-bg)">🔐</div><div><div class="cfg-label" style="color:var(--red)">Cerrar sesión</div><div class="cfg-sub">Volver a pedir correo, contraseña y PIN</div></div></div><div class="cfg-arrow">›</div></div>
@@ -3425,6 +3432,7 @@ const SYNC_PENDIENTE_VERSION = 2;
 // La sesión es temporal: se pide nuevamente al abrir la app o tras 15 minutos sin actividad.
 const AUTH_INACTIVIDAD_MS = 15 * 60 * 1000;
 const AUTH_MARCADOR_SESION = 'yoritex_auth_activa';
+const AUTH_RECORDAR_KEY = 'yoritex_auth_recordar';
 let _authTimerInactividad = null;
 let _authUltimaActividad = 0;
 let _authVigilanciaIniciada = false;
@@ -3560,8 +3568,34 @@ function detenerTiempoInactividad(){
   if(_authTimerInactividad) clearTimeout(_authTimerInactividad);
   _authTimerInactividad = null;
 }
+function authRecordarSeleccionado(){
+  return document.getElementById('auth-recordar')?.checked !== false;
+}
+function authSesionRecordada(){
+  try { return localStorage.getItem(AUTH_RECORDAR_KEY) === '1'; } catch(e) { return false; }
+}
+function authTieneSesionMarcada(){
+  return sessionStorage.getItem(AUTH_MARCADOR_SESION) === '1' || authSesionRecordada();
+}
+function authMarcarSesion(recordar){
+  sessionStorage.setItem(AUTH_MARCADOR_SESION, '1');
+  try {
+    if(recordar) localStorage.setItem(AUTH_RECORDAR_KEY, '1');
+    else localStorage.removeItem(AUTH_RECORDAR_KEY);
+  } catch(e){}
+}
+function authLimpiarMarcadores(){
+  sessionStorage.removeItem(AUTH_MARCADOR_SESION);
+  try { localStorage.removeItem(AUTH_RECORDAR_KEY); } catch(e){}
+}
 function reiniciarTiempoInactividad(){
   if(!_firebaseUsuario || _authBloqueando) return;
+  // En un dispositivo personal la sesión recordada permanece activa. El cierre
+  // manual continúa eliminando tanto la sesión como la copia local sensible.
+  if(authSesionRecordada()){
+    detenerTiempoInactividad();
+    return;
+  }
   _authUltimaActividad = Date.now();
   detenerTiempoInactividad();
   _authTimerInactividad = setTimeout(bloquearPorInactividad, AUTH_INACTIVIDAD_MS);
@@ -3582,7 +3616,7 @@ async function bloquearPorInactividad(){
   }
   _authBloqueando = true;
   detenerTiempoInactividad();
-  sessionStorage.removeItem(AUTH_MARCADOR_SESION);
+  authLimpiarMarcadores();
   limpiarAccesoEnMemoria();
   const error = document.getElementById('auth-error');
   if(error) error.textContent = 'Sesión cerrada por inactividad. Ingresa nuevamente.';
@@ -3608,7 +3642,12 @@ async function inicializarAuthFirebase(){
     if(!window.firebase) throw new Error('No se pudo cargar Firebase. Revisa tu conexión e intenta de nuevo.');
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseAuth = firebase.auth();
-    await _firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    const recordar = authSesionRecordada();
+    const checkRecordar = document.getElementById('auth-recordar');
+    if(checkRecordar) checkRecordar.checked = recordar || localStorage.getItem(AUTH_RECORDAR_KEY) === null;
+    await _firebaseAuth.setPersistence(recordar
+      ? firebase.auth.Auth.Persistence.LOCAL
+      : firebase.auth.Auth.Persistence.SESSION);
     if(_authObservadorIniciado) return;
     _authObservadorIniciado = true;
     iniciarVigilanciaInactividad();
@@ -3620,7 +3659,7 @@ async function inicializarAuthFirebase(){
         return;
       }
       // No se reutiliza una sesión que Firebase hubiese guardado de una apertura anterior.
-      if(sessionStorage.getItem(AUTH_MARCADOR_SESION) !== '1'){
+      if(!authTieneSesionMarcada()){
         await _firebaseAuth.signOut();
         return;
       }
@@ -3647,11 +3686,15 @@ async function authIniciarSesion(){
   if(error) error.textContent='';
   if(boton){ boton.disabled=true; boton.textContent='Ingresando...'; }
   try{
-    sessionStorage.setItem(AUTH_MARCADOR_SESION, '1');
+    const recordar = authRecordarSeleccionado();
+    await _firebaseAuth.setPersistence(recordar
+      ? firebase.auth.Auth.Persistence.LOCAL
+      : firebase.auth.Auth.Persistence.SESSION);
+    authMarcarSesion(recordar);
     await _firebaseAuth.signInWithEmailAndPassword(email,password);
     document.getElementById('auth-password').value='';
   }catch(e){
-    sessionStorage.removeItem(AUTH_MARCADOR_SESION);
+    authLimpiarMarcadores();
     const mensajes = {
       'auth/invalid-email':'El correo no es válido.',
       'auth/invalid-credential':'Correo o contraseña incorrectos.',
@@ -12758,7 +12801,7 @@ async function sincronizarManual(){
 async function cerrarSesion(){
   if(!confirm('¿Cerrar sesión? Tendrás que ingresar correo, contraseña y PIN nuevamente.')) return;
   detenerTiempoInactividad();
-  sessionStorage.removeItem(AUTH_MARCADOR_SESION);
+  authLimpiarMarcadores();
   _pinVerificado = false;
   _pinGuardado = '';
   _pinIngresado = '';

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08111d">
+  <title>Asistente YORI-TEX</title>
+  <style>
+    :root{--bg:#07111e;--panel:#0e1d2e;--panel2:#13263b;--line:#233b55;--text:#f4f7fb;--muted:#91a7bf;--gold:#ffb52e;--green:#27d980;--red:#ff6670;--blue:#58b8ff;--purple:#b58cff}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -20%,#17334f 0,#07111e 43%);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+    body{min-height:100vh;min-height:100dvh}.hidden{display:none!important}button,input{font:inherit}
+    .login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);z-index:20}
+    .login-card{width:min(380px,100%);padding:28px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(150deg,#12243a,#0b1929);box-shadow:0 24px 80px #0008}
+    .brand{text-align:center;font-weight:900;font-size:24px;letter-spacing:.04em}.brand span{color:var(--gold)}.login-sub{text-align:center;color:var(--muted);font-size:13px;margin:8px 0 24px}
+    label.field{display:block;font-size:12px;font-weight:750;color:#c8d5e4;margin:12px 0 7px}.input{width:100%;border:1px solid var(--line);border-radius:13px;background:#091625;color:var(--text);padding:13px 14px;outline:none}.input:focus{border-color:var(--gold);box-shadow:0 0 0 3px #ffb52e1b}
+    .remember{display:flex;gap:9px;align-items:flex-start;color:var(--muted);font-size:12px;line-height:1.35;margin:14px 0}.remember input{width:17px;height:17px;accent-color:var(--gold)}
+    .primary{width:100%;border:0;border-radius:13px;background:linear-gradient(135deg,#ffd061,var(--gold));color:#17202a;font-weight:850;padding:13px;cursor:pointer}.primary:disabled{opacity:.55;cursor:wait}.error{min-height:36px;color:var(--red);font-size:12px;text-align:center;padding-top:12px;line-height:1.4}
+    .app{min-height:100vh;min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto;max-width:980px;margin:auto;border-inline:1px solid #162c42;background:#081522cc}
+    header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px max(16px,env(safe-area-inset-left));background:#081522ee;backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+    .head-brand{display:flex;align-items:center;gap:11px;font-weight:900}.logo{width:40px;height:40px;border-radius:12px;border:1px solid #805b17;background:#101f31;object-fit:cover}.head-title span{color:var(--gold)}.head-sub{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px}
+    .head-actions{display:flex;gap:8px}.icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;padding:9px 11px;cursor:pointer;text-decoration:none}
+    main{overflow:auto;padding:18px 16px 160px}.welcome{max-width:720px;margin:18px auto}.hero{padding:19px;border:1px solid #654b1d;border-radius:20px;background:linear-gradient(145deg,#192b3d,#172432 70%);box-shadow:0 12px 35px #0004}.hero h1{font-size:20px;margin:0 0 7px}.hero p{color:var(--muted);font-size:13px;line-height:1.55;margin:0}.chips{display:flex;gap:8px;overflow:auto;padding:12px 1px 3px}.chip{flex:0 0 auto;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:#dce8f4;padding:9px 12px;font-size:12px;cursor:pointer}.chip:hover{border-color:var(--gold);color:var(--gold)}
+    .messages{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:13px}.msg{display:flex;gap:9px;align-items:flex-start}.msg.user{justify-content:flex-end}.avatar{flex:0 0 31px;width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:#182d42;border:1px solid var(--line);font-size:15px}.bubble{max-width:min(680px,87%);padding:13px 14px;border-radius:17px;border:1px solid var(--line);background:var(--panel);line-height:1.52;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}.user .bubble{background:#45320f;border-color:#75541a}.bubble a{color:#6ac5ff;font-weight:700}.meta{font-size:10px;color:var(--muted);margin-top:8px}.action-card{margin-top:11px;padding:12px;border-radius:13px;border:1px solid #725520;background:#2a2112}.action-title{font-weight:800;color:#ffd06a;margin-bottom:7px}.action-text{font-size:12px;color:#d5c5a5;line-height:1.45}.action-btn{margin-top:10px;border:0;border-radius:10px;padding:10px 12px;background:var(--gold);color:#151b22;font-weight:850;cursor:pointer}.action-btn.danger{background:var(--red);color:#fff}.typing{display:inline-flex;gap:5px;align-items:center}.typing i{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:pulse 1s infinite}.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}@keyframes pulse{50%{opacity:.25;transform:translateY(-2px)}}
+    .composer-wrap{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(980px,100%);padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(180deg,#08152200,#081522 18%);z-index:8}.composer{display:flex;gap:9px;align-items:flex-end;padding:9px;border:1px solid var(--line);border-radius:19px;background:#0d1d2d;box-shadow:0 14px 50px #0009}.composer textarea{flex:1;min-height:44px;max-height:140px;resize:none;border:0;background:transparent;color:var(--text);outline:none;padding:11px 8px;line-height:1.35}.send{width:44px;height:44px;border:0;border-radius:14px;background:var(--gold);font-size:19px;cursor:pointer}.send:disabled{opacity:.45}.composer-note{text-align:center;font-size:10px;color:#7189a2;margin-top:7px}
+    @media(max-width:560px){header{padding-top:calc(10px + env(safe-area-inset-top))}.head-sub{display:none}.icon-btn.hide-mobile{display:none}.hero{border-radius:17px}.bubble{max-width:91%}}
+  </style>
+</head>
+<body>
+  <section id="login" class="login">
+    <div class="login-card">
+      <div class="brand">✨ YORI<span>-TEX</span></div>
+      <div class="login-sub">Asistente administrativo conectado a tus datos actuales</div>
+      <form id="login-form" autocomplete="on">
+        <label class="field" for="email">Correo</label>
+        <input class="input" id="email" name="username" type="email" autocomplete="username" inputmode="email" autocapitalize="none" required>
+        <label class="field" for="password">Contraseña</label>
+        <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+        <label class="remember"><input id="remember" type="checkbox" checked><span><strong>Recordar en este dispositivo</strong><br>No lo actives en una computadora compartida.</span></label>
+        <button class="primary" id="login-btn" type="submit">Ingresar</button>
+        <div id="login-error" class="error"></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="app" class="app hidden">
+    <header>
+      <div class="head-brand"><img class="logo" src="./logo-yori-tex-plano.png" alt="YORI-TEX"><div><div class="head-title">YORI<span>-TEX</span> · Asistente</div><div class="head-sub">Consulta amplia · cambios protegidos</div></div></div>
+      <div class="head-actions"><a class="icon-btn hide-mobile" href="./index.html">Abrir aplicación</a><button class="icon-btn" id="logout" title="Cerrar sesión">Salir</button></div>
+    </header>
+    <main id="main">
+      <div class="welcome" id="welcome">
+        <div class="hero"><h1>¿Qué necesitas saber hoy?</h1><p>Puedo cruzar ventas, inventario, cupos, cobros, vencimientos y finanzas. Para cambios sencillos te mostraré una confirmación; las operaciones delicadas seguirán dentro de YORI‑TEX.</p></div>
+        <div class="chips">
+          <button class="chip">¿Qué debo cobrar hoy?</button>
+          <button class="chip">Dame un informe de Spotify por cuenta</button>
+          <button class="chip">¿Cuáles son las próximas cuentas en vencer?</button>
+          <button class="chip">¿Qué fue lo último que vendí?</button>
+          <button class="chip">¿Qué puedes hacer y qué no?</button>
+        </div>
+      </div>
+      <div class="messages" id="messages"></div>
+    </main>
+    <div class="composer-wrap">
+      <div class="composer"><textarea id="prompt" rows="1" placeholder="Pregúntame cualquier cosa sobre YORI-TEX…"></textarea><button class="send" id="send" title="Enviar">➤</button></div>
+      <div class="composer-note">La IA no recibe contraseñas ni PIN. Verifica los cambios antes de confirmarlos.</div>
+    </div>
+  </section>
+
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+  <script>
+    const API_URL='https://script.google.com/macros/s/AKfycbyI1ecwaMem5dQUAPBNywxx3BoJZ_z874Lk7XNmOTnyO2PnFCeJn6kE63MQ_-ZDMVPV/exec';
+    const FIREBASE_CONFIG={apiKey:'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',authDomain:'yori-tex.firebaseapp.com',projectId:'yori-tex',storageBucket:'yori-tex.firebasestorage.app',messagingSenderId:'249055898385',appId:'1:249055898385:web:01b09ed80cbe8be413bab0'};
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const auth=firebase.auth();
+    const state={busy:false,history:[],pending:null};
+    const $=id=>document.getElementById(id);
+
+    function showLogged(logged){$('login').classList.toggle('hidden',logged);$('app').classList.toggle('hidden',!logged);if(logged)setTimeout(()=>$('prompt').focus(),80)}
+    auth.onAuthStateChanged(user=>showLogged(!!user));
+    $('login-form').addEventListener('submit',async e=>{
+      e.preventDefault();$('login-error').textContent='';$('login-btn').disabled=true;$('login-btn').textContent='Ingresando…';
+      try{
+        await auth.setPersistence($('remember').checked?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION);
+        await auth.signInWithEmailAndPassword($('email').value.trim(),$('password').value);
+        $('password').value='';
+      }catch(err){$('login-error').textContent=err.code==='auth/invalid-credential'?'Correo o contraseña incorrectos.':'No se pudo iniciar sesión. Revisa tus datos y conexión.'}
+      finally{$('login-btn').disabled=false;$('login-btn').textContent='Ingresar'}
+    });
+    $('logout').addEventListener('click',async()=>{if(confirm('¿Cerrar sesión del asistente?'))await auth.signOut()});
+
+    function appendRich(container,text){
+      const regex=/(https?:\/\/[^\s]+)/g;let last=0;String(text||'').replace(regex,(url,_,offset)=>{
+        container.append(document.createTextNode(String(text).slice(last,offset)));
+        const a=document.createElement('a');a.href=url.replace(/[),.;]+$/,'');a.target='_blank';a.rel='noopener';a.textContent=url.includes('wa.me/')?'Abrir WhatsApp':a.href;container.append(a);last=offset+url.length;return url;
+      });container.append(document.createTextNode(String(text||'').slice(last)));
+    }
+    function addMessage(role,text,extra={}){
+      $('welcome').style.display='none';const row=document.createElement('div');row.className='msg '+role;
+      if(role!=='user'){const av=document.createElement('div');av.className='avatar';av.textContent=role==='assistant'?'✨':'⚠️';row.append(av)}
+      const bubble=document.createElement('div');bubble.className='bubble';appendRich(bubble,text);
+      if(extra.action&&extra.action!=='ninguna'){
+        const card=document.createElement('div');card.className='action-card';
+        const title=document.createElement('div');title.className='action-title';title.textContent='Cambio preparado';
+        const desc=document.createElement('div');desc.className='action-text';desc.textContent=extra.confirmation||'Revisa y confirma esta operación.';
+        const btn=document.createElement('button');btn.className='action-btn'+(extra.action==='no_renovo_liberar'?' danger':'');btn.textContent=extra.action==='marcar_pagado'?'Confirmar pago':extra.action==='marcar_pendiente'?'Marcar por cobrar':'Confirmar: no renovó y liberar cupo';
+        btn.addEventListener('click',()=>executeAction(extra,btn));card.append(title,desc,btn);bubble.append(card);
+      }
+      const meta=document.createElement('div');meta.className='meta';meta.textContent=new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});bubble.append(meta);row.append(bubble);$('messages').append(row);$('main').scrollTop=$('main').scrollHeight;return row;
+    }
+    function addTyping(){const row=document.createElement('div');row.className='msg';row.id='typing';row.innerHTML='<div class="avatar">✨</div><div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div>';$('messages').append(row);$('main').scrollTop=$('main').scrollHeight}
+    function removeTyping(){$('typing')?.remove()}
+    async function api(body){
+      const user=auth.currentUser;if(!user)throw new Error('Tu sesión terminó. Vuelve a ingresar.');
+      body.idToken=await user.getIdToken();
+      const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),120000);
+      try{
+        const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body),cache:'no-store',redirect:'follow',signal:controller.signal});
+        const data=await response.json();if(!response.ok||data.ok===false)throw new Error(data.error||'El servidor rechazó la solicitud.');return data.data;
+      }finally{clearTimeout(timer)}
+    }
+    async function ask(prefill){
+      if(state.busy)return;const question=String(prefill||$('prompt').value).trim();if(!question)return;
+      state.busy=true;$('send').disabled=true;$('prompt').value='';addMessage('user',question);state.history.push({rol:'user',texto:question});addTyping();
+      try{
+        const result=await api({accion:'asistente',pregunta:question,historial:state.history.slice(-8)});removeTyping();
+        const answer=result?.respuesta||'No pude preparar una respuesta.';addMessage('assistant',answer,{action:result?.accion,ventaUid:result?.ventaUid,confirmation:result?.confirmacion});state.history.push({rol:'assistant',texto:answer});state.history=state.history.slice(-10);
+      }catch(err){removeTyping();const msg=err.name==='AbortError'?'La consulta tardó demasiado. Intenta nuevamente.':String(err.message||'No se pudo consultar el asistente.');addMessage('error',msg);if(/NO_AUTORIZADO/.test(msg))await auth.signOut()}
+      finally{state.busy=false;$('send').disabled=false;$('prompt').focus()}
+    }
+    async function executeAction(extra,button){
+      if(!extra.ventaUid)return addMessage('error','La IA no identificó una venta exacta; no se realizó ningún cambio.');
+      const warning=extra.action==='no_renovo_liberar'?'Esta acción marcará la venta como no renovada y liberará únicamente los cupos que todavía pertenezcan a esa venta.':'Se actualizará el pago en la venta y en sus cupos vinculados.';
+      if(!confirm((extra.confirmation||'¿Confirmas el cambio?')+'\n\n'+warning))return;
+      button.disabled=true;button.textContent='Confirmando en la nube…';
+      try{
+        const result=await api({accion:'asistenteAccion',accionSolicitada:extra.action,accion: 'asistenteAccion',operacion:extra.action,ventaUid:extra.ventaUid,confirmado:true});
+        // Compatibilidad: el backend toma "operacion" para evitar confundirla con la ruta.
+        addMessage('assistant','Cambio confirmado en la nube: '+(result.cliente||result.ventaId)+' · '+(result.estado||extra.action)+'. YORI-TEX lo recibirá en su próxima actualización.');button.textContent='Aplicado ✓';
+      }catch(err){addMessage('error','No se aplicó el cambio. '+String(err.message||''));button.disabled=false;button.textContent='Intentar nuevamente'}
+    }
+    $('send').addEventListener('click',()=>ask());$('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask()}});
+    document.querySelectorAll('.chip').forEach(btn=>btn.addEventListener('click',()=>ask(btn.textContent)));
+  </script>
+</body>
+</html>

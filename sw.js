@@ -1,5 +1,5 @@
-const CACHE_NAME = 'yoritex-v36-20260902-garantias-por-producto';
-const APP_SHELL = ['./', './index.html', './manifest.json', './logo-yori-tex-plano.png'];
+const CACHE_NAME = 'yoritex-v37-20260903-asistente-ia';
+const APP_SHELL = ['./', './index.html', './asistente.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
   authDomain: 'yori-tex.firebaseapp.com',
@@ -28,11 +28,13 @@ self.addEventListener('fetch', event => {
   if(event.request.method !== 'GET') return;
   const isPage = event.request.mode === 'navigate';
   if(isPage){
+    const path = new URL(event.request.url).pathname;
+    const cacheKey = path.endsWith('/asistente.html') ? './asistente.html' : './index.html';
     event.respondWith(fetch(event.request).then(response => {
       const copy = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+      caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, copy));
       return response;
-    }).catch(() => caches.match('./index.html')));
+    }).catch(() => caches.match(cacheKey)));
     return;
   }
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
