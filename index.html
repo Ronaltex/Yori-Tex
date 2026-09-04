@@ -6127,9 +6127,10 @@ function mvRenderPerfilesMulti(){
   const campos = [cap.perfil ? 'perfil' : '', cap.pin ? 'PIN' : ''].filter(Boolean).join(' y ');
   wrap.innerHTML = `<div class="aviso" style="margin-top:8px">Configura ${campos} por cada acceso del combo.</div>` + picks.map((p, idx) => {
     const cuenta = APP.cuentas.find(c => c.uid === p.cuentaUID);
+    const cupo = cuenta?.cupos?.[p.cupoIdx] || {};
     return `<div class="${cap.perfil && cap.pin ? 'row2' : ''}" style="margin-top:7px">
-      ${cap.perfil ? `<div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · ${esc(cuenta ? etiquetaAccesoCuenta(cuenta,cuenta.cupos[p.cupoIdx]||{},p.cupoIdx,getSrv(cuenta.srvUid)) : 'Acceso')} perfil</label><input type="text" class="mv-perfil-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="Perfil ${idx+1}"/></div>` : ''}
-      ${cap.pin ? `<div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · PIN</label><input type="text" class="mv-pin-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" placeholder="1234" maxlength="8"/></div>` : ''}
+      ${cap.perfil ? `<div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · ${esc(cuenta ? etiquetaAccesoCuenta(cuenta,cupo,p.cupoIdx,getSrv(cuenta.srvUid)) : 'Acceso')} perfil</label><input type="text" class="mv-perfil-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" value="${esc(cupo.perfil || '')}" placeholder="Perfil ${idx+1}"/></div>` : ''}
+      ${cap.pin ? `<div class="field"><label>${esc(cuenta?.id || 'Cuenta')} · PIN</label><input type="text" class="mv-pin-multi" data-cuenta="${esc(p.cuentaUID)}" data-cupo="${p.cupoIdx}" value="${esc(cupo.pin || '')}" placeholder="1234" maxlength="10"/></div>` : ''}
     </div>`;
   }).join('');
 }
@@ -6144,19 +6145,33 @@ function mvAccesosSeleccionadosParaMensaje(){
   }
   return picks.map(p => {
     const cuenta = APP.cuentas.find(c => c.uid === p.cuentaUID);
+    const cupo = cuenta?.cupos?.[p.cupoIdx] || {};
     const perfilEl = document.querySelector(`.mv-perfil-multi[data-cuenta="${p.cuentaUID}"][data-cupo="${p.cupoIdx}"]`);
     const pinEl = document.querySelector(`.mv-pin-multi[data-cuenta="${p.cuentaUID}"][data-cupo="${p.cupoIdx}"]`);
     return {
       cuenta,
       cupoIdx: p.cupoIdx,
-      perfil: usarPerfil ? (perfilEl?.value || document.getElementById('mv-perfil')?.value || '') : '',
-      pin: usarPin ? (pinEl?.value || document.getElementById('mv-pin')?.value || '') : ''
+      perfil: usarPerfil ? (perfilEl ? perfilEl.value : (document.getElementById('mv-perfil')?.value || cupo.perfil || '')) : '',
+      pin: usarPin ? (pinEl ? pinEl.value : (document.getElementById('mv-pin')?.value || cupo.pin || '')) : ''
     };
   }).filter(x => x.cuenta);
 }
 function mvSelCupo(){
   const cuenta = APP.cuentas.find(c => c.uid === _mvCuentaSelUID);
   if(!cuenta) return;
+  const seleccion = mvSeleccionCupos();
+  if(seleccion.length === 1){
+    const cupo = cuenta.cupos?.[seleccion[0].cupoIdx] || {};
+    const perfilInput = document.getElementById('mv-perfil');
+    const pinInput = document.getElementById('mv-pin');
+    if(perfilInput) perfilInput.value = cupo.perfil || '';
+    if(pinInput) pinInput.value = cupo.pin || '';
+  } else if(!seleccion.length){
+    const perfilInput = document.getElementById('mv-perfil');
+    const pinInput = document.getElementById('mv-pin');
+    if(perfilInput) perfilInput.value = '';
+    if(pinInput) pinInput.value = '';
+  }
   mvRenderPerfilesMulti();
   document.getElementById('mv-correo-auto').style.display = 'block';
   document.getElementById('mv-correo-auto-val').textContent = cuenta.correo;
@@ -6402,10 +6417,11 @@ async function mvGuardar(){
     cuposAsignados.forEach(asig => {
       const cuentaAsig = APP.cuentas.find(c => c.uid === asig.cuentaUID);
       if(cuentaAsig && cuentaAsig.cupos && cuentaAsig.cupos[asig.cupoIdx]){
+        const cupoAnterior = cuentaAsig.cupos[asig.cupoIdx] || {};
         const perfilEl = document.querySelector(`.mv-perfil-multi[data-cuenta="${asig.cuentaUID}"][data-cupo="${asig.cupoIdx}"]`);
         const pinEl = document.querySelector(`.mv-pin-multi[data-cuenta="${asig.cuentaUID}"][data-cupo="${asig.cupoIdx}"]`);
-        const perfilAsig = sanitizarTexto(perfilEl?.value || perfilGlobal, 50);
-        const pinAsig = sanitizarTexto(pinEl?.value || pinGlobal, 10);
+        const perfilAsig = sanitizarTexto(perfilEl ? perfilEl.value : (perfilGlobal || cupoAnterior.perfil || ''), 50);
+        const pinAsig = sanitizarTexto(pinEl ? pinEl.value : (pinGlobal || cupoAnterior.pin || ''), 10);
         Object.assign(asig, {
           perfil: perfilAsig,
           pin: pinAsig,
@@ -6489,8 +6505,8 @@ async function mvGuardar(){
     cliente: nombre, wa: waInput,
     srvUid, srvNom: srv ? srv.emoji + ' ' + srv.nombre : srvUid,
     plan: sanitizarTexto(document.getElementById('mv-plan').value, 100),
-    correo, perfil: document.getElementById('mv-capturar-perfil')?.checked ? sanitizarTexto(document.getElementById('mv-perfil')?.value||'', 50) : '',
-    pin: document.getElementById('mv-capturar-pin')?.checked ? sanitizarTexto(document.getElementById('mv-pin')?.value||'', 10) : '',
+    correo, perfil: document.getElementById('mv-capturar-perfil')?.checked ? sanitizarTexto(cuposAsignados[0]?.perfil || document.getElementById('mv-perfil')?.value || '', 50) : '',
+    pin: document.getElementById('mv-capturar-pin')?.checked ? sanitizarTexto(cuposAsignados[0]?.pin || document.getElementById('mv-pin')?.value || '', 10) : '',
     invCorreo: capacidadesServicio(srv).invitacion ? sanitizarTexto(document.getElementById('mv-inv-correo')?.value||'', 200) : '',
     precio: precioVenta,
     metodo: sanitizarTexto(document.getElementById('mv-metodo').value, 50),

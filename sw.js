@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v40-20260903-asistente-local';
+const CACHE_NAME = 'yoritex-v41-20260904-perfiles-pin';
 const APP_SHELL = ['./', './index.html', './asistente.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
