@@ -4355,6 +4355,7 @@ function cupoLibreConRol(cupo){
 }
 function liberarCuposDeVenta(v){
   if(!v) return;
+  conservarHistorialCuentaVenta(v);
   const asignaciones = asignacionesCuposVenta(v);
   const porCuenta = {};
   asignaciones.forEach(a => {
@@ -4497,6 +4498,7 @@ function desvincularVentasDeCuenta(cuenta){
     const actuales = asignacionesCuposVenta(v);
     const restantes = actuales.filter(a => a.cuentaUID !== cuenta.uid);
     if(restantes.length === actuales.length && v.cuentaUID !== cuenta.uid) return;
+    conservarHistorialCuentaVenta(v);
     const detalles = Array.isArray(v.cuposAsignados) ? v.cuposAsignados : actuales;
     v.cuposAsignados = detalles.filter(a => a.cuentaUID !== cuenta.uid);
     if(!v.cuposAsignados.length && restantes.length) v.cuposAsignados = restantes;
@@ -4553,6 +4555,7 @@ function archivarCuentaFantasmaSiVacia(cuenta){
   }
 }
 function liberarCupoAnterior(cuentaUID, cupoIdx, ventaUID){
+  conservarHistorialCuentaVenta(APP.ventas.find(v => v.uid === ventaUID));
   if(!cuentaUID || cupoIdx === null || cupoIdx === undefined || cupoIdx === '') return;
   const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
   if(!cuenta || !cuenta.cupos || !cuenta.cupos[cupoIdx]) return;
@@ -4870,7 +4873,8 @@ function textoBusquedaVenta(v){
   const extrasAsignados = asignados.map(a => [a.correo, a.perfil, a.pin, a.cuentaId, a.cuentaUID].join(' ')).join(' ');
   return [
     v.id, v.cliente, v.wa, v.correo, v.invCorreo, v.perfil, v.pin, v.plan, v.srvNom, v.catNom, v.notas, v.estado,
-    cuenta?.id, cuenta?.correo, cuenta?.pass, extrasAsignados
+    cuenta?.id, cuenta?.correo, cuenta?.pass, extrasAsignados,
+    historialCuentasVentaDatos(v, APP.cuentas).map(r => [r.cuentaId,r.correo,r.perfil].join(' ')).join(' ')
   ].join(' ');
 }
 function textoBusquedaCuenta(c){
@@ -6017,6 +6021,7 @@ async function validarCuposDisponiblesEnNube(seleccion, ventaUidPermitida=''){
   }
 }
 function snapshotOperacionCritica(){
+  (APP.ventas || []).forEach(conservarHistorialCuentaVenta);
   return {
     ventas: JSON.parse(JSON.stringify(APP.ventas || [])),
     cuentas: JSON.parse(JSON.stringify(APP.cuentas || [])),
@@ -7607,16 +7612,14 @@ function depurarInactivosAntiguos(){
     const fecha = fechaInactivacionVenta(v);
     const antiguedad = fecha ? -diasHasta(fecha) : DIAS_RETENCION_INACTIVOS + 1;
     if(ventaFueSustituida(v) || antiguedad > DIAS_RETENCION_INACTIVOS){
+      conservarHistorialCuentaVenta(v);
       v.eliminadoRegistro = true;
       v.purgaOperativa = true;
       v.cuentaUID = null;
       v.cupoIdx = null;
       v.cupoIdxs = [];
       v.cuposAsignados = [];
-      v.correo = '';
-      v.perfil = '';
-      v.pin = '';
-      v.invCorreo = '';
+      // La salida del inventario no borra los datos históricos de la venta.
       cambios = true;
     }
   });
@@ -7729,6 +7732,7 @@ function venBulkRenovarConfirmar(){
     // Marcar la venta anterior como inactiva
     v.activa = false;
     v.motivoSalida = 'Renovado';
+    conservarHistorialCuentaVenta(v);
     v.fechaInactivacion = new Date().toISOString();
     APP.ventas.push(nuevaVenta);
     APP._ventaCounter++;
@@ -7868,6 +7872,59 @@ function venToggleCuposGrupo(clave){
   window._venCuposAbiertos.has(clave) ? window._venCuposAbiertos.delete(clave) : window._venCuposAbiertos.add(clave);
   renderVencimientos();
 }
+// Copia histórica de ubicación: nunca se usa para ocupar o liberar cupos.
+function historialCuentasVentaDatos(v, cuentas){
+  if(!v) return [];
+  const lista = valor => {
+    if(Array.isArray(valor)) return valor;
+    try { const parsed = JSON.parse(valor || '[]'); return Array.isArray(parsed) ? parsed : []; } catch(e){ return []; }
+  };
+  const indice = valor => valor === '' || valor === null || valor === undefined || isNaN(parseInt(valor)) ? null : parseInt(valor);
+  const resultado = [];
+  const agregar = r => {
+    if(!r || (!r.cuentaUID && !r.correo && !r.cuentaId)) return;
+    const fila = {cuentaUID:String(r.cuentaUID || ''),cuentaId:String(r.cuentaId || ''),correo:String(r.correo || ''),cupoIdx:indice(r.cupoIdx),perfil:String(r.perfil || ''),fecha:String(r.fecha || v.fecha || '')};
+    const clave = x => JSON.stringify([x.cuentaUID,x.correo,x.cupoIdx,x.perfil]);
+    if(!resultado.some(x => clave(x) === clave(fila))) resultado.push(fila);
+  };
+  lista(v.historialCuentas).forEach(agregar);
+  const asigs = lista(v.cuposAsignados).map(a => ({...a}));
+  if(!asigs.length && v.cuentaUID){
+    const indices = Array.isArray(v.cupoIdxs) && v.cupoIdxs.length ? v.cupoIdxs :
+      (typeof v.cupoIdxs === 'string' && v.cupoIdxs.trim() ? v.cupoIdxs.split(',') : [v.cupoIdx]);
+    indices.forEach(idx => asigs.push({cuentaUID:v.cuentaUID,cupoIdx:indice(idx)}));
+  }
+  // La venta inactiva conserva su propia referencia, nunca los datos del nuevo ocupante.
+  asigs.forEach((a,i) => {
+    const cuenta = (cuentas || []).find(c => c.uid === a.cuentaUID);
+    const cu = cuenta && cuenta.cupos && cuenta.cupos[indice(a.cupoIdx)];
+    const propio = cu && cu.ventaUid === v.uid;
+    const guardada = resultado.some(r => r.cuentaUID === String(a.cuentaUID || '') && r.cupoIdx === indice(a.cupoIdx));
+    if(guardada && !propio) return;
+    agregar({cuentaUID:a.cuentaUID,cuentaId:a.cuentaId || cuenta?.id || '',
+      correo:a.correo || (propio ? cuenta.correo : '') || (i===0 ? v.correo : '') || cuenta?.correo || '',
+      cupoIdx:a.cupoIdx,perfil:a.perfil || (propio ? cu.perfil : '') || (i===0 ? v.perfil : '') || '',fecha:v.fecha});
+  });
+  // Datos ya existentes de reposiciones permiten recuperar referencias eliminadas.
+  if(!resultado.length){
+    lista(v.historialReposiciones).forEach(e => {
+      agregar({cuentaUID:e.cuentaAnteriorUID,cuentaId:e.cuentaAnteriorId,correo:e.correoAnterior || '',cupoIdx:e.cupoAnteriorIdx,fecha:e.fecha});
+      agregar({cuentaUID:e.cuentaNuevaUID,cuentaId:e.cuentaNuevaId,correo:e.correoNuevo || '',cupoIdx:e.cupoNuevoIdx,fecha:e.fecha});
+    });
+  }
+  if(!resultado.length && v.correo) agregar({correo:v.correo,perfil:v.perfil || '',cupoIdx:null,fecha:v.fecha});
+  return resultado;
+}
+function conservarHistorialCuentaVenta(v){
+  if(v) v.historialCuentas = historialCuentasVentaDatos(v, APP.cuentas);
+}
+function referenciasHistoricasRegistro(v){
+  return historialCuentasVentaDatos(v, APP.cuentas).map(r => {
+    const cuenta = APP.cuentas.find(c => c.uid === r.cuentaUID);
+    return {...r, id:r.cuentaId || 'Cuenta anterior', historica:true,
+      existe:!!cuenta, archivada:!!cuenta?.archivada, conflicto:false};
+  });
+}
 function referenciasInventarioVenta(v){
   const asignaciones = asignacionesCuposVenta(v);
   const refs = asignaciones.map(a => {
@@ -7885,12 +7942,21 @@ function referenciasInventarioVenta(v){
   return refs;
 }
 function resumenInventarioRegistro(v){
-  const refs = referenciasInventarioVenta(v);
-  if(!refs.length) return `<div class="reg-inventory-empty">Sin cuenta de inventario vinculada</div>`;
+  const actuales = referenciasInventarioVenta(v);
+  const historicas = referenciasHistoricasRegistro(v);
+  const inactiva = v.activa === false || v.eliminadoRegistro || v.purgaOperativa;
+  const refs = inactiva ? historicas : [
+    ...actuales.map(r => ({...r,existe:true})),
+    ...historicas.filter(h => !actuales.some(a => a.cuentaUID===h.cuentaUID && a.cupoIdx===h.cupoIdx && a.correo===h.correo))
+  ];
+  if(!refs.length) return `<div class="reg-inventory-empty">Esta venta no conserva datos de la cuenta anterior.</div>`;
   return `<div class="reg-inventory-links">${refs.map((r,i) => {
     const estadoClase = r.conflicto ? ' is-error' : (r.archivada ? ' is-warning' : '');
     const detalle = [r.correo||'Sin correo', r.cupoIdx!==null?'Cupo '+(r.cupoIdx+1):'', r.perfil?'Perfil '+r.perfil:''].filter(Boolean).join(' · ');
-    return `<div class="reg-inventory-link${estadoClase}"><div class="reg-inventory-main"><div class="reg-inventory-title">📦 ${esc(r.id)}${refs.length>1?' · acceso '+(i+1):''}${r.archivada?' · archivada':''}${r.conflicto?' · conflicto':''}</div><div class="reg-inventory-sub">${esc(detalle)}</div></div>${r.archivada||r.conflicto?`<button type="button" class="btn-sm reg-inventory-btn" onclick="event.stopPropagation();abrirRevisionIntegridad()">Revisar</button>`:`<button type="button" class="btn-sm reg-inventory-btn" onclick="event.stopPropagation();irACuentaInventario('${esc(r.cuentaUID)}')">Ver cuenta</button>`}</div>`;
+    const boton = r.existe && !r.archivada
+      ? `<button type="button" class="btn-sm reg-inventory-btn" onclick="event.stopPropagation();irACuentaInventario('${esc(r.cuentaUID)}')">${r.historica?'Ver inventario actual':'Ver cuenta'}</button>`
+      : '';
+    return `<div class="reg-inventory-link${estadoClase}"><div class="reg-inventory-main"><div class="reg-inventory-title">📦 ${r.historica?'Cuenta anterior · ':''}${esc(r.id)}${r.archivada?' · archivada':''}${r.conflicto?' · conflicto':''}</div><div class="reg-inventory-sub">${esc(detalle)}</div>${r.historica?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Referencia histórica; no reserva este cupo.</div>':''}</div>${boton}</div>`;
   }).join('')}</div>`;
 }
 function resumenInventarioVencimiento(v){
@@ -8570,7 +8636,7 @@ async function renGuardar(){
 
   // Conservar el historial original; solo se actualizan datos de contacto compartidos.
   v.wa = nuevoWA || v.wa;
-  v.correo = nuevoCorreo || v.correo;
+    // El correo de la venta anterior pertenece al período anterior.
 
   // Manejar cuenta de inventario
   if(origen === 'inventario' && cuentaInvUID){
@@ -12259,11 +12325,13 @@ function sanearPayloadReferenciasVirtuales(data){
   };
 }
 function construirPayload(){
+  (APP.ventas || []).forEach(conservarHistorialCuentaVenta);
   depurarInactivosAntiguos();
   const ventasPayload = (APP.ventas || []).map(v => {
     const limpia = sanearVentaReferenciasVirtuales(v, false);
     return ({
       ...limpia,
+      historialCuentas: JSON.stringify(limpia.historialCuentas || []),
       cupoIdxs: Array.isArray(limpia.cupoIdxs) ? limpia.cupoIdxs.join(',') : (limpia.cupoIdxs || ''),
       cuposAsignados: Array.isArray(limpia.cuposAsignados) ? JSON.stringify(limpia.cuposAsignados) : (limpia.cuposAsignados || ''),
       historialReposiciones: Array.isArray(limpia.historialReposiciones) ? JSON.stringify(limpia.historialReposiciones) : (limpia.historialReposiciones || '')
@@ -12597,6 +12665,8 @@ function normalizarVenta(v){
   }
   cuposAsignados = cuposAsignados.map(x => ({
     cuentaUID: x.cuentaUID,
+    cuentaId: x.cuentaId || '',
+    correo: x.correo || '',
     cupoIdx: parseInt(x.cupoIdx),
     perfil: x.perfil || '',
     pin: x.pin || '',
