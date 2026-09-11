@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v44-20260911-busqueda-contraste';
+const CACHE_NAME = 'yoritex-v45-20260911-editor-cupos';
 const APP_SHELL = ['./', './index.html', './asistente.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',

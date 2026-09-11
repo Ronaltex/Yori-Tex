@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="yoritex-build" content="v44-20260911-busqueda-contraste"/>
+<meta name="yoritex-build" content="v45-20260911-editor-cupos"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="referrer" content="no-referrer"/>
 <meta http-equiv="X-Content-Type-Options" content="nosniff"/>
@@ -2660,7 +2660,7 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
   <div class="field"><label>Plan / tipo de acceso</label><input type="text" id="ec-plan" placeholder="Ej: Familiar 1 mes, Individual 3 meses..."/></div>
   <div class="field"><label>Fecha de vencimiento</label><input type="date" id="ec-vence"/></div>
   <div class="divider"></div>
-  <button class="btn btn-primary" style="margin-bottom:8px" onclick="ecGuardar()">💾 Guardar</button>
+  <button class="btn btn-primary" id="ec-guardar-btn" style="margin-bottom:8px" onclick="ecGuardar()">💾 Guardar</button>
   <button class="btn btn-red" onclick="ecLiberar()">🟢 Liberar cupo</button>
 </div>
 </div>
@@ -4575,9 +4575,9 @@ function liberarCupoAnterior(cuentaUID, cupoIdx, ventaUID){
 // MODALES
 // ══════════════════════════════════════
 function abrirModal(id){ document.getElementById(id).classList.add('open'); }
-function cerrarModal(id){ document.getElementById(id).classList.remove('open'); }
+function cerrarModal(id){ if(id==='modal-editar-cupo' && _ecGuardando) return; document.getElementById(id).classList.remove('open'); }
 document.addEventListener('click', e => {
-  if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+  if(e.target.classList.contains('modal-overlay')) cerrarModal(e.target.id);
 });
 
 // ══════════════════════════════════════
@@ -7154,10 +7154,13 @@ function eliminarCuentaVirtual(uidVirtual){
 }
 
 function abrirEditarCupo(cuentaUID, cupoIdx){
+  if(_ecGuardando) return;
   const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
   if(!cuenta) return;
   cuenta.cupos = normalizarRolesCuposCuenta(cuenta, getSrv(cuenta.srvUid), cuenta.cupos, false);
   const cupo = cuenta.cupos[cupoIdx];
+  if(!cupo) return;
+  _ecOrigen=ecFirma(cuenta,cupoIdx);
   const srv = getSrv(cuenta.srvUid);
   aplicarCamposAccesoServicio('ec', srv);
   _editCupoUID = cuentaUID; _editCupoIdx = cupoIdx;
@@ -7179,56 +7182,125 @@ function abrirEditarCupo(cuentaUID, cupoIdx){
   document.getElementById('ec-tipo-acceso-field').style.display = modeloAccesoServicio(srv).usaCuentaMadre ? '' : 'none';
   abrirModal('modal-editar-cupo');
 }
-function ecGuardar(){
-  const cuentaUID = document.getElementById('ec-cuenta-uid').value;
-  const cupoIdx = parseInt(document.getElementById('ec-cupo-idx').value);
-  const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
-  if(!cuenta) return;
-  const srv = getSrv(cuenta.srvUid);
-  const modelo = modeloAccesoServicio(srv);
-  const tipoAcceso = document.getElementById('ec-tipo-acceso').value || (modelo.usaCuentaMadre ? '' : modelo.tipoAcceso);
-  if(tipoAcceso === 'madre'){
-    cuenta.cupos.forEach((cu,i) => {
-      if(i !== cupoIdx && cu.tipoAcceso === 'madre') cuenta.cupos[i] = {...cu,tipoAcceso:modelo.tipoAcceso,etiquetaAcceso:'',rolConfirmado:true,rolOrigen:'manual'};
+let _ecGuardando = false;
+let _ecOrigen = '';
+function ecFirma(cuenta, idx){
+  return JSON.stringify([cuenta?.cupos?.[idx],(APP.ventas||[]).filter(v => v.activa!==false && !v.eliminadoRegistro && (v.uid===cuenta?.cupos?.[idx]?.ventaUid || asignacionesCuposVenta(v).some(a=>a.cuentaUID===cuenta?.uid && a.cupoIdx===idx)))]);
+}
+function ecVentaExacta(cuenta, idx){
+  const cu=cuenta.cupos[idx];
+  const ventas=(APP.ventas||[]).filter(v=>v.activa!==false && !v.eliminadoRegistro && (v.uid===cu.ventaUid || asignacionesCuposVenta(v).some(a=>a.cuentaUID===cuenta.uid && a.cupoIdx===idx)));
+  if(ventas.length>1) throw new Error('Este cupo tiene vínculos en conflicto. No se modificó ningún cliente.');
+  return ventas[0]||null;
+}
+function ecAplicar(cuenta, idx, datos){
+  const anterior=cuenta.cupos[idx], venta=ecVentaExacta(cuenta,idx);
+  if(datos.estado==='ocupado' && !venta) throw new Error('Para ocupar este cupo usa Nueva venta o Reposición. No se creará un vínculo por coincidencia de nombre o teléfono.');
+  if(venta) conservarHistorialCuentaVenta(venta);
+  let detalles=venta ? asignacionesCrudasVenta(venta).map(a=>({...a,cupoIdx:parseInt(a.cupoIdx)})) : [];
+  if(venta && !detalles.some(a=>a.cuentaUID===cuenta.uid && a.cupoIdx===idx)){
+    if(detalles.length) throw new Error('La venta apunta a otro acceso. Revisa su vinculación antes de editar este cupo.');
+    detalles=[{cuentaUID:cuenta.uid,cupoIdx:idx}];
+  }
+  if(datos.estado==='libre' && venta){
+    const restantes=detalles.filter(a=>a.cuentaUID!==cuenta.uid || a.cupoIdx!==idx);
+    venta.cuposAsignados=restantes;
+    venta.cuentaUID=restantes[0]?.cuentaUID||null;
+    venta.cupoIdx=restantes[0]?.cupoIdx??null;
+    venta.cupoIdxs=restantes.filter(a=>a.cuentaUID===venta.cuentaUID).map(a=>a.cupoIdx);
+    if(!restantes.length){
+      venta.activa=false;
+      venta.fechaInactivacion=hoy();
+      venta.motivoSalida='Cupo liberado desde Inventario';
+    } else {
+      const principal=APP.cuentas.find(c=>c.uid===venta.cuentaUID);
+      const acceso=principal?.cupos?.[venta.cupoIdx];
+      if(principal) venta.correo=principal.correo||'';
+      if(acceso) ['perfil','pin','invCorreo'].forEach(k=>venta[k]=acceso[k]||'');
+    }
+  } else if(venta){
+    const cambiaPlazo=venta.vence!==datos.vence;
+    ['cliente','wa','plan','vence'].forEach(k=>venta[k]=datos[k]);
+    if(cambiaPlazo){
+    venta.dias=Math.max(1,Math.round((new Date(venta.vence+'T12:00:00')-new Date(venta.fecha+'T12:00:00'))/86400000)||venta.dias||30);
+    venta.plazoCantidad=venta.dias; venta.plazoUnidad='dias';
+    }
+    venta.cuposAsignados=detalles.map(a=>{
+      if(a.cuentaUID===cuenta.uid && a.cupoIdx===idx) return {...a,perfil:datos.perfil,pin:datos.pin,vence:datos.vence};
+      return {...a,vence:datos.vence};
+    });
+    if(detalles.length===1 || (venta.cuentaUID===cuenta.uid && parseInt(venta.cupoIdx)===idx)){
+      ['perfil','pin','invCorreo'].forEach(k=>venta[k]=datos[k]);
+    }
+    // Identidad/plazo son de la misma venta; credenciales son de cada acceso.
+    detalles.forEach(a=>{
+      const cu=APP.cuentas.find(c=>c.uid===a.cuentaUID)?.cupos?.[a.cupoIdx];
+      if(!cu || (cu.ventaUid && cu.ventaUid!==venta.uid)) throw new Error('Otro acceso de esta venta cambió de ocupante.');
+      ['cliente','wa','plan','vence'].forEach(k=>cu[k]=datos[k]);
+      cu.periodoHasta=datos.vence;
     });
   }
-  const estadoNuevo = document.getElementById('ec-estado').value;
-  const cupoEditado = {
-    ...cuenta.cupos[cupoIdx],
-    estado: estadoNuevo,
-    cliente: document.getElementById('ec-cliente').value,
-    wa: document.getElementById('ec-wa').value,
-    perfil: document.getElementById('ec-perfil').value,
-    pin: document.getElementById('ec-pin').value,
-    invCorreo: document.getElementById('ec-inv-correo').value,
-    plan: document.getElementById('ec-plan').value,
-    vence: document.getElementById('ec-vence').value,
-    tipoAcceso,
-    etiquetaAcceso: tipoAcceso === 'madre' ? 'Cuenta madre' : '',
-    rolConfirmado: !!tipoAcceso,
-    rolOrigen: tipoAcceso ? 'manual' : '',
-    pendienteCobro: false,
-    periodoDesde: cuenta.desde || hoy(),
-    periodoHasta: document.getElementById('ec-vence').value || cuenta.hasta || ''
-  };
-  cuenta.cupos[cupoIdx] = estadoNuevo === 'libre'
-    ? cupoLibreConRol(cupoEditado)
-    : cupoEditado;
-  if(estadoNuevo === 'ocupado') ccBuscarVentaActivaDeCupo(cuentaUID,cupoIdx,cuenta.cupos[cupoIdx],true);
-  cerrarModal('modal-editar-cupo');
-  renderInventario();
-  sincronizarConSheets();
+  const editado={...anterior,...datos,etiquetaAcceso:datos.tipoAcceso==='madre'?'Cuenta madre':'',rolConfirmado:!!datos.tipoAcceso,rolOrigen:datos.tipoAcceso?'manual':''};
+  if(datos.estado==='libre'){
+    // Un perfil y PIN preconfigurados pertenecen al acceso, no al cliente saliente.
+    cuenta.cupos[idx]={...cupoLibreConRol(editado),perfil:datos.perfil||'',pin:datos.pin||''};
+  } else {
+    cuenta.cupos[idx]={...editado,ventaUid:venta.uid,pendienteCobro:venta.estado!=='pagado',periodoDesde:venta.fecha||anterior.periodoDesde||'',periodoHasta:datos.vence};
+  }
+  if(datos.tipoAcceso==='madre') cuenta.cupos.forEach((cu,i)=>{
+    if(i!==idx && cu.tipoAcceso==='madre') Object.assign(cu,{tipoAcceso:modeloAccesoServicio(getSrv(cuenta.srvUid)).tipoAcceso,etiquetaAcceso:'',rolConfirmado:true,rolOrigen:'manual'});
+  });
+}
+async function ecGuardar(liberar=false){
+  if(_ecGuardando) return false;
+  const cuentaUID=document.getElementById('ec-cuenta-uid').value;
+  const idx=parseInt(document.getElementById('ec-cupo-idx').value);
+  const cuenta=APP.cuentas.find(c=>c.uid===cuentaUID);
+  if(!cuenta?.cupos?.[idx]) return false;
+  const campos=['cliente','wa','perfil','pin','plan','vence','tipo-acceso','inv-correo'];
+  const datos={estado:liberar?'libre':document.getElementById('ec-estado').value};
+  campos.forEach(k=>datos[{'tipo-acceso':'tipoAcceso','inv-correo':'invCorreo'}[k]||k]=sanitizarTexto(document.getElementById('ec-'+k).value, k==='pin'?8:200));
+  let snapshot=null;
+  const controles=[...document.querySelectorAll('#modal-editar-cupo button,#modal-editar-cupo input,#modal-editar-cupo select')];
+  const estados=controles.map(e=>e.disabled);
+  try {
+    if(_ecOrigen && ecFirma(cuenta,idx)!==_ecOrigen) throw new Error('Los datos cambiaron desde que abriste el editor. Ciérralo y vuelve a abrirlo antes de guardar.');
+    const venta=ecVentaExacta(cuenta,idx);
+    if(datos.estado==='ocupado'){
+      if(!datos.cliente || !/^\d{4}-\d{2}-\d{2}$/.test(datos.vence)) throw new Error('Indica el nombre y una fecha de vencimiento válida.');
+      if(venta?.fecha && datos.vence<venta.fecha) throw new Error('El vencimiento no puede ser anterior al inicio de la venta.');
+      if(cuenta.hasta && datos.vence>cuenta.hasta && !confirm('El cliente vence después de la cuenta madre. ¿Guardar de todas formas y renovar la cuenta madre a tiempo?')) return false;
+      if(venta && asignacionesCuposVenta(venta).length>1 && !confirm('Esta venta tiene varios cupos. El nombre, WhatsApp, plan y vencimiento se actualizarán en todos sus cupos; el perfil y PIN solo en este. ¿Continuar?')) return false;
+    } else if(cuenta.cupos[idx].estado==='ocupado' && !confirm('¿Liberar este cupo? Se conservarán la venta histórica y sus cobros; si era su último acceso quedará inactiva.')) return false;
+    _ecGuardando=true;
+    controles.forEach(e=>e.disabled=true);
+    document.getElementById('ec-guardar-btn').textContent='Confirmando en la nube…';
+    if(!_pinVerificado) throw new Error('Inicia sesión y conecta con la nube antes de guardar.');
+    if(_syncGuardando || _syncPendiente || _syncDirty) throw new Error('Hay otra sincronización pendiente. Espera a que termine y vuelve a guardar.');
+    snapshot=snapshotOperacionCritica();
+    ecAplicar(cuenta,idx,datos);
+    const ok=await sincronizarConSheets(true);
+    if(!ok) throw new Error(_ultimoErrorSync||'La nube no confirmó el cambio.');
+    _ecOrigen=ecFirma(cuenta,idx);
+    _ecGuardando=false;
+    cerrarModal('modal-editar-cupo');
+    renderInventario();renderRegistro();renderVencimientos();
+    return true;
+  } catch(err){
+    if(snapshot){
+      restaurarSnapshotOperacion(snapshot);
+      _ecOrigen=ecFirma(APP.cuentas.find(c=>c.uid===cuentaUID),idx);
+    }
+    alert('No se confirmó el cambio. El editor conserva lo que escribiste.\n\n'+err.message);
+    return false;
+  } finally {
+    _ecGuardando=false;
+    controles.forEach((e,i)=>e.disabled=estados[i]);
+    document.getElementById('ec-guardar-btn').textContent='💾 Guardar';
+  }
 }
 function ecLiberar(){
-  const cuentaUID = document.getElementById('ec-cuenta-uid').value;
-  const cupoIdx = parseInt(document.getElementById('ec-cupo-idx').value);
-  const cuenta = APP.cuentas.find(c => c.uid === cuentaUID);
-  if(!cuenta) return;
-  const actual = cuenta.cupos[cupoIdx] || {};
-  cuenta.cupos[cupoIdx] = { estado: 'libre', tipoAcceso:actual.tipoAcceso||'', etiquetaAcceso:actual.etiquetaAcceso||'', rolConfirmado:actual.rolConfirmado||false, rolOrigen:actual.rolOrigen||'' };
-  cerrarModal('modal-editar-cupo');
-  renderInventario();
-  sincronizarConSheets();
+  return ecGuardar(true);
 }
 
 // Nueva cuenta
