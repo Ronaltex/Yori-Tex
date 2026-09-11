@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
+<meta name="yoritex-build" content="v44-20260911-busqueda-contraste"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="referrer" content="no-referrer"/>
 <meta http-equiv="X-Content-Type-Options" content="nosniff"/>
@@ -114,7 +115,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
 .search-wrap{position:relative;margin-bottom:12px}
 .search-wrap input{padding-left:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px}
 .search-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text3);pointer-events:none}
-.search-wrap input{padding-right:40px}
+.search-wrap input{padding-right:40px;color:#f4f7fb;-webkit-text-fill-color:#f4f7fb;caret-color:#f4f7fb;color-scheme:dark}
+.search-wrap input::placeholder{color:#a8b8cc;-webkit-text-fill-color:#a8b8cc;opacity:1}
+.search-wrap input:autofill,.search-wrap input:-webkit-autofill{-webkit-text-fill-color:#f4f7fb;box-shadow:0 0 0 1000px var(--surface) inset}
 .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:26px;height:26px;border:none;border-radius:8px;background:rgba(137,165,204,.12);color:var(--text2);font-size:15px;font-weight:800;display:none;align-items:center;justify-content:center;cursor:pointer}
 .search-clear.show{display:flex}
 .filters{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
