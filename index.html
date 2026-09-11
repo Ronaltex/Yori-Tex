@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="yoritex-build" content="v45-20260911-editor-cupos"/>
+<meta name="yoritex-build" content="v46-20260911-operaciones-confirmadas"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="referrer" content="no-referrer"/>
 <meta http-equiv="X-Content-Type-Options" content="nosniff"/>
@@ -2028,7 +2028,7 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
     <button class="filter-btn" onclick="venFiltrar('hoy',this)">Hoy</button>
     <button class="filter-btn" onclick="venFiltrar('pronto',this)">Esta semana</button>
     <button class="filter-btn" onclick="venFiltrar('ok',this)">Al día</button>
-    <button class="filter-btn" onclick="venFiltrar('inactivo',this)">Inactivos · 5 días</button>
+    <button class="filter-btn" onclick="venFiltrar('inactivo',this)">Inactivos / reservados</button>
   </div>
   <div class="search-wrap"><span class="search-ico">🔍</span><input id="ven-search" type="text" placeholder="Buscar cliente, servicio, correo, teléfono..." oninput="venBuscar(this.value)"></div>
   <div id="ven-search-scope" class="aviso" style="display:none;margin-bottom:10px" aria-live="polite"></div>
@@ -2893,7 +2893,7 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
   <div id="nr-info" style="font-size:13px;color:var(--text2);margin-bottom:14px"></div>
   <input type="hidden" id="nr-venta-uid"/>
   <label class="radio-opt"><input type="radio" name="nr-accion" value="liberar" checked onchange="nrToggleAviso()"><div><div class="ro-title">🟢 Liberar cupo</div><div class="ro-sub">La cuenta sigue activa para otros clientes</div></div></label>
-  <label class="radio-opt"><input type="radio" name="nr-accion" value="solo-inactivar" onchange="nrToggleAviso()"><div><div class="ro-title">📋 Solo marcar inactivo</div><div class="ro-sub">El cupo queda ocupado, sin eliminar datos</div></div></label>
+  <label class="radio-opt"><input type="radio" name="nr-accion" value="solo-inactivar" onchange="nrToggleAviso()"><div><div class="ro-title">📋 Solo marcar inactivo</div><div class="ro-sub">El cupo queda reservado hasta que lo liberes o renueves</div></div></label>
   <label class="radio-opt" style="border-color:var(--red-border);background:var(--red-bg)"><input type="radio" name="nr-accion" value="eliminar-todo" onchange="nrToggleAviso()"><div><div class="ro-title" style="color:var(--red)">🗑️ Eliminar todo</div><div class="ro-sub">Libera el cupo Y elimina el registro de esta venta</div></div></label>
   <div class="field" style="margin-top:4px"><label>Motivo (opcional)</label><input type="text" id="nr-motivo" placeholder="Ej: No contestó, canceló..."/></div>
   <div class="aviso-red" id="nr-aviso-normal">⚠️ El historial de pagos anteriores no se borra.</div>
@@ -4378,7 +4378,7 @@ function liberarCuposDeVenta(v){
 }
 function reconciliarRelacionesVentasCupos(){
   const resultado = {reparados:0,huerfanos:0,conflictos:0,liberadosVencidos:0,huerfanosDetalle:[]};
-  const activas = (APP.ventas || []).filter(v => v && v.activa !== false && !v.eliminadoRegistro);
+  const activas = (APP.ventas || []).filter(v => ventaOcupa(v));
 
   // Quitar referencias antiguas que quedaron dentro de una venta múltiple
   // cuando ese cupo ya fue asignado explícitamente a otra venta. Solo se
@@ -4509,6 +4509,7 @@ function desvincularVentasDeCuenta(cuenta){
     v.cuposAsignados = detalles.filter(a => a.cuentaUID !== cuenta.uid);
     if(!v.cuposAsignados.length && restantes.length) v.cuposAsignados = restantes;
     v.cuentaUID = v.cuposAsignados[0]?.cuentaUID || null;
+    if(!v.cuentaUID) v.reservaInactiva = false;
     v.cupoIdx = v.cuposAsignados[0]?.cupoIdx ?? null;
     v.cupoIdxs = v.cuentaUID ? v.cuposAsignados.filter(a => a.cuentaUID === v.cuentaUID).map(a => parseInt(a.cupoIdx)).filter(i => !isNaN(i)) : [];
   });
@@ -4575,7 +4576,7 @@ function liberarCupoAnterior(cuentaUID, cupoIdx, ventaUID){
 // MODALES
 // ══════════════════════════════════════
 function abrirModal(id){ document.getElementById(id).classList.add('open'); }
-function cerrarModal(id){ if(id==='modal-editar-cupo' && _ecGuardando) return; document.getElementById(id).classList.remove('open'); }
+function cerrarModal(id){ if(_operacionGuardando || (id==='modal-editar-cupo' && _ecGuardando))return;document.getElementById(id).classList.remove('open'); }
 document.addEventListener('click', e => {
   if(e.target.classList.contains('modal-overlay')) cerrarModal(e.target.id);
 });
@@ -4584,6 +4585,7 @@ document.addEventListener('click', e => {
 // NAVEGACIÓN
 // ══════════════════════════════════════
 function navIr(id, btn){
+  if(_operacionGuardando) return;
   const screen = document.getElementById('s-' + id);
   if(!screen) return;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -6324,7 +6326,7 @@ function plantillaBaseServicio(contexto, srvUid){
     : '🔐 Datos de acceso:\n[ACCESOS]';
   const textos = {
     venta_nueva: asegurarFirmaPlantilla(srv.entregaTexto) || '¡Hola [CLIENTE]! 👋\n\nTu acceso a *[SERVICIO]* está listo ✅\n\n' + datosAcceso + '\n\n📅 Vence: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
-    renovacion: asegurarFirmaPlantilla(srv.renovacionTexto) || '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + (srv.tieneInvitacion ? datosAcceso + '\n\n' : '') + '📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
+    renovacion: asegurarFirmaPlantilla(srv.renovacionTexto) || '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* fue renovado correctamente ✅\n\n' + datosAcceso + '\n\n📅 Nuevo vencimiento: [VENCE]\n💵 Monto: $[PRECIO]\n\n[FIRMA]',
     cobro_pendiente: 'Hola [CLIENTE] 👋\n\nQueda pendiente el pago de *$[PRECIO]* por tu servicio *[SERVICIO]*.\n\n📅 Vencimiento: [VENCE]\n\n[FIRMA]',
     garantia: garantiaModo === 'propia' ? String(srv.garantiaTexto || '').trim() : '🛡️ *Garantía de [SERVICIO]*\n\nConserva este mensaje. Si tienes un inconveniente con el acceso, escríbenos indicando el nombre del servicio y el problema. La garantía aplica hasta el vencimiento registrado: *[VENCE]*.\n\n[FIRMA]',
     vencimiento: '¡Hola [CLIENTE]! 👋\n\nTu servicio *[SERVICIO]* vence el *[VENCE]*.\n\nEl valor de la renovación es *$[PRECIO]*.\n\n¿Lo renovamos? 🔄\n\n[FIRMA]',
@@ -6745,8 +6747,8 @@ function renderInventario(){
 
   // ── Separar: activas vs por renovar ───────────────────────
   const hoyStr = hoy();
-  const activas    = cuentas.filter(c => c.cupos.some(cu => cu.estado==='ocupado' && (!cu.vence || cu.vence >= hoyStr)));
-  const porRenovar = cuentas.filter(c => c.cupos.every(cu => cu.estado==='libre' || (cu.vence && cu.vence < hoyStr)));
+  const activas    = cuentas.filter(c => c.cupos.some(cu => cu.estado==='ocupado'));
+  const porRenovar = cuentas.filter(c => c.cupos.every(cu => cu.estado==='libre'));
 
   function renderCuenta(c){
     const lib = c.cupos.filter(cu => cu.estado==='libre').length;
@@ -6825,7 +6827,7 @@ function renderInventario(){
           <div style="display:flex;align-items:center;gap:8px">
             <div class="cupo-dot dot-ocupado" style="flex-shrink:0"></div>
             <div class="cupo-info" style="flex:1">
-              <div class="cupo-cliente">${esc(cu.cliente||nombreAcceso)} <span style="font-size:9px;color:var(--orange)">· ${esc(nombreAcceso)}</span> ${planStr}</div>
+              <div class="cupo-cliente">${esc(cu.cliente||nombreAcceso)} <span style="font-size:9px;color:var(--orange)">· ${esc(nombreAcceso)}</span> ${planStr}${ventaReserva(APP.ventas.find(v=>v.uid===cu.ventaUid))?' · Reservado':''}</div>
               <div class="cupo-sub">${cu.perfil?'Perfil: '+esc(cu.perfil)+' · ':''}${venceBadge || '<span style="color:var(--text3);font-size:10px">Sin fecha asignada</span>'}</div>
               ${invStr}
             </div>
@@ -7039,16 +7041,19 @@ function abrirEditarCuenta(cuentaUID){
 }
 
 // Renovar cuenta madre desde inventario
-function ncRenovarCuenta(){
+async function ncRenovarCuenta(){
+  
+  return operacionConfirmada('modal-nueva-cuenta',async()=>{
   const cuentaUID = document.getElementById('nc-edit-uid').value;
   if(!cuentaUID){ alert('Guarda primero la cuenta'); return; }
   const c = APP.cuentas.find(x => x.uid === cuentaUID);
   if(!c) return;
   const renDesde = document.getElementById('nc-ren-desde').value;
   const renHasta = document.getElementById('nc-ren-hasta').value;
-  const renCosto = parseFloat(document.getElementById('nc-ren-costo').value)||0;
+  const renCosto = importeFormulario('nc-ren-costo',0);
   const renMetodo = document.getElementById('nc-ren-metodo').value;
   if(!renDesde || !renHasta){ alert('Indica la fecha desde y hasta de renovación'); return; }
+  if(renHasta<renDesde || renCosto<0) throw new Error('Revisa fechas y costo.');
   // Actualizar vigencia en la cuenta
   c.desde = renDesde;
   c.hasta = renHasta;
@@ -7080,19 +7085,15 @@ function ncRenovarCuenta(){
       esCostoReal: true,
       notas: `Renovación automática desde inventario. Período: ${renDesde} → ${renHasta}`
     });
-    alert(esUsdt
-      ? `✅ Renovación registrada.\n💱 ${renCosto.toFixed(2)} USDT registrados como gasto.`
-      : `✅ Renovación registrada.\n💰 Costo $${renCosto.toFixed(2)} agregado automáticamente a gastos.`);
-  } else {
-    alert('✅ Vigencia actualizada.');
   }
-  cerrarModal('modal-nueva-cuenta');
-  renderInventario();
-  renderCostos();
-  sincronizarConSheets();
+
+return true;
+});
 }
 
-function eliminarCuenta(uid){
+async function eliminarCuenta(uid){
+  
+  return operacionConfirmada('',async()=>{
   const c = APP.cuentas.find(x => x.uid === uid);
   if(!c) return;
   const ocupados = (c.cupos || []).filter(cu => cu.estado === 'ocupado').length;
@@ -7110,14 +7111,9 @@ function eliminarCuenta(uid){
   if(!APP.cuentasEliminadas.includes(uid)) APP.cuentasEliminadas.push(uid);
   desvincularVentasDeCuenta(c);
   APP.cuentas = APP.cuentas.filter(c => c.uid !== uid);
-  renderInventario();
-  renderRegistro();
-  renderVencimientos();
-  renderDashboard();
-  renderCostos();
-  actualizarSaldoBinance();
-  renderBinance();
-  sincronizarConSheets();
+
+return true;
+});
 }
 function editarCuentaVirtual(uidVirtual){
   const c = construirCuentaVirtual(uidVirtual);
@@ -7131,7 +7127,9 @@ function editarCuentaVirtual(uidVirtual){
   }
   alert('Esta cuenta Auto tiene varios clientes. Abre la flecha y edita el cupo/cliente específico.');
 }
-function eliminarCuentaVirtual(uidVirtual){
+async function eliminarCuentaVirtual(uidVirtual){
+  
+  return operacionConfirmada('',async()=>{
   const c = construirCuentaVirtual(uidVirtual);
   if(!c || !c.ventasRef || !c.ventasRef.length) return;
   const msg = c.ventasRef.length > 1
@@ -7146,11 +7144,9 @@ function eliminarCuentaVirtual(uidVirtual){
     v.cupoIdxs = [];
     v.cuposAsignados = [];
   });
-  renderInventario();
-  renderRegistro();
-  renderVencimientos();
-  renderDashboard();
-  sincronizarConSheets();
+
+return true;
+});
 }
 
 function abrirEditarCupo(cuentaUID, cupoIdx){
@@ -7185,11 +7181,11 @@ function abrirEditarCupo(cuentaUID, cupoIdx){
 let _ecGuardando = false;
 let _ecOrigen = '';
 function ecFirma(cuenta, idx){
-  return JSON.stringify([cuenta?.cupos?.[idx],(APP.ventas||[]).filter(v => v.activa!==false && !v.eliminadoRegistro && (v.uid===cuenta?.cupos?.[idx]?.ventaUid || asignacionesCuposVenta(v).some(a=>a.cuentaUID===cuenta?.uid && a.cupoIdx===idx)))]);
+  return JSON.stringify([cuenta?.cupos?.[idx],(APP.ventas||[]).filter(v => ventaOcupa(v) && (v.uid===cuenta?.cupos?.[idx]?.ventaUid || asignacionesCuposVenta(v).some(a=>a.cuentaUID===cuenta?.uid && a.cupoIdx===idx)))]);
 }
 function ecVentaExacta(cuenta, idx){
   const cu=cuenta.cupos[idx];
-  const ventas=(APP.ventas||[]).filter(v=>v.activa!==false && !v.eliminadoRegistro && (v.uid===cu.ventaUid || asignacionesCuposVenta(v).some(a=>a.cuentaUID===cuenta.uid && a.cupoIdx===idx)));
+  const ventas=(APP.ventas||[]).filter(v=>ventaOcupa(v) && (v.uid===cu.ventaUid || asignacionesCuposVenta(v).some(a=>a.cuentaUID===cuenta.uid && a.cupoIdx===idx)));
   if(ventas.length>1) throw new Error('Este cupo tiene vínculos en conflicto. No se modificó ningún cliente.');
   return ventas[0]||null;
 }
@@ -7209,7 +7205,7 @@ function ecAplicar(cuenta, idx, datos){
     venta.cupoIdx=restantes[0]?.cupoIdx??null;
     venta.cupoIdxs=restantes.filter(a=>a.cuentaUID===venta.cuentaUID).map(a=>a.cupoIdx);
     if(!restantes.length){
-      venta.activa=false;
+      venta.activa=false;venta.reservaInactiva=false;
       venta.fechaInactivacion=hoy();
       venta.motivoSalida='Cupo liberado desde Inventario';
     } else {
@@ -7252,7 +7248,7 @@ function ecAplicar(cuenta, idx, datos){
   });
 }
 async function ecGuardar(liberar=false){
-  if(_ecGuardando) return false;
+  if(_ecGuardando || _operacionGuardando) return false;
   const cuentaUID=document.getElementById('ec-cuenta-uid').value;
   const idx=parseInt(document.getElementById('ec-cupo-idx').value);
   const cuenta=APP.cuentas.find(c=>c.uid===cuentaUID);
@@ -7497,7 +7493,7 @@ function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, m
     const fifo = calcFIFO(costoCuenta);
     usdtUsado = costoCuenta;
     montoUSDReal = fifo.total || costoCuenta;
-    descontarUSDTBinance(costoCuenta, `Adquisicion cuenta madre - ${idVal} (${srv ? srv.nombre : srvUid})`, cuentaUID, costoUID, fecha || hoy());
+    if(!descontarUSDTBinance(costoCuenta, `Adquisicion cuenta madre - ${idVal} (${srv ? srv.nombre : srvUid})`, cuentaUID, costoUID, fecha || hoy())) return false;
   }
   APP.costos.push({
     uid: costoUID,
@@ -7517,6 +7513,8 @@ function registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, m
   return true;
 }
 async function ncGuardarMasivo(){
+  
+  return operacionConfirmada('modal-nueva-cuenta',async()=>{
   const srvUid = document.getElementById('nc-srv').value;
   if(!srvUid){ alert('Selecciona el servicio'); return; }
   const items = ncBulkItems();
@@ -7526,16 +7524,18 @@ async function ncGuardarMasivo(){
   const custom = document.getElementById('nc-bulk-pass-mode').value === 'custom';
   if(custom && items.some(x => !x.pass)){ alert('Hay cuentas sin contrasena. Usa formato: correo | contrasena'); return; }
   if(!custom && !document.getElementById('nc-bulk-pass-same').value){ alert('Ingresa la contrasena comun'); return; }
-  const numCupos = parseInt(document.getElementById('nc-cupos').value) || 1;
+  const numCupos = Number(document.getElementById('nc-cupos').value);
+  if(!Number.isInteger(numCupos) || numCupos<1 || numCupos>100) throw new Error('Indica de 1 a 100 cupos, sin decimales.');
   const srv = getSrv(srvUid);
   const prefijo = (document.getElementById('nc-id').value.trim() || (srv?.nombre || 'SRV').toUpperCase().slice(0,3)).replace(/\s+/g,'-').toUpperCase();
-  const costoTotal = parseFloat(document.getElementById('nc-costo').value)||0;
+  const costoTotal = importeFormulario('nc-costo',0);
   const costoCuenta = items.length ? parseFloat((costoTotal / items.length).toFixed(6)) : 0;
   const metodoPago = document.getElementById('nc-metodo-pago').value;
   const adelantoUID = document.getElementById('nc-adelanto')?.value || '';
   const ncDesde = document.getElementById('nc-desde').value;
   const ncHasta = document.getElementById('nc-hasta').value;
-  const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
+  if(ncDesde && ncHasta && ncHasta<ncDesde) throw new Error('El vencimiento no puede ser anterior al inicio.');
+  const pventa = importeFormulario('nc-pventa',0);
   const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
   const notas = document.getElementById('nc-notas').value;
   const modelo = modeloAccesoServicio(srv);
@@ -7558,40 +7558,31 @@ async function ncGuardarMasivo(){
       notas,
       cupos: crearCuposModelo(srv, numCupos)
     });
-    registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, ncDesde || hoy(), adelantoUID);
+    if(!registrarCostoCuentaMadre(cuentaUID, idVal, srv, srvUid, costoCuenta, metodoPago, ncDesde || hoy(), adelantoUID)) throw new Error('No se pudo registrar el costo de una cuenta.');
   });
-  cerrarModal('modal-nueva-cuenta');
-  renderInventario();
-  renderCostos();
-  actualizarSaldoBinance();
-  renderBinance();
-  const _dashEl = document.getElementById('s-dashboard');
-  if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
-  const sincronizado = await sincronizarConSheets(true);
-  if(!sincronizado){
-    alert(`⚠️ Se crearon ${items.length} cuenta(s), pero aún están solo en este dispositivo. YORI-TEX reintentará guardarlas automáticamente cuando vuelva la conexión.`);
-    return;
-  }
-  alert(`✅ Se crearon y sincronizaron ${items.length} cuenta(s). Costo por cuenta: $${costoCuenta.toFixed(2)}`);
+
+return true;
+});
 }
 async function ncGuardar(){
-  if(document.getElementById('nc-modo')?.value === 'masivo' && !document.getElementById('nc-edit-uid').value){
-    return ncGuardarMasivo();
-  }
+  if(document.getElementById('nc-modo')?.value==='masivo' && !document.getElementById('nc-edit-uid').value)return ncGuardarMasivo();
+  return operacionConfirmada('modal-nueva-cuenta',async()=>{
   const srvUid = document.getElementById('nc-srv').value;
   if(!srvUid){ alert('Selecciona el servicio'); return; }
   const correo = document.getElementById('nc-correo').value.trim();
   if(!correo){ alert('Ingresa el correo'); return; }
-  const numCupos = parseInt(document.getElementById('nc-cupos').value) || 1;
+  const numCupos = Number(document.getElementById('nc-cupos').value);
+  if(!Number.isInteger(numCupos) || numCupos<1 || numCupos>100) throw new Error('Indica de 1 a 100 cupos, sin decimales.');
   const srv = getSrv(srvUid);
   const idVal = document.getElementById('nc-id').value.trim() || `${(srv?.nombre||'SRV').toUpperCase().slice(0,3)}-0${APP.cuentas.length+1}`;
   const editUID = document.getElementById('nc-edit-uid').value;
-  const costoTotal = parseFloat(document.getElementById('nc-costo').value)||0;
+  const costoTotal = importeFormulario('nc-costo',0);
   const metodoPago = document.getElementById('nc-metodo-pago').value;
   const adelantoUID = document.getElementById('nc-adelanto')?.value || '';
   const ncDesde = document.getElementById('nc-desde').value;
   const ncHasta = document.getElementById('nc-hasta').value;
-  const pventa = parseFloat(document.getElementById('nc-pventa').value)||0;
+  if(ncDesde && ncHasta && ncHasta<ncDesde) throw new Error('El vencimiento no puede ser anterior al inicio.');
+  const pventa = importeFormulario('nc-pventa',0);
   const renovable = (document.getElementById('nc-renovable')?.value || 'si') !== 'no';
   const modelo = modeloAccesoServicio(srv);
   const direccion = document.getElementById('nc-direccion').value.trim();
@@ -7599,6 +7590,8 @@ async function ncGuardar(){
     const i = APP.cuentas.findIndex(c => c.uid === editUID);
     if(i > -1){
       const old = APP.cuentas[i].cupos;
+      if(numCupos<old.length && old.slice(numCupos).some(cu=>cu.estado==='ocupado')) throw new Error('Libera o repón los cupos ocupados antes de reducir la cantidad.');
+      if(APP.cuentas[i].srvUid!==srvUid && old.some(cu=>cu.estado==='ocupado')) throw new Error('No cambies el producto de una cuenta ocupada. Usa Reposición.');
       // Al EDITAR: solo actualizar datos de la cuenta, NUNCA re-registrar costo.
       // El costo ya fue registrado cuando se creó. Si cambió, el usuario debe
       // usar la sección de Costos directamente para ajustarlo.
@@ -7632,21 +7625,17 @@ async function ncGuardar(){
       if(!okCosto){ APP.cuentas = APP.cuentas.filter(c=>c.uid!==nuevaCuentaUID); return; }
     }
   }
-  document.getElementById('nc-edit-uid').value = '';
-  document.getElementById('nc-titulo').innerHTML = '📦 Nueva cuenta <button class="modal-close" onclick="cerrarModal(\'modal-nueva-cuenta\')">×</button>';
-  document.getElementById('nc-renovar-bloque').style.display = 'none';
-  cerrarModal('modal-nueva-cuenta');
-  renderInventario();
-  renderCostos();
-  actualizarSaldoBinance();
-  renderBinance();
-  // FIX: refrescar dashboard si está visible
-  const _dashEl = document.getElementById('s-dashboard');
-  if(_dashEl && _dashEl.classList.contains('active')) renderDashboard();
-  const sincronizado = await sincronizarConSheets(true);
-  if(!sincronizado){
-    alert('⚠️ La cuenta quedó guardada solo en este dispositivo. YORI-TEX reintentará sincronizarla automáticamente cuando vuelva la conexión.');
-  }
+
+if(editUID){
+ const c=APP.cuentas.find(c=>c.uid===editUID);
+ for(const v of APP.ventas.filter(ventaOcupa)){
+   const asigs=asignacionesCrudasVenta(v);
+   v.cuposAsignados=asigs.map(a=>a.cuentaUID===editUID?{...a,correo:c.correo,cuentaId:c.id,perfil:c.cupos[a.cupoIdx]?.perfil||'',pin:c.cupos[a.cupoIdx]?.pin||''}:a);
+   if(v.cuentaUID===editUID){const cu=c.cupos[v.cupoIdx];v.correo=c.correo;if(cu){v.perfil=cu.perfil||'';v.pin=cu.pin||'';v.invCorreo=cu.invCorreo||'';}}
+ }
+}
+return true;
+});
 }
 
 // ══════════════════════════════════════
@@ -7655,8 +7644,9 @@ async function ncGuardar(){
 let _venBusq = '';
 let _venGruposAbiertos = new Set();
 let _venGruposInicializados = false;
-function venBuscar(v){ _venBusq = v; _venGruposInicializados = false; actualizarSearchClear(document.getElementById('ven-search') || document.querySelector('#s-vencimientos .search-wrap input')); renderVencimientos(); }
+function venBuscar(v){ _venSeleccionados.clear(); _venBusq = v; _venGruposInicializados = false; actualizarSearchClear(document.getElementById('ven-search') || document.querySelector('#s-vencimientos .search-wrap input')); renderVencimientos(); }
 function venFiltrar(f, btn){
+  _venSeleccionados.clear();
   APP._filtroVen = f;
   _venGruposInicializados = false;
   document.querySelectorAll('#ven-filtros .filter-btn').forEach(b => b.classList.remove('active'));
@@ -7723,6 +7713,7 @@ function ventaFueSustituida(v){
   return false;
 }
 function esInactivoReutilizable(v){
+  if(ventaReserva(v)) return true;
   if(!v || v.activa !== false || v.eliminadoRegistro || v.purgaOperativa) return false;
   if(ventaFueSustituida(v) || /renovad|reposici[oó]n|reembolso|cuenta ca[ií]da|eliminad/i.test(String(v.motivoSalida || ''))) return false;
   const fecha = fechaInactivacionVenta(v);
@@ -7733,6 +7724,7 @@ function esInactivoReutilizable(v){
 function depurarInactivosAntiguos(){
   let cambios = false;
   (APP.ventas || []).forEach(v => {
+    if(ventaReserva(v)) return;
     if(v.activa !== false || v.eliminadoRegistro || v.purgaOperativa) return;
     const fecha = fechaInactivacionVenta(v);
     const antiguedad = fecha ? -diasHasta(fecha) : DIAS_RETENCION_INACTIVOS + 1;
@@ -7828,64 +7820,7 @@ function venBulkRenovar(){
   abrirModal('modal-bulk-renovar');
 }
 
-function venBulkRenovarConfirmar(){
-  const metodo = document.getElementById('bulk-ren-metodo').value;
-  let renovados = 0;
-  // Snapshot del set porque lo vamos a modificar
-  const uids = Array.from(_venSeleccionados);
-  uids.forEach(ventaUid => {
-    const v = APP.ventas.find(x => x.uid === ventaUid);
-    if(!v) return;
-    const dias = v.dias || 30;
-    // Nueva vence: si ya venció → desde hoy; si aún vigente → extender desde vence actual
-    const baseDate = (v.vence && v.vence > hoy()) ? v.vence : hoy();
-    const nuevaVence = sumarDias(baseDate, dias);
-    const nuevaVenta = {
-      ...v,
-      uid: uid(),
-      id:  numVenta(),
-      fecha: hoy(),
-      vence: nuevaVence,
-      dias,
-      metodo,
-      estado: 'pagado',
-      activa: true,
-      tipoRegistro: 'renovacion',
-      ventaOrigenUID: v.uid,
-      creado: new Date().toISOString()
-    };
-    // Marcar la venta anterior como inactiva
-    v.activa = false;
-    v.motivoSalida = 'Renovado';
-    conservarHistorialCuentaVenta(v);
-    v.fechaInactivacion = new Date().toISOString();
-    APP.ventas.push(nuevaVenta);
-    APP._ventaCounter++;
-    const asignaciones = asignacionesCuposVenta(v);
-    const precioPorCupo = asignaciones.length ? (parseFloat(nuevaVenta.precio)||0)/asignaciones.length : (parseFloat(nuevaVenta.precio)||0);
-    nuevaVenta.cuposAsignados = asignaciones.map(a => {
-      const cuenta = APP.cuentas.find(c => c.uid === a.cuentaUID);
-      const idx = parseInt(a.cupoIdx);
-      const cupo = cuenta?.cupos?.[idx] || {};
-      if(cuenta?.cupos?.[idx]) cuenta.cupos[idx] = {...cupo,estado:'ocupado',cliente:nuevaVenta.cliente,wa:nuevaVenta.wa,vence:nuevaVence,ventaUid:nuevaVenta.uid,pendienteCobro:false,periodoDesde:nuevaVenta.fecha,periodoHasta:nuevaVence,montoVenta:precioPorCupo};
-      return {...a,cuentaId:cuenta?.id||'',correo:cuenta?.correo||'',perfil:cupo.perfil||'',pin:cupo.pin||'',precio:precioPorCupo,estado:'pagado',fecha:nuevaVenta.fecha,vence:nuevaVence};
-    });
-    if(nuevaVenta.cuposAsignados.length){
-      nuevaVenta.cuentaUID = nuevaVenta.cuposAsignados[0].cuentaUID;
-      nuevaVenta.cupoIdx = nuevaVenta.cuposAsignados[0].cupoIdx;
-      nuevaVenta.cupoIdxs = nuevaVenta.cuposAsignados.filter(a=>a.cuentaUID===nuevaVenta.cuentaUID).map(a=>a.cupoIdx);
-    }
-    renovados++;
-  });
-  cerrarModal('modal-bulk-renovar');
-  venToggleSelMode(); // salir del modo selección y limpiar
-  renderVencimientos();
-  renderRegistro();
-  renderInventario();
-  alert('✅ ' + renovados + ' cliente' + (renovados!==1?'s':'') + ' renovado' + (renovados!==1?'s':'') + ' correctamente');
-  // Usar sincronizarConSheets (no silenciosa) para garantizar que todo persiste
-  sincronizarConSheets();
-}
+
 
 function venBulkEliminar(){
   if(_venSeleccionados.size === 0){ alert('Selecciona al menos un cliente'); return; }
@@ -7897,45 +7832,7 @@ function venBulkEliminar(){
   abrirModal('modal-bulk-eliminar');
 }
 
-function venBulkEliminarConfirmar(){
-  const eliminarIngreso = document.querySelector('input[name="bulk-eli-ingreso"]:checked')?.value === 'eliminar';
-  if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
-  let procesados = 0;
-  const uids = Array.from(_venSeleccionados);
-  uids.forEach(ventaUid => {
-    const v = APP.ventas.find(x => x.uid === ventaUid);
-    if(!v) return;
-    // Una venta puede ocupar varios accesos, incluso en cuentas distintas.
-    liberarCuposDeVenta(v);
-    // Agregar a lista negra para que no reaparezca (crítico para históricas)
-    if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
-    if(eliminarIngreso){
-      // Eliminar completamente del array
-      const idx = APP.ventas.findIndex(x => x.uid === ventaUid);
-      if(idx !== -1) APP.ventas.splice(idx, 1);
-    } else {
-      // Mantener en historial financiero pero ocultar de vistas operativas
-      v.activa          = false;
-      v.eliminadoRegistro = true;
-      v.motivoSalida    = 'Eliminado masivo (ingreso conservado)';
-      v.cuentaUID       = null;
-      v.cupoIdx         = null;
-      v.cupoIdxs        = [];
-      v.cuposAsignados  = [];
-      v.fechaInactivacion = new Date().toISOString();
-    }
-    procesados++;
-  });
-  cerrarModal('modal-bulk-eliminar');
-  venToggleSelMode(); // salir del modo selección y limpiar
-  renderVencimientos();
-  renderInventario();
-  renderBadgeVencimientos();
-  if(typeof renderDashboard === 'function') renderDashboard();
-  alert('🗑️ ' + procesados + ' cliente' + (procesados!==1?'s':'') + ' eliminado' + (procesados!==1?'s':''));
-  // Siempre sincronizarConSheets (garantiza que ventasEliminadas se guarda)
-  sincronizarConSheets();
-}
+
 
 function seccionVencimiento(venta, dias){
   if(venta.activa === false) return {orden:90, clave:'inactivos', titulo:'Servicios inactivos'};
@@ -7989,8 +7886,7 @@ function mensajeVencimientoGrupo(grupo){
   if(d < -2) return `Hola ${nombre}! 👋\n\n${sujeto} de *${servicio}* ${vencioTexto} hace ${Math.abs(d)} días y el período de gracia ya expiró.${detalle}${totalTexto}\n\n¿Deseas renovar${cupos===1?'lo':'los'}?\n\n${APP.config.firma||''}`;
   if(d < 0) return `Hola ${nombre}! 👋\n\n${sujeto} de *${servicio}* ${vencioTexto} hace ${Math.abs(d)} día${Math.abs(d)===1?'':'s'}.${detalle}${totalTexto}\n\n¿Los renovamos? 🔄\n\n${APP.config.firma||''}`;
   if(d === 0) return `Hola ${nombre}! 👋\n\n${sujeto} de *${servicio}* ${venceTexto} *hoy*.${detalle}${totalTexto}\n\n¿Los renovamos? 🔄\n\n${APP.config.firma||''}`;
-  if(d <= 7) return `Hola ${nombre}! 👋\n\nTe recuerdo que ${sujeto.toLowerCase()} de *${servicio}* ${venceTexto} en *${d} días* (${fmtFecha(v.vence)}).${detalle}${totalTexto}\n\n¿Los renovamos? 🔄\n\n${APP.config.firma||''}`;
-  return '';
+  return `Hola ${nombre}! 👋\n\nTe recuerdo que ${sujeto.toLowerCase()} de *${servicio}* ${venceTexto} en *${d} días* (${fmtFecha(v.vence)}).${detalle}${totalTexto}\n\n¿Los renovamos? 🔄\n\n${APP.config.firma||''}`;
 }
 function venToggleCuposGrupo(clave){
   if(!window._venCuposAbiertos) window._venCuposAbiertos = new Set();
@@ -8183,7 +8079,8 @@ function renderVencimientos(){
     const btns = isInactivo ?
       `<div class="btns-2" style="margin-top:8px">
         <button class="btn btn-green" style="font-size:12px;padding:8px" onclick="abrirRenovar('${esc(v.uid)}')">✅ Renovar</button>
-        ${wa ? `<a href="https://wa.me/${encodeURIComponent(wa)}" target="_blank" rel="noopener noreferrer"><button class="btn btn-wa" style="font-size:12px;padding:8px;width:100%">📱 WA</button></a>` : '<div></div>'}
+        <button class="btn btn-red" onclick="abrirNoRenovo('${esc(v.uid)}')">Liberar / retirar</button>
+        ${wa ? `<button class="btn btn-wa" onclick="enviarWA('${esc(wa)}',venMsgWA['${esc(v.uid)}']||'Hola, ¿deseas renovar tu servicio?')">📱 WA</button>` : ''}
       </div>` :
       `<div class="btns-3">
         <button class="btn btn-green" style="font-size:12px;padding:8px" onclick="abrirRenovar('${esc(v.uid)}')">✅ Renovó</button>
@@ -8202,7 +8099,7 @@ function renderVencimientos(){
           ${chkHtml}
           <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--white)">${esc(v.cliente)}</div><div style="font-size:12px;color:var(--text2);margin-top:2px">${esc(v.srvNom)} · ${esc(v.id)}${cuposDeVenta(v)>1 ? ' · ' + cuposDeVenta(v) + ' cupos' : ''}</div></div>
         </div>
-        ${!_venSelMode ? (isInactivo ? `<span class="badge badge-inactivo">Disponible ${Math.max(0, DIAS_RETENCION_INACTIVOS + diasHasta(fechaInactivacionVenta(v)))}d</span>` : badgeVen(v.vence)) : ''}
+        ${!_venSelMode ? (isInactivo ? `<span class="badge badge-inactivo">${ventaReserva(v)?'Cupo reservado':'Historial disponible '+Math.max(0, DIAS_RETENCION_INACTIVOS + diasHasta(fechaInactivacionVenta(v)))+'d'}</span>` : badgeVen(v.vence)) : ''}
       </div>
       <div style="font-size:12px;color:var(--text3)">Vence: ${fmtFecha(v.vence)} · $${v.precio.toFixed(2)} · ${esc(v.metodo)}</div>
       ${resumenInventarioVencimiento(v)}
@@ -8313,6 +8210,8 @@ function renSelCupo(){
   if(!c || !c.cupos[cupoIdx]) return;
   const cu = c.cupos[cupoIdx];
   document.getElementById('ren-correo').value = c.correo || '';
+  document.getElementById('ren-perfil').value = cu.perfil || '';
+  document.getElementById('ren-pin').value = cu.pin || '';
 }
 function renBasePlazoFecha(){
   const v = APP.ventas.find(x => x.uid === document.getElementById('ren-venta-uid')?.value) || {};
@@ -8437,6 +8336,8 @@ async function abrirRenovar(ventaUid){
 }
 
 function renSelCuenta(){
+  document.getElementById('ren-perfil').value='';
+  document.getElementById('ren-pin').value='';
   const selVal = document.getElementById('ren-cuenta-inv').value;
   const infoEl = document.getElementById('ren-cuenta-info');
   const costoEl = document.getElementById('ren-costo-cuenta');
@@ -8482,9 +8383,12 @@ function renVentaFormulario(){
   const base = APP.ventas.find(x => x.uid === document.getElementById('ren-venta-uid').value) || {};
   const srvUid = document.getElementById('ren-srv').value || base.srvUid || '';
   const srv = getSrv(srvUid);
-  const cuentaUID = document.getElementById('ren-cuenta-inv')?.value || base.cuentaUID || null;
+  const esManual=document.querySelector('input[name="ren-origen"]:checked')?.value==='manual';
+  const cuentaUID = esManual ? null : (document.getElementById('ren-cuenta-inv')?.value || base.cuentaUID || null);
   const cupoVal = document.getElementById('ren-cupo-inv')?.value;
-  const correo = document.getElementById('ren-correo').value || base.correo || '';
+  const cuenta=APP.cuentas.find(c=>c.uid===cuentaUID);
+  const cupo=cuenta?.cupos?.[cupoVal!==''?parseInt(cupoVal):base.cupoIdx];
+  const correo = esManual ? document.getElementById('ren-correo-manual').value : (cuenta?.correo || document.getElementById('ren-correo').value || '');
   return {
     ...base,
     srvUid,
@@ -8492,11 +8396,18 @@ function renVentaFormulario(){
     cuentaUID,
     cupoIdx:cupoVal !== '' && cupoVal !== undefined ? parseInt(cupoVal) : base.cupoIdx,
     correo,
+    cuposAsignados:cuenta?(asignacionesCuposVenta(base).length?asignacionesCuposVenta(base):[{cuentaUID:cuenta.uid,cupoIdx:parseInt(cupoVal)}]).map(a=>{
+      const principal=(a.cuentaUID===base.cuentaUID && a.cupoIdx===parseInt(base.cupoIdx)) || !base.cuentaUID;
+      const destino=principal?{cuentaUID:cuenta.uid,cupoIdx:parseInt(cupoVal)}:a;
+      const c=APP.cuentas.find(c=>c.uid===destino.cuentaUID),cp=c?.cupos?.[destino.cupoIdx];
+      return {...destino,correo:c?.correo||'',perfil:(principal?document.getElementById('ren-perfil').value:'')||cp?.perfil||'',pin:(principal?document.getElementById('ren-pin').value:'')||cp?.pin||''};
+    }):[],
+    invCorreo:cupo?.invCorreo||base.invCorreo||'',
     wa:document.getElementById('ren-wa').value || base.wa,
-    perfil:document.getElementById('ren-perfil').value || base.perfil,
-    pin:document.getElementById('ren-pin').value || base.pin,
+    perfil:document.getElementById('ren-perfil').value || cupo?.perfil || (esManual?base.perfil:'') || '',
+    pin:document.getElementById('ren-pin').value || cupo?.pin || (esManual?base.pin:'') || '',
     vence:document.getElementById('ren-vence').value || base.vence,
-    precio:parseFloat(document.getElementById('ren-precio').value) || base.precio,
+    precio:importeFormulario('ren-precio',base.precio),
     estado:document.getElementById('ren-estado').value || base.estado
   };
 }
@@ -8517,10 +8428,12 @@ function renPrevisualizarWA(){
   llenarSelectPlantillas('ren-plantilla','renovacion',v.srvUid);
   document.getElementById('ren-wa-texto').value = resolverMensajeSeleccionado('renovacion',v.srvUid,'ren-plantilla',ctxMensajeVenta(v));
   document.getElementById('ren-wa-preview-wrap').style.display = 'block';
+  document.getElementById('ren-wa-preview-wrap').dataset.firma=JSON.stringify(v);
 }
 function renActualizarMensajePlantilla(){
   const v = renVentaFormulario();
   document.getElementById('ren-wa-texto').value = resolverMensajeSeleccionado('renovacion',v.srvUid,'ren-plantilla',ctxMensajeVenta(v));
+  document.getElementById('ren-wa-preview-wrap').dataset.firma=JSON.stringify(v);
 }
 function abrirMensajeEntregaVenta(ventaUid){
   const venta = APP.ventas.find(v => v.uid === ventaUid);
@@ -8677,203 +8590,51 @@ function segRender(){
 }
 
 async function renGuardar(){
-  if(_renGuardando) return;
-  if(!renVenceManual()){ alert('Corrige la nueva fecha de vencimiento antes de renovar.'); return; }
-  const ventaUid = document.getElementById('ren-venta-uid').value;
-  const v = APP.ventas.find(x => x.uid === ventaUid);
-  if(!v) return;
-  const cuentaAnteriorUID = v.cuentaUID || null;
-  const cupoAnteriorIdx = v.cupoIdx;
-  const nuevoWA = sanitizarTexto(document.getElementById('ren-wa').value, 20);
-  const origen = document.querySelector('input[name="ren-origen"]:checked')?.value || 'inventario';
-  const mensajeRenPreparado = document.getElementById('ren-wa-preview-wrap')?.style.display !== 'none' ? document.getElementById('ren-wa-texto')?.value : '';
-  const cuentaInvUID = origen === 'inventario' ? document.getElementById('ren-cuenta-inv').value : '';
-  const cupoInvIdx = origen === 'inventario' && document.getElementById('ren-cupo-inv') ? document.getElementById('ren-cupo-inv').value : '';
-  let cupoRenovacionIdx = null;
-  if(cuentaInvUID){
-    const cuentaElegida = APP.cuentas.find(c => c.uid === cuentaInvUID);
-    const venceCliente = document.getElementById('ren-vence').value;
-    const faltanCuenta = cuentaElegida?.hasta ? diasEntre(cuentaElegida.hasta, venceCliente) : null;
-    if(faltanCuenta !== null && faltanCuenta > 0){
-      const continuar = confirm(`⚠️ La cuenta ${cuentaElegida.id || cuentaElegida.correo || ''} está registrada hasta ${fmtFecha(cuentaElegida.hasta)}, pero el cliente quedará hasta ${fmtFecha(venceCliente)}.\n\nFaltan ${faltanCuenta} día${faltanCuenta!==1?'s':''} de cobertura.\n\n¿Confirmas que renovarás la cuenta madre a tiempo y deseas continuar?`);
-      if(!continuar) return;
-    } else if(cuentaElegida && !cuentaElegida.hasta){
-      if(!confirm('⚠️ Esta cuenta no tiene una fecha final registrada. ¿Confirmas que revisarás o renovarás la cuenta madre y deseas continuar?')) return;
-    }
-    cupoRenovacionIdx = resolverCupoRenovacion(cuentaInvUID,cupoInvIdx,cuentaAnteriorUID,cupoAnteriorIdx);
-    if(cupoRenovacionIdx === null || isNaN(cupoRenovacionIdx)){
-      alert('Selecciona el cupo exacto de la cuenta nueva. La renovación no reutilizará automáticamente el número del cupo anterior.');
-      return;
-    }
-    const seleccionRenovacion = [{cuentaUID:cuentaInvUID,cupoIdx:cupoRenovacionIdx}];
-    const conflictos = validarCuposDisponiblesLocalmente(seleccionRenovacion, v.uid);
-    if(conflictos.length){
-      alert('No se puede renovar en ese cupo porque otro cliente ya lo ocupa:\n\n• ' + conflictos.join('\n• ') + '\n\nActualiza el inventario y elige otro.');
-      return;
-    }
-    renSetGuardando(true);
-    const disponibilidadNube = await validarCuposDisponiblesEnNube(seleccionRenovacion, v.uid);
-    if(!disponibilidadNube.ok){
-      renSetGuardando(false);
-      const detalle = disponibilidadNube.conflictos.length
-        ? disponibilidadNube.conflictos.join('\n• ')
-        : disponibilidadNube.error;
-      alert('No se inició la renovación porque el inventario cambió en la nube.\n\n• ' + detalle + '\n\nCierra y vuelve a abrir Renovar para cargar los cupos actuales.');
-      return;
-    }
-  } else {
-    renSetGuardando(true);
+  if(!renVenceManual()){alert('Corrige el vencimiento.');return;}
+  let mensajePreparado='';
+  const preview=document.getElementById('ren-wa-preview-wrap');
+  if(preview?.style.display!=='none'){
+    try{
+      if(preview.dataset.firma===JSON.stringify(renVentaFormulario())) mensajePreparado=document.getElementById('ren-wa-texto').value;
+      else if(!confirm('Cambiaste datos después de preparar el mensaje. Se generará uno actualizado al guardar. ¿Continuar?'))return;
+    }catch(e){alert(e.message);return;}
   }
-  const snapshot = snapshotOperacionCritica();
-
-  // Leer correo según origen
-  const nuevoCorreo = origen === 'manual'
-    ? sanitizarTexto(document.getElementById('ren-correo-manual').value || document.getElementById('ren-correo').value, 200)
-    : sanitizarTexto(document.getElementById('ren-correo').value, 200);
-
-  // Leer servicio/plan si se seleccionaron
-  const catUid = document.getElementById('ren-cat').value;
-  const srvUid = document.getElementById('ren-srv').value;
-  const planSel = document.getElementById('ren-plan');
-  const planVal = planSel.options[planSel.selectedIndex]?.textContent || '';
-
-  const nuevaVenta = {
-    ...v, uid:uid(), id:numVenta(), fecha:hoy(),
-    vence: document.getElementById('ren-vence').value || sumarDias(v.vence || hoy(), v.dias || 30),
-    dias: Math.max(1, diasEntre(renBasePlazoFecha(), document.getElementById('ren-vence').value) || v.dias || 30),
-    plazoCantidad: Math.max(1, parseInt(document.getElementById('ren-plazo-cantidad').value) || 1),
-    plazoUnidad: document.getElementById('ren-plazo-unidad').value || 'meses',
-    plazoBase: document.getElementById('ren-base-plazo').value || 'vencimiento',
-    precio: parseFloat(document.getElementById('ren-precio').value) || v.precio,
-    metodo: document.getElementById('ren-metodo').value,
-    wa: nuevoWA || v.wa,
-    correo: nuevoCorreo || v.correo,
-    estado: document.getElementById('ren-estado').value || 'pagado', activa: true,
-    tipoRegistro:'renovacion', ventaOrigenUID:v.uid, creado: new Date().toISOString()
-  };
-
-  // Actualizar categoría/servicio/plan si se modificaron
-  if(catUid) nuevaVenta.catUid = catUid;
-  if(srvUid){ nuevaVenta.srvUid = srvUid; const srv = getSrv(srvUid); nuevaVenta.srvNom = srv ? srv.nombre : v.srvNom; }
-  if(planVal && planVal !== '— Elige plan —' && planVal !== '— Elige servicio —') nuevaVenta.plan = planVal;
-
-  if(document.getElementById('ren-perfil').value) nuevaVenta.perfil = document.getElementById('ren-perfil').value;
-  if(document.getElementById('ren-pin').value) nuevaVenta.pin = document.getElementById('ren-pin').value;
-
-  // Conservar el historial original; solo se actualizan datos de contacto compartidos.
-  v.wa = nuevoWA || v.wa;
-    // El correo de la venta anterior pertenece al período anterior.
-
-  // Manejar cuenta de inventario
-  if(origen === 'inventario' && cuentaInvUID){
-    nuevaVenta.cuentaUID = cuentaInvUID;
-    nuevaVenta.cupoIdx = cupoRenovacionIdx;
-    if(cuentaAnteriorUID && (cuentaAnteriorUID !== cuentaInvUID || String(cupoAnteriorIdx) !== String(nuevaVenta.cupoIdx))){
-      liberarCupoAnterior(cuentaAnteriorUID, cupoAnteriorIdx, v.uid);
+  const v=APP.ventas.find(v=>v.uid===document.getElementById('ren-venta-uid').value);if(!v)return;
+  const nueva=await operacionConfirmada('modal-renovar',async()=>{
+    const leer=id=>document.getElementById('ren-'+id)?.value||'';
+    const inventario=document.querySelector('input[name="ren-origen"]:checked')?.value!=='manual';
+    const cuentaUID=leer('cuenta-inv');
+    const idx=resolverCupoRenovacion(cuentaUID,leer('cupo-inv'),v.cuentaUID,v.cupoIdx);
+    let destinos=[];
+    if(inventario){
+      if(!cuentaUID || idx===null)throw new Error('Selecciona explícitamente la cuenta y el cupo.');
+      destinos=asignacionesCuposVenta(v);
+      if(!destinos.length)destinos=[{cuentaUID,cupoIdx:idx}];
+      else destinos=destinos.map(a=>a.cuentaUID===v.cuentaUID && a.cupoIdx===parseInt(v.cupoIdx)?{cuentaUID,cupoIdx:idx}:a);
+      if(!destinos.some(a=>a.cuentaUID===cuentaUID&&a.cupoIdx===idx))throw new Error('Revisa las asignaciones de esta venta antes de renovar.');
+      venValidarAsignaciones(v,destinos);
+      if(!venConfirmarCobertura(destinos,leer('vence')))return false;
+      const nube=await validarCuposDisponiblesEnNube(destinos,v.uid);if(!nube.ok)throw new Error(nube.error||nube.conflictos.join('\n'));
     }
-    const cuenta = APP.cuentas.find(c => c.uid === cuentaInvUID);
-    if(cuenta){
-      if(nuevoCorreo) nuevaVenta.correo = cuenta.correo || nuevoCorreo;
-      else nuevaVenta.correo = cuenta.correo || v.correo;
-      // Marcar el cupo como ocupado
-      if(nuevaVenta.cupoIdx !== null && nuevaVenta.cupoIdx !== undefined){
-        cuenta.cupos[nuevaVenta.cupoIdx] = {
-          estado: 'ocupado', cliente: v.cliente, wa: nuevoWA || v.wa,
-          perfil: nuevaVenta.perfil || v.perfil || '', pin: nuevaVenta.pin || v.pin || '',
-          vence: nuevaVenta.vence,
-          pendienteCobro: nuevaVenta.estado !== 'pagado',
-          periodoDesde: nuevaVenta.fecha || hoy(),
-          periodoHasta: nuevaVenta.vence || '',
-          ventaUid: nuevaVenta.uid
-        };
-      }
-    }
-  } else if(origen === 'inventario' && cuentaInvUID === '' && v.cuentaUID){
-    // Si había cuenta pero no se seleccionó ninguna en renovar, mantener la misma
-    nuevaVenta.cuentaUID = v.cuentaUID;
-    nuevaVenta.cupoIdx = v.cupoIdx;
-    const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
-    if(cuenta){
-      if(v.cupoIdx !== null && cuenta.cupos[v.cupoIdx]){
-        cuenta.cupos[v.cupoIdx].vence = nuevaVenta.vence;
-        if(nuevoWA) cuenta.cupos[v.cupoIdx].wa = nuevoWA;
-        if(nuevaVenta.perfil) cuenta.cupos[v.cupoIdx].perfil = nuevaVenta.perfil;
-        if(nuevaVenta.pin) cuenta.cupos[v.cupoIdx].pin = nuevaVenta.pin;
-        cuenta.cupos[v.cupoIdx].pendienteCobro = nuevaVenta.estado !== 'pagado';
-        cuenta.cupos[v.cupoIdx].periodoDesde = nuevaVenta.fecha || hoy();
-        cuenta.cupos[v.cupoIdx].periodoHasta = nuevaVenta.vence || '';
-        cuenta.cupos[v.cupoIdx].ventaUid = nuevaVenta.uid;
-      }
-    }
-  } else if(origen === 'manual' && cuentaAnteriorUID){
-    liberarCupoAnterior(cuentaAnteriorUID, cupoAnteriorIdx, v.uid);
-    nuevaVenta.cuentaUID = null;
-    nuevaVenta.cupoIdx = null;
-  }
-
-  // Normalizar todas las asignaciones de la renovación para que apunten a la venta nueva.
-  if(nuevaVenta.cuentaUID){
-    let asignacionesRen = asignacionesCuposVenta(nuevaVenta);
-    if(cuentaInvUID && (cuentaAnteriorUID !== nuevaVenta.cuentaUID || String(cupoAnteriorIdx) !== String(nuevaVenta.cupoIdx))){
-      asignacionesRen = asignacionesRen.map(a => (a.cuentaUID === cuentaAnteriorUID && parseInt(a.cupoIdx) === parseInt(cupoAnteriorIdx))
-        ? {...a,cuentaUID:nuevaVenta.cuentaUID,cupoIdx:nuevaVenta.cupoIdx}
-        : a);
-    }
-    if(!asignacionesRen.length) asignacionesRen = [{cuentaUID:nuevaVenta.cuentaUID,cupoIdx:nuevaVenta.cupoIdx}];
-    const precioPorCupo = asignacionesRen.length ? (parseFloat(nuevaVenta.precio)||0)/asignacionesRen.length : (parseFloat(nuevaVenta.precio)||0);
-    nuevaVenta.cuposAsignados = asignacionesRen.map(a => {
-      const cuenta = APP.cuentas.find(c=>c.uid===a.cuentaUID);
-      const idx = parseInt(a.cupoIdx);
-      const cupo = cuenta?.cupos?.[idx] || {};
-      if(cuenta?.cupos?.[idx]) cuenta.cupos[idx] = {...cupo,estado:'ocupado',cliente:nuevaVenta.cliente,wa:nuevaVenta.wa,vence:nuevaVenta.vence,ventaUid:nuevaVenta.uid,pendienteCobro:nuevaVenta.estado!=='pagado',periodoDesde:nuevaVenta.fecha,periodoHasta:nuevaVenta.vence,montoVenta:precioPorCupo};
-      return {...a,cuentaUID:a.cuentaUID,cupoIdx:idx,correo:cuenta?.correo||'',cuentaId:cuenta?.id||'',perfil:cupo.perfil||a.perfil||nuevaVenta.perfil||'',pin:cupo.pin||a.pin||nuevaVenta.pin||'',precio:precioPorCupo,estado:nuevaVenta.estado,fecha:nuevaVenta.fecha,vence:nuevaVenta.vence};
-    });
-    nuevaVenta.cuentaUID = nuevaVenta.cuposAsignados[0]?.cuentaUID || nuevaVenta.cuentaUID;
-    nuevaVenta.cupoIdx = nuevaVenta.cuposAsignados[0]?.cupoIdx ?? nuevaVenta.cupoIdx;
-    nuevaVenta.cupoIdxs = nuevaVenta.cuposAsignados.filter(a=>a.cuentaUID===nuevaVenta.cuentaUID).map(a=>a.cupoIdx);
-  } else {
-    nuevaVenta.cuposAsignados = [];
-    nuevaVenta.cupoIdxs = [];
-  }
-
-  // Registrar costo si aplica
-  const costoAdq = parseFloat(document.getElementById('ren-costo-cuenta').value) || 0;
-  const metodoAdq = document.getElementById('ren-metodo-adq')?.value || 'Transferencia';
-  const usaInventario = !!nuevaVenta.cuentaUID;
-
-  if(costoAdq > 0 && !usaInventario){
-    const esUsdt = metodoAdq.toLowerCase().includes('usdt') || metodoAdq.toLowerCase().includes('binance');
-    if(esUsdt){
-      descontarUSDTBinance(costoAdq, `Venta manual — ${nuevaVenta.srvNom} (${v.cliente})`, nuevaVenta.cuentaUID || null, null, hoy());
-    } else {
-      APP.costos.push({ uid:uid(), tipo:'otro', fecha:hoy(), catUid:'cg-cuentas', desc:`Cuenta nueva/manual — ${nuevaVenta.srvNom} (${v.cliente})`, metodo:metodoAdq, montoUSD:costoAdq, usdtUsado:0, esCostoReal:true, notas:`Desde renovación ${nuevaVenta.id}` });
-    }
-  }
-  nuevaVenta.costoAsignadoUSD = usaInventario ? costoAdq : 0;
-
-  v.activa = false;
-  v.motivoSalida = 'Renovado';
-  v.fechaInactivacion = new Date().toISOString();
-  APP.ventas.push(nuevaVenta);
-  APP._ventaCounter++;
-  renderVencimientos();
-  renderRegistro();
-  renderInventario();
-  actualizarSaldoBinance();
-  renderBinance();
-  crearNotificacionLocal('renovacion', 'Servicio renovado', `${nuevaVenta.cliente} renovó ${nuevaVenta.srvNom || 'su servicio'} hasta ${fmtFecha(nuevaVenta.vence)}.`, `renovacion-${nuevaVenta.uid}`, {pantalla:'registro',ventaUid:nuevaVenta.uid});
-  const confirmado = await sincronizarConSheets(true);
-  if(!confirmado){
-    restaurarSnapshotOperacion(snapshot);
-    renSetGuardando(false);
-    alert('No se guardó la renovación y tus datos volvieron al estado anterior.\n\n' + (_ultimoErrorSync || 'La nube rechazó la operación o detectó un cupo ocupado.'));
-    return;
-  }
-  cerrarModal('modal-renovar');
-  renSetGuardando(false);
-  alert(`✅ Renovación ${nuevaVenta.id} guardada y confirmada`);
-  mostrarMensajePostVenta(nuevaVenta, 'renovacion');
-  if(mensajeRenPreparado) document.getElementById('post-wa-texto').value = mensajeRenPreparado;
+    const cambios={fecha:hoy(),vence:leer('vence'),precio:importeFormulario('ren-precio',v.precio),metodo:leer('metodo'),estado:leer('estado')||'pagado',
+      wa:leer('wa').trim()||v.wa,correo:inventario?v.correo:leer('correo-manual').trim(),
+      dias:Math.max(1,diasEntre(renBasePlazoFecha(),leer('vence'))||30),plazoCantidad:Number(leer('plazo-cantidad'))||1,plazoUnidad:leer('plazo-unidad')||'meses',plazoBase:leer('base-plazo')||'vencimiento'};
+    if(!inventario && !cambios.correo)throw new Error('Indica el correo de la cuenta manual.');
+    const srv=getSrv(leer('srv'));
+    if(srv){cambios.srvUid=leer('srv');cambios.srvNom=srv.nombre;cambios.catUid=srv.catUid;}
+    if(destinos.some(a=>{const c=APP.cuentas.find(c=>c.uid===a.cuentaUID);return c.srvUid!==(cambios.srvUid||v.srvUid);}))throw new Error('El producto seleccionado no corresponde a todas las cuentas de destino.');
+    const plan=document.getElementById('ren-plan');const texto=plan?.options[plan.selectedIndex]?.textContent||'';
+    if(texto && !texto.startsWith('—'))cambios.plan=texto;
+    // Vacío significa conservar el valor del destino, no copiar las credenciales antiguas.
+    if(leer('perfil'))cambios.perfil=leer('perfil');
+    if(leer('pin'))cambios.pin=leer('pin');
+    const nuevo=venCrearRenovacion(v,cambios,destinos);
+    const costo=importeFormulario('ren-costo-cuenta',0);
+    if(costo>0 && !inventario && !registrarCostoManualVenta(nuevo,costo,leer('metodo-adq')||'Transferencia'))throw new Error('No se pudo registrar el costo. Revisa el saldo.');
+    nuevo.costoAsignadoUSD=inventario?costo:0;
+    return nuevo;
+  },'Renovación guardada y confirmada');
+  if(nueva){mostrarMensajePostVenta(nueva,'renovacion');if(mensajePreparado)document.getElementById('post-wa-texto').value=mensajePreparado;}
 }
 
 // Todas las rutas usan la misma cola: evita que una renovación y otra edición se pisen.
@@ -8903,75 +8664,164 @@ function nrToggleAviso(){
     avisoEliminar.style.display = 'none';
   }
 }
-function nrGuardar(){
-  const ventaUid = document.getElementById('nr-venta-uid').value;
-  const v = APP.ventas.find(x => x.uid === ventaUid);
-  if(!v) return;
-  const accion = document.querySelector('input[name="nr-accion"]:checked').value;
-  const motivo = document.getElementById('nr-motivo').value;
-
-  if(accion === 'eliminar-todo'){
-    // Mostrar segundo modal para preguntar sobre el ingreso
-    const monto = parseFloat(v.precio || v.monto || 0).toFixed(2);
-    document.getElementById('nrce-info').innerHTML =
-      `<strong>${v.cliente}</strong> · ${v.srvNom} · ${v.id}<br>` +
-      `<span style="color:var(--red);font-size:12px">Ingreso registrado: <strong>$${monto}</strong></span>`;
-    // Resetear radio del segundo modal
-    const r = document.querySelector('input[name="nrce-ingreso"][value="mantener"]');
-    if(r) r.checked = true;
-    cerrarModal('modal-no-renovo');
-    abrirModal('modal-nr-confirmar-eliminar');
+let _operacionGuardando=false;
+function ventaReserva(v){
+  return !!v && v.activa===false && !v.eliminadoRegistro && (v.reservaInactiva===true || v.reservaInactiva==='true');
+}
+function ventaOcupa(v){
+  return !!v && !v.eliminadoRegistro && (v.activa!==false || ventaReserva(v));
+}
+function importeFormulario(id, anterior=0){
+  const texto=String(document.getElementById(id)?.value??'').trim();
+  const n=texto===''?Number(anterior):Number(texto);
+  if(!Number.isFinite(n)||n<0) throw new Error('El importe debe ser un número igual o mayor que cero.');
+  return n;
+}
+function refrescarOperaciones(){
+  renderInventario(); renderRegistro(); renderVencimientos(); renderBadgeVencimientos();
+  renderCostos(); actualizarSaldoBinance();
+  if(document.getElementById('s-dashboard')?.classList.contains('active')) renderDashboard();
+}
+async function operacionConfirmada(modal, preparar, mensaje='Cambio guardado y confirmado'){
+  if(_operacionGuardando || _ecGuardando || _renGuardando) return false;
+  if(!_pinVerificado){alert('Inicia sesión para confirmar el guardado en la nube.');return false;}
+  if(_syncDirty || _syncGuardando || _syncPendiente || _syncChecking){alert('Hay otra sincronización en curso. Espera a que termine; no se modificó nada.');return false;}
+  let snapshot=null, confirmado=false;
+  const controles=[...document.querySelectorAll('button,input,select,textarea')];
+  const disabled=controles.map(e=>e.disabled);
+  _operacionGuardando=true;
+  controles.forEach(e=>e.disabled=true);
+  try {
+    snapshot=snapshotOperacionCritica();
+    const resultado=await preparar();
+    if(!resultado){restaurarSnapshotOperacion(snapshot);return false;}
+    const ok=await sincronizarConSheets(true);
+    if(!ok) throw new Error(_ultimoErrorSync || 'La nube no confirmó el guardado.');
+    confirmado=true;
+    _operacionGuardando=false;
+    if(modal) cerrarModal(modal);
+    try{refrescarOperaciones();}catch(e){console.error(e);}
+    if(mensaje) alert('✅ '+mensaje);
+    return resultado;
+  }catch(e){
+    if(snapshot && !confirmado) restaurarSnapshotOperacion(snapshot);
+    alert('No se confirmó la operación. Tus cambios no se muestran como guardados; el formulario sigue disponible.\n\n'+(e?.message||e));
+    return false;
+  }finally{
+    _operacionGuardando=false;
+    controles.forEach((e,i)=>e.disabled=disabled[i]);
+  }
+}
+function venValidarAsignaciones(v, asignaciones){
+  const claves=new Set();
+  for(const a of asignaciones){
+    const c=APP.cuentas.find(c=>c.uid===a.cuentaUID), cu=c?.cupos?.[parseInt(a.cupoIdx)];
+    const key=a.cuentaUID+'|'+parseInt(a.cupoIdx);
+    if(claves.has(key)) throw new Error('Se seleccionó dos veces el mismo cupo.');
+    claves.add(key);
+    if(!c || c.archivada || c.eliminada || !cu) throw new Error('La cuenta o el cupo ya no está disponible.');
+    if(cu.estado!=='libre' && cu.ventaUid!==v.uid) throw new Error('El cupo ya está ocupado por '+(cu.cliente||'otro cliente')+'.');
+    const otro=APP.ventas.find(x=>x.uid!==v.uid && ventaOcupa(x) && asignacionesCuposVenta(x).some(b=>b.cuentaUID===a.cuentaUID && b.cupoIdx===parseInt(a.cupoIdx)));
+    if(otro) throw new Error('Otra venta tiene asignado este cupo: '+(otro.id||otro.cliente));
+  }
+}
+function venRetirar(v, accion, borrarIngreso=false){
+  conservarHistorialCuentaVenta(v);
+  if(accion==='solo-inactivar'){
+    const asignaciones=asignacionesCuposVenta(v);
+    venValidarAsignaciones(v,asignaciones);
+    if(!asignaciones.length) throw new Error('No hay un cupo vinculado que se pueda reservar. Usa Liberar cupo para conservar solo el historial.');
+    v.activa=false; v.reservaInactiva=true; v.fechaInactivacion=hoy(); v.motivoSalida='Inactivo con cupo reservado';
     return;
   }
-
-  v.activa = false;
-  v.motivoSalida = motivo || 'No renovó';
-  v.fechaInactivacion = new Date().toISOString();
-  if(accion === 'liberar' && v.cuentaUID){
-    liberarCuposDeVenta(v);
+  liberarCuposDeVenta(v);
+  v.reservaInactiva=false;v.activa=false;v.fechaInactivacion=hoy();
+  v.motivoSalida=accion==='eliminar'?'Eliminado de Vencimientos':'No renovó';
+  v.cuentaUID=null;v.cupoIdx=null;v.cupoIdxs=[];v.cuposAsignados=[];
+  if(accion==='eliminar'){
+    APP.ventasEliminadas=APP.ventasEliminadas||[];
+    if(!APP.ventasEliminadas.includes(v.uid)) APP.ventasEliminadas.push(v.uid);
+    if(borrarIngreso) APP.ventas=APP.ventas.filter(x=>x.uid!==v.uid);
+    else v.eliminadoRegistro=true;
   }
-
-  cerrarModal('modal-no-renovo');
-  renderVencimientos();
-  renderInventario();
-  renderBadgeVencimientos();
-  sincronizarConSheets();
+}
+function venCrearRenovacion(v, cambios, destinos){
+  venValidarAsignaciones(v,destinos);
+  conservarHistorialCuentaVenta(v);
+  // Capturar credenciales del destino antes de liberar los cupos anteriores.
+  const accesos=destinos.map(a=>({...a,cupo:{...APP.cuentas.find(c=>c.uid===a.cuentaUID).cupos[parseInt(a.cupoIdx)]}}));
+  const nueva={...v,...cambios,uid:uid(),id:numVenta(),activa:true,reservaInactiva:false,eliminadoRegistro:false,purgaOperativa:false,
+    fechaInactivacion:'',motivoSalida:'',tipoRegistro:'renovacion',ventaOrigenUID:v.uid,creado:new Date().toISOString(),historialCuentas:[],historialReposiciones:[]};
+  liberarCuposDeVenta(v);
+  v.activa=false;v.reservaInactiva=false;v.motivoSalida='Renovado';v.fechaInactivacion=hoy();
+  nueva.cuposAsignados=accesos.map((a,i)=>{
+    const cuenta=APP.cuentas.find(c=>c.uid===a.cuentaUID);
+    const cu={...a.cupo,estado:'ocupado',ventaUid:nueva.uid,cliente:nueva.cliente,wa:nueva.wa,vence:nueva.vence,
+      plan:nueva.plan,pendienteCobro:nueva.estado!=='pagado',periodoDesde:nueva.fecha,periodoHasta:nueva.vence,montoVenta:nueva.precio/accesos.length};
+    if(i===0){
+      if(cambios.perfil!==undefined) cu.perfil=cambios.perfil;
+      if(cambios.pin!==undefined) cu.pin=cambios.pin;
+    }
+    cuenta.cupos[parseInt(a.cupoIdx)]=cu;
+    return {cuentaUID:cuenta.uid,cupoIdx:parseInt(a.cupoIdx),cuentaId:cuenta.id,correo:cuenta.correo,perfil:cu.perfil||'',pin:cu.pin||'',precio:cu.montoVenta,estado:nueva.estado,fecha:nueva.fecha,vence:nueva.vence};
+  });
+  nueva.cuentaUID=nueva.cuposAsignados[0]?.cuentaUID||null;
+  nueva.cupoIdx=nueva.cuposAsignados[0]?.cupoIdx??null;
+  nueva.cupoIdxs=nueva.cuposAsignados.filter(a=>a.cuentaUID===nueva.cuentaUID).map(a=>a.cupoIdx);
+  if(accesos.length){
+    const c=APP.cuentas.find(c=>c.uid===nueva.cuentaUID), cu=c.cupos[nueva.cupoIdx];
+    nueva.correo=c.correo||'';nueva.perfil=cu.perfil||'';nueva.pin=cu.pin||'';nueva.invCorreo=cu.invCorreo||'';
+  }
+  APP.ventas.push(nueva); APP._ventaCounter++;
+  return nueva;
+}
+function venConfirmarCobertura(destinos, fecha){
+  const cuentas=[...new Set(destinos.map(a=>a.cuentaUID))].map(id=>APP.cuentas.find(c=>c.uid===id));
+  const cortas=cuentas.filter(c=>!c?.hasta || c.hasta<fecha);
+  return !cortas.length || confirm('Estas cuentas necesitan revisar o renovar su vigencia para cubrir al cliente: '+cortas.map(c=>c?.id||c?.correo||'Cuenta').join(', ')+'. ¿Continuar de todas formas?');
+}
+function nrGuardar(){
+  const v=APP.ventas.find(x=>x.uid===document.getElementById('nr-venta-uid').value);
+  if(!v)return;
+  const accion=document.querySelector('input[name="nr-accion"]:checked')?.value;
+  if(accion==='eliminar-todo'){
+    document.getElementById('nrce-info').textContent=(v.cliente||'Cliente')+' · Ingreso: $'+Number(v.precio||0).toFixed(2)+'. La cuenta madre y sus costos se conservan.';
+    document.querySelector('input[name="nrce-ingreso"][value="mantener"]').checked=true;
+    cerrarModal('modal-no-renovo');abrirModal('modal-nr-confirmar-eliminar');return;
+  }
+  return operacionConfirmada('modal-no-renovo',()=>{venRetirar(v,accion);v.motivoSalida=document.getElementById('nr-motivo').value||v.motivoSalida;return true;});
 }
 function nrEjecutarEliminar(){
-  const ventaUid = document.getElementById('nr-venta-uid').value;
-  const v = APP.ventas.find(x => x.uid === ventaUid);
-  if(!v){ cerrarModal('modal-nr-confirmar-eliminar'); return; }
-  const eliminarIngreso = document.querySelector('input[name="nrce-ingreso"]:checked')?.value === 'eliminar';
-
-  // Liberar cupo en la cuenta
-  if(v.cuentaUID) liberarCuposDeVenta(v);
-
-  if(eliminarIngreso){
-    // Agregar a lista negra para que no reaparezca al recargar
-    if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
-    if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
-    // Eliminar venta por completo
-    const idx = APP.ventas.findIndex(x => x.uid === ventaUid);
-    if(idx !== -1) APP.ventas.splice(idx, 1);
-  } else {
-    // Mantener venta en historial financiero pero marcar como eliminada del registro
-    v.activa = false;
-    v.eliminadoRegistro = true;  // se excluye de listas de clientes/vencimientos, no del dashboard
-    v.motivoSalida = 'Eliminado (ingreso conservado)';
-    v.cuentaUID = null;
-    v.cupoIdx = null;
-    // También agregar a lista negra para que la versión histórica no reaparezca
-    if(!APP.ventasEliminadas) APP.ventasEliminadas = [];
-    if(!APP.ventasEliminadas.includes(ventaUid)) APP.ventasEliminadas.push(ventaUid);
-  }
-
-  cerrarModal('modal-nr-confirmar-eliminar');
-  renderVencimientos();
-  renderInventario();
-  renderBadgeVencimientos();
-  renderDashboard && renderDashboard();
-  sincronizarConSheets();
+  const v=APP.ventas.find(x=>x.uid===document.getElementById('nr-venta-uid').value);if(!v)return;
+  const borrar=document.querySelector('input[name="nrce-ingreso"]:checked')?.value==='eliminar';
+  return operacionConfirmada('modal-nr-confirmar-eliminar',()=>{venRetirar(v,'eliminar',borrar);return true;});
 }
+async function venBulkRenovarConfirmar(){
+  const ids=[..._venSeleccionados];if(!ids.length)return;
+  if(!confirm('Se renovarán '+ids.length+' ventas seleccionadas, con sus importes y plazos actuales, y se marcarán pagadas. ¿Confirmas que todas fueron pagadas?'))return;
+  const ok=await operacionConfirmada('modal-bulk-renovar',async()=>{
+    const ventas=ids.map(id=>APP.ventas.find(v=>v.uid===id));
+    if(ventas.some(v=>!v))throw new Error('Una venta seleccionada ya no existe.');
+    for(const v of ventas){
+      const fecha=sumarDias(v.vence>hoy()?v.vence:hoy(),Number(v.dias)||30);
+      const destinos=asignacionesCuposVenta(v);
+      venValidarAsignaciones(v,destinos);
+      if(!venConfirmarCobertura(destinos,fecha))return false;
+      if(destinos.length){const nube=await validarCuposDisponiblesEnNube(destinos,v.uid);if(!nube.ok)throw new Error(nube.error||nube.conflictos.join('\n'));}
+      venCrearRenovacion(v,{fecha:hoy(),vence:fecha,precio:Number(v.precio)||0,metodo:document.getElementById('bulk-ren-metodo').value,estado:'pagado'},destinos);
+    }
+    return true;
+  });
+  if(ok){if(_venSelMode)venToggleSelMode();else _venSeleccionados.clear();refrescarOperaciones();}
+}
+async function venBulkEliminarConfirmar(){
+  const ids=[..._venSeleccionados];if(!ids.length)return;
+  const borrar=document.querySelector('input[name="bulk-eli-ingreso"]:checked')?.value==='eliminar';
+  if(!confirm('¿Eliminar '+ids.length+' ventas seleccionadas? '+(borrar?'Se quitarán sus ingresos.':'Se conservarán sus ingresos.')+' Las cuentas madre y sus costos se conservan.'))return;
+  const ok=await operacionConfirmada('modal-bulk-eliminar',()=>{for(const id of ids){const v=APP.ventas.find(v=>v.uid===id);if(!v)throw new Error('Una venta ya no existe.');venRetirar(v,'eliminar',borrar);}return true;});
+  if(ok){if(_venSelMode)venToggleSelMode();else _venSeleccionados.clear();refrescarOperaciones();}
+}
+
 
 // ══════════════════════════════════════
 // DASHBOARD
@@ -9631,7 +9481,7 @@ function ccNormalizarIdentidad(valor){
 }
 function ccBuscarVentaActivaDeCupo(cuentaUID, cupoIdx, cupo, reparar=false){
   const idx = parseInt(cupoIdx);
-  const activas = (APP.ventas || []).filter(v => v && v.activa !== false && !v.eliminadoRegistro);
+  const activas = (APP.ventas || []).filter(v => ventaOcupa(v));
   let venta = cupo?.ventaUid ? activas.find(v => v.uid === cupo.ventaUid) : null;
 
   if(!venta && cuentaUID && !isNaN(idx)){
@@ -12464,7 +12314,7 @@ function construirPayload(){
     });
   });
   return sanearPayloadReferenciasVirtuales({
-    ventas: ventasPayload, cuentas: APP.cuentas, costos: APP.costos,
+    versionOperaciones:46, ventas: ventasPayload, cuentas: APP.cuentas, costos: APP.costos,
     recargas: APP.recargas, reembolsos: APP.reembolsos, egresos: APP.egresos || [],
     movimientosBinance: APP.movimientosBinance || [],
     proveedores: APP.proveedores || [], adelantosProveedor: APP.adelantosProveedor || [],
@@ -12619,7 +12469,7 @@ function aplicarCambiosNube(){
   actualizarIndicadorCambiosNube();
 }
 async function verificarCambiosNube(){
-  if(!_pinVerificado || _syncChecking || _syncDirty || _syncGuardando || _syncPendiente) return;
+  if(_operacionGuardando || !_pinVerificado || _syncChecking || _syncDirty || _syncGuardando || _syncPendiente) return;
   _syncChecking = true;
   try {
     setSyncStatus('Revisando...', 'warn');
@@ -12818,6 +12668,7 @@ function normalizarVenta(v){
     dias:   (parseInt(v.dias) > 0) ? parseInt(v.dias) : 30,
     diasPlanOriginal: (parseInt(v.diasPlanOriginal) > 0) ? parseInt(v.diasPlanOriginal) : ((parseInt(v.dias) > 0) ? parseInt(v.dias) : 30),
     precio: isNaN(parseFloat(v.precio)) ? 0 : parseFloat(v.precio),
+    reservaInactiva: v.reservaInactiva === true || v.reservaInactiva === 'true',
     activa: (v.activa === 'false' || v.activa === false) ? false : true,
     eliminadoRegistro: v.eliminadoRegistro === true || v.eliminadoRegistro === 'TRUE' || v.eliminadoRegistro === 'true',
     wa:     waCorregido,
@@ -13377,7 +13228,7 @@ function instalarSanitizadorRenders(){
 
 document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('online', () => {
-    if(_pinVerificado) sincronizarConSheets(true);
+    if(_pinVerificado && !_operacionGuardando && !_ecGuardando && !_renGuardando) sincronizarConSheets(true);
   });
   inicializarAuthFirebase();
   iniciarReparadorMojibake();
