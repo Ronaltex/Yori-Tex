@@ -1968,6 +1968,7 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
     <input id="reg-search" type="text" placeholder="Buscar cliente, servicio, correo, perfil, teléfono..." oninput="regBuscar(this.value)">
     <button class="search-clear" id="reg-search-clear" onclick="limpiarBusqueda('reg')">×</button>
   </div>
+  <div id="reg-search-scope" class="aviso" style="display:none;margin-bottom:10px" aria-live="polite"></div>
   <div class="card" id="reg-lista-container">
     <div class="empty"><div class="e-ico">📋</div><div>Sin ventas registradas.<br>Toca <b>＋ Venta</b> para agregar.</div></div>
   </div>
@@ -1992,6 +1993,7 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
     <input id="inv-search" type="text" placeholder="Buscar cuenta, cliente, correo, perfil, teléfono..." oninput="invBuscar(this.value)">
     <button class="search-clear" id="inv-search-clear" onclick="limpiarBusqueda('inv')">×</button>
   </div>
+  <div id="inv-search-scope" class="aviso" style="display:none;margin-bottom:10px" aria-live="polite"></div>
   <div class="filters" id="inv-filtros">
     <button class="filter-btn active" onclick="invFiltrar('todos',this)">Todos</button>
   </div>
@@ -2025,7 +2027,8 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
     <button class="filter-btn" onclick="venFiltrar('ok',this)">Al día</button>
     <button class="filter-btn" onclick="venFiltrar('inactivo',this)">Inactivos · 5 días</button>
   </div>
-  <div class="search-wrap"><span class="search-ico">🔍</span><input type="text" placeholder="Buscar cliente, servicio..." oninput="venBuscar(this.value)"></div>
+  <div class="search-wrap"><span class="search-ico">🔍</span><input id="ven-search" type="text" placeholder="Buscar cliente, servicio, correo, teléfono..." oninput="venBuscar(this.value)"></div>
+  <div id="ven-search-scope" class="aviso" style="display:none;margin-bottom:10px" aria-live="polite"></div>
   <div id="ven-lista"><div class="empty"><div class="e-ico">⏰</div><div>Sin vencimientos aún</div></div></div>
 </div>
 
@@ -4857,35 +4860,80 @@ function regFiltrar(f, btn){
   renderRegistro();
 }
 function normalizarBusqueda(v){
-  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f\u200b-\u200d\ufeff]/g,'').trim();
 }
 function coincideBusqueda(texto, consulta){
   const q = normalizarBusqueda(consulta);
   if(!q) return true;
   const base = normalizarBusqueda(texto);
-  const qNum = String(consulta || '').replace(/\D/g,'');
-  const baseNum = String(texto || '').replace(/\D/g,'');
-  return base.includes(q) || (!!qNum && baseNum.includes(qNum));
+  if(base.includes(q)) return true;
+  // Un correo o nombre con números nunca se interpreta como un teléfono.
+  if(!/^\+?[\d\s().-]+$/.test(q)) return false;
+  const qNum = q.replace(/\D/g,'');
+  if(qNum.length < 3) return false;
+  const numeros = base.match(/\+?\d[\d ().-]*\d/g) || [];
+  return numeros.some(n => n.replace(/\D/g,'').includes(qNum));
+}
+function ventaActualBusquedaCupo(cuenta, cupo, idx){
+  if(cupo.estado !== 'ocupado') return null;
+  if(cupo.ventaUid) return (APP.ventas || []).find(v => v.uid===cupo.ventaUid && v.activa!==false && !v.eliminadoRegistro) || null;
+  const activas = (APP.ventas || []).filter(v => v.activa !== false && !v.eliminadoRegistro);
+  // Solo una referencia técnica única; no unir clientes por nombre o teléfono.
+  const candidatas = activas.filter(v => asignacionesCuposVenta(v).some(a => a.cuentaUID===cuenta.uid && a.cupoIdx===idx));
+  return candidatas.length === 1 ? candidatas[0] : null;
 }
 function textoBusquedaVenta(v){
   const cuenta = APP.cuentas.find(c => c.uid === v.cuentaUID);
   const asignados = Array.isArray(v.cuposAsignados) ? v.cuposAsignados : [];
   const extrasAsignados = asignados.map(a => [a.correo, a.perfil, a.pin, a.cuentaId, a.cuentaUID].join(' ')).join(' ');
+  const invitacionesActuales = v.activa === false || v.eliminadoRegistro ? [] : APP.cuentas.flatMap(c =>
+    (c.cupos || []).flatMap((cu,i) => cu.estado==='ocupado' && (cu.ventaUid===v.uid || (!cu.ventaUid && ventaActualBusquedaCupo(c,cu,i)?.uid===v.uid)) ? [cu.invCorreo,c.correo] : []));
   return [
     v.id, v.cliente, v.wa, v.correo, v.invCorreo, v.perfil, v.pin, v.plan, v.srvNom, v.catNom, v.notas, v.estado,
     cuenta?.id, cuenta?.correo, cuenta?.pass, extrasAsignados,
-    historialCuentasVentaDatos(v, APP.cuentas).map(r => [r.cuentaId,r.correo,r.perfil].join(' ')).join(' ')
-  ].join(' ');
+    historialCuentasVentaDatos(v, APP.cuentas).map(r => [r.cuentaId,r.correo,r.perfil].join(' ')).join('\n'),
+    ...invitacionesActuales
+  ].join('\n');
 }
 function textoBusquedaCuenta(c){
   const srv = getSrv(c.srvUid);
   const cat = srv ? getCat(srv.catUid) : null;
-  const cuposTxt = (c.cupos || []).map(cu => [
-    cu.cliente, cu.wa, cu.perfil, cu.pin, cu.plan, cu.invCorreo, cu.vence, cu.estado
-  ].join(' ')).join(' ');
+  const cuposTxt = (c.cupos || []).map((cu,i) => {
+    const venta = ventaActualBusquedaCupo(c,cu,i);
+    return [cu.cliente,cu.wa,cu.perfil,cu.pin,cu.plan,cu.invCorreo,cu.vence,cu.estado,venta?.invCorreo].join('\n');
+  }).join('\n');
   return [
     c.id, c.correo, c.pass, c.srvNom, srv?.nombre, cat?.nombre, c.notas, cuposTxt
-  ].join(' ');
+  ].join('\n');
+}
+function actualizarAlcanceBusqueda(tipo){
+  const box = document.getElementById(tipo+'-search-scope');
+  if(!box) return;
+  const consulta = {reg:_regBusq,inv:_invBusq,ven:_venBusq}[tipo];
+  const filtros = tipo==='reg' ? ['reg-filtros'] : tipo==='inv' ? ['inv-filtros','inv-servicios-filtros','inv-status-filtros'] : ['ven-filtros'];
+  const limitado = tipo==='reg' ? !['todo','todos'].includes(APP._filtroReg) : tipo==='inv' ? [APP._filtroInv,_invServicio,_invEstado].some(f => f && f!=='todos') : APP._filtroVen!=='todos';
+  if(!consulta || !limitado){ box.style.display='none'; box.innerHTML=''; return; }
+  const nombres = filtros.map(id => document.querySelector('#'+id+' .active')?.textContent?.trim()).filter(Boolean);
+  box.style.display='block';
+  box.innerHTML = 'Buscando dentro de: '+esc(nombres.join(' · ') || 'los filtros seleccionados')+'. <button type="button" class="btn-sm" style="margin-top:6px;white-space:normal" onclick="buscarSinFiltros(\''+tipo+'\')">Buscar sin estos filtros</button>';
+}
+function buscarSinFiltros(tipo){
+  if(tipo==='reg'){
+    APP._filtroReg='todo';
+    document.getElementById('reg-dia-picker').style.display='none';
+  } else if(tipo==='inv'){
+    APP._filtroInv='todos'; _invServicio='todos'; _invEstado='todos';
+  } else if(tipo==='ven'){
+    APP._filtroVen='todos'; _venGruposInicializados=false;
+  } else return;
+  const grupos = tipo==='inv' ? ['inv-filtros','inv-servicios-filtros','inv-status-filtros'] : [tipo+'-filtros'];
+  grupos.forEach(id => document.querySelectorAll('#'+id+' button').forEach(b => {
+    const accion=b.getAttribute('onclick') || '';
+    b.classList.toggle('active', accion.includes("'todos'") || accion.includes("'todo'"));
+  }));
+  if(tipo==='reg') renderRegistro();
+  else if(tipo==='inv') renderInventario();
+  else renderVencimientos();
 }
 function actualizarSearchClear(input){
   const btn = input?.parentElement?.querySelector('.search-clear');
@@ -4968,6 +5016,7 @@ function renderFilaRegistro(v, chips, chipLbl){
 }
 
 function renderRegistro(){
+  actualizarAlcanceBusqueda('reg');
   const hoyStr = hoy();
   let ventas = [...APP.ventas];
   if(APP._filtroReg === 'hoy') ventas = ventas.filter(v => v.fecha === hoyStr);
@@ -5041,7 +5090,7 @@ function renderRegistro(){
   if(lblPorEl) lblPorEl.textContent = kpiLblPorCobrar;
   const cont = document.getElementById('reg-lista-container');
   if(!ventas.length){
-    cont.innerHTML = '<div class="empty"><div class="e-ico">📋</div><div>Sin ventas para mostrar.</div></div>';
+    cont.innerHTML = '<div class="empty"><div class="e-ico">📋</div><div>'+(_regBusq?'No hay ventas que coincidan con la búsqueda y los filtros actuales.':'Sin ventas para mostrar.')+'</div></div>';
     return;
   }
   const chips = {pagado:'verde',por_cobrar:'rojo',parcial:'amarillo',pendiente:'rojo',por_revisar:'amarillo'};
@@ -6589,6 +6638,7 @@ async function copiarDireccionInventario(cuentaUID, boton){
 }
 
 function renderInventario(){
+  actualizarAlcanceBusqueda('inv');
   // ── Cuentas formales ──────────────────────────────────────
   const cuentasFormales = (APP.cuentas || []).filter(c => !c.archivada && !c.eliminada);
 
@@ -6831,7 +6881,7 @@ function renderInventario(){
 
   const lista = document.getElementById('inv-lista');
   if(!cuentas.length){
-    lista.innerHTML = '<div class="empty"><div class="e-ico">📦</div><div>Sin cuentas. Toca <b>＋ Cuenta</b>.</div></div>';
+    lista.innerHTML = '<div class="empty"><div class="e-ico">📦</div><div>'+(_invBusq?'No hay cuentas que coincidan con la búsqueda y los filtros actuales.':'Sin cuentas. Toca <b>＋ Cuenta</b>.')+'</div></div>';
     return;
   }
 
@@ -7984,6 +8034,7 @@ function irACuentaInventario(cuentaUID){
   },80);
 }
 function renderVencimientos(){
+  actualizarAlcanceBusqueda('ven');
   depurarInactivosAntiguos();
   let ventas = APP._filtroVen === 'inactivo'
     ? APP.ventas.filter(esInactivoReutilizable)
@@ -8010,7 +8061,7 @@ function renderVencimientos(){
   });
   const lista = document.getElementById('ven-lista');
   if(!ventas.length){
-    lista.innerHTML = '<div class="empty"><div class="e-ico">⏰</div><div>Sin vencimientos para mostrar.</div></div>';
+    lista.innerHTML = '<div class="empty"><div class="e-ico">⏰</div><div>'+(_venBusq?'No hay clientes que coincidan con la búsqueda y los filtros actuales.':'Sin vencimientos para mostrar.')+'</div></div>';
     return;
   }
   const productos = [];

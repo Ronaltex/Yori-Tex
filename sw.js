@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yoritex-v42-20260908-historial-cuentas';
+const CACHE_NAME = 'yoritex-v43-20260911-busqueda-correos';
 const APP_SHELL = ['./', './index.html', './asistente.html', './manifest.json', './logo-yori-tex-plano.png'];
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA58LjJd3R28quWhTDlU4TXHVxK5e6eIxg',
