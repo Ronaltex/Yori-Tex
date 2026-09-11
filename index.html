@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="yoritex-build" content="v46-20260911-operaciones-confirmadas"/>
+<meta name="yoritex-build" content="v47-20260911-cola-guardado"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="referrer" content="no-referrer"/>
 <meta http-equiv="X-Content-Type-Options" content="nosniff"/>
@@ -3414,6 +3414,7 @@ let _pinVerificado = false;
 let _pinGuardado = ''; // Se carga desde Sheets al verificar
 let _syncDirty = false;
 let _syncChecking = false;
+let _syncLecturaEpoch = 0;
 let _syncTimer = null;
 let _ultimaSync = null;
 let _firmaNube = '';
@@ -7269,10 +7270,11 @@ async function ecGuardar(liberar=false){
       if(venta && asignacionesCuposVenta(venta).length>1 && !confirm('Esta venta tiene varios cupos. El nombre, WhatsApp, plan y vencimiento se actualizarán en todos sus cupos; el perfil y PIN solo en este. ¿Continuar?')) return false;
     } else if(cuenta.cupos[idx].estado==='ocupado' && !confirm('¿Liberar este cupo? Se conservarán la venta histórica y sus cobros; si era su último acceso quedará inactiva.')) return false;
     _ecGuardando=true;
+    _syncLecturaEpoch++;
     controles.forEach(e=>e.disabled=true);
     document.getElementById('ec-guardar-btn').textContent='Confirmando en la nube…';
     if(!_pinVerificado) throw new Error('Inicia sesión y conecta con la nube antes de guardar.');
-    if(_syncGuardando || _syncPendiente || _syncDirty) throw new Error('Hay otra sincronización pendiente. Espera a que termine y vuelve a guardar.');
+    await prepararTurnoGuardado();
     snapshot=snapshotOperacionCritica();
     ecAplicar(cuenta,idx,datos);
     const ok=await sincronizarConSheets(true);
@@ -8685,13 +8687,14 @@ function refrescarOperaciones(){
 async function operacionConfirmada(modal, preparar, mensaje='Cambio guardado y confirmado'){
   if(_operacionGuardando || _ecGuardando || _renGuardando) return false;
   if(!_pinVerificado){alert('Inicia sesión para confirmar el guardado en la nube.');return false;}
-  if(_syncDirty || _syncGuardando || _syncPendiente || _syncChecking){alert('Hay otra sincronización en curso. Espera a que termine; no se modificó nada.');return false;}
   let snapshot=null, confirmado=false;
   const controles=[...document.querySelectorAll('button,input,select,textarea')];
   const disabled=controles.map(e=>e.disabled);
   _operacionGuardando=true;
+  _syncLecturaEpoch++;
   controles.forEach(e=>e.disabled=true);
   try {
+    await prepararTurnoGuardado();
     snapshot=snapshotOperacionCritica();
     const resultado=await preparar();
     if(!resultado){restaurarSnapshotOperacion(snapshot);return false;}
@@ -12140,6 +12143,20 @@ async function apiCall(body, timeoutMs){
   }
   throw ultimoError || new Error('No se pudo conectar con Google Sheets.');
 }
+async function prepararTurnoGuardado(){
+  if(_syncGuardando){
+    setSyncStatus('Esperando el guardado anterior…','warn');
+    if(!await esperarSyncLibre()) throw new Error('El envío anterior no terminó. Conservamos el formulario; revisa la conexión.');
+  }
+  if(_syncPendiente){
+    setSyncStatus('Guardando cambios pendientes…','warn');
+    if(_syncReintentoTimer){clearTimeout(_syncReintentoTimer);_syncReintentoTimer=null;}
+    const resultado=await procesarColaSync();
+    if(resultado===false) throw new Error(_ultimoErrorSync || 'La nube rechazó los cambios anteriores. Conservamos el formulario.');
+    if(_syncGuardando && !await esperarSyncLibre()) throw new Error('El envío pendiente no terminó. Conservamos el formulario.');
+  }
+  if(_syncDirty || _syncPendiente) throw new Error(_ultimoErrorSync || 'Hay cambios anteriores sin confirmar. No se descartaron; revisa la conexión antes de continuar.');
+}
 function esperarSyncLibre(limiteMs=130000){
   const inicio = Date.now();
   return new Promise(resolve => {
@@ -12237,11 +12254,11 @@ async function procesarColaSync(){
     setSyncStatus('Cambio rechazado · nube protegida', 'err');
   }
   if(_syncPendiente && !_syncReintentoTimer){
-    procesarColaSync();
-    return;
+    return procesarColaSync();
   }
   const esperas = _syncEsperas.splice(0);
   esperas.forEach(resolve => resolve(ok));
+  return ok;
 }
 function configParaSync(){
   const cfg = { ...(APP.config || {}) };
@@ -12363,6 +12380,9 @@ function firmaDatos(data){
   try { return JSON.stringify(data || {}); } catch(e){ return ''; }
 }
 function setSyncStatus(texto, tipo=''){
+  if(tipo==='ok' && (_syncDirty || _syncPendiente)){
+    texto='Cambios pendientes de confirmar';tipo='warn';
+  }
   const el = document.getElementById('sync-status');
   if(!el) return;
   el.textContent = texto;
@@ -12469,11 +12489,14 @@ function aplicarCambiosNube(){
   actualizarIndicadorCambiosNube();
 }
 async function verificarCambiosNube(){
-  if(_operacionGuardando || !_pinVerificado || _syncChecking || _syncDirty || _syncGuardando || _syncPendiente) return;
+  if(_operacionGuardando || _ecGuardando || !_pinVerificado || _syncChecking || _syncDirty || _syncGuardando || _syncPendiente) return;
+  const lecturaEpoch = _syncLecturaEpoch;
   _syncChecking = true;
   try {
     setSyncStatus('Revisando...', 'warn');
     const res = await apiCall({ accion:'cargar', pin:_pinGuardado }, 60000);
+    // Una lectura iniciada antes de editar nunca puede pisar un guardado posterior.
+    if(lecturaEpoch!==_syncLecturaEpoch || _operacionGuardando || _ecGuardando || _syncDirty || _syncGuardando || _syncPendiente) return;
     if(res && res.ok && res.data){
       const firma = firmaDatos(res.data);
       if(_firmaNube && firma && firma !== _firmaNube){
@@ -12495,7 +12518,7 @@ async function verificarCambiosNube(){
       }
     }
   } catch(e){
-    setSyncStatus('Sin conexión', 'err');
+    if(lecturaEpoch===_syncLecturaEpoch && !_operacionGuardando && !_ecGuardando) setSyncStatus('Sin conexión', 'err');
   } finally {
     _syncChecking = false;
   }
