@@ -1,6 +1,6 @@
 ﻿<!DOCTYPE html>
 <html lang="es">
-<head>
+<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; worker-src 'self'; manifest-src 'self'; connect-src https://muhcnsndvdggcjcsaagu.supabase.co; form-action 'none'; base-uri 'none'">
 <meta charset="UTF-8"/>
 <meta name="yoritex-build" content="v47-20260911-cola-guardado"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
@@ -16,18 +16,7 @@
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <title>YORI-TEX</title>
 <!-- Chart.js con fallback -->
-<script>
-(function(){
-  var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
-  s.onerror = function(){
-    var s2 = document.createElement('script');
-    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(s);
-})();
-</script>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -3388,9 +3377,9 @@ body.visual-v6 .reg-icon-delete{color:var(--red)!important;opacity:.72}
 </div>
 
 </body>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+
+
+
 <script>
 // ══════════════════════════════════════
 // CONFIGURACIÓN API & PIN
@@ -3811,141 +3800,7 @@ function sanitizarNumero(val, min=0, max=999999){
 function urlPublicaActual(){
   return location.protocol === 'https:' ? new URL('./', location.href).href : (APP.config.appUrl || 'https://ronaltex.github.io/Yori-Tex/');
 }
-const VENTAS_HISTORICAS = (function(){
-  const srvMap = {
-    'chatgpt':'srv-chatgpt','capcut':'srv-capcut','netflix':'srv-netflix',
-    'spotify':'srv-spotify','disney':'srv-disney','zapping':'srv-iptv',
-    'google one':'srv-google-one','googleone':'srv-google-one'
-  };
-  const srvNomMap = {
-    'srv-chatgpt':'🤖 ChatGPT Plus','srv-capcut':'✂️ CapCut Pro',
-    'srv-netflix':'🎬 Netflix','srv-spotify':'🎵 Spotify Familiar',
-    'srv-disney':'🏰 Disney+','srv-iptv':'📡 Zapping IPTV',
-    'srv-google-one':'💾 Google One'
-  };
-  const raw = [
-    ['ALEXIS','+593990824698','chatgpt','2026-04-22',60,'2026-06-21',7.00],
-    ['JIMMY','+593990850314','capcut','2026-04-22',30,'2026-05-22',4.00],
-    ['JOSE ROBAYO','+593992850813','chatgpt','2026-04-22',30,'2026-05-22',4.00],
-    ['KLEVER MEZA','+593981598986','capcut','2026-04-22',30,'2026-05-22',4.00],
-    ['ESTEFANIA','+593980741983','netflix','2026-04-22',30,'2026-05-22',4.50],
-    ['RAUL','+593993971299','capcut','2026-04-22',30,'2026-05-22',4.00],
-    ['LENIN','+593985537008','chatgpt','2026-04-23',30,'2026-05-23',3.50],
-    ['ROY','+593969079816','chatgpt','2026-04-23',30,'2026-05-23',3.59],
-    ['CAROLINA','+593982970912','netflix','2026-04-23',30,'2026-05-23',4.50],
-    ['JEANCARLO','+593983071626','chatgpt','2026-04-24',30,'2026-05-24',3.50],
-    ['NELSON SARC','+593983884351','chatgpt','2026-04-24',30,'2026-05-24',3.50],
-    ['WILLIAM','+593986595996','spotify','2026-04-24',120,'2026-08-22',11.50],
-    ['RIXON','+593967490012','chatgpt','2026-04-24',30,'2026-05-24',3.50],
-    ['SHANDE','+593986969347','chatgpt','2026-04-24',30,'2026-05-24',3.50],
-    ['SHANDE','+593986969347','zapping','2026-04-24',30,'2026-05-24',3.50],
-    ['JHON CONOR','+593984108173','capcut','2026-04-25',30,'2026-05-25',4.00],
-    ['RUBENS','+593998776010','chatgpt','2026-04-25',30,'2026-05-25',5.00],
-    ['TATI','+593986422240','chatgpt','2026-04-25',30,'2026-05-25',5.00],
-    ['MIGUEL','+593994073057','chatgpt','2026-04-26',30,'2026-05-26',5.00],
-    ['KEYLER','+593967727096','netflix','2026-04-26',30,'2026-05-26',4.50],
-    ['ANDRES OBANDO','+593969583316','chatgpt','2026-04-26',30,'2026-05-26',5.00],
-    ['Diego kash','+593961043802','capcut','2026-04-27',30,'2026-05-27',4.00],
-    ['Marcelo','+593987273370','capcut','2026-04-27',30,'2026-05-27',5.00],
-    ['SCARLETH','+593979500795','capcut','2026-04-27',30,'2026-05-27',4.00],
-    ['LEONARDO','+593986990376','netflix','2026-04-27',30,'2026-05-27',4.50],
-    ['Luis acero','+593984707287','chatgpt','2026-04-27',30,'2026-05-27',5.00],
-    ['JAVIER Apupslo','+593983586134','capcut','2026-04-28',30,'2026-05-28',4.00],
-    ['DAYURI','+593999237731','capcut','2026-04-28',30,'2026-05-28',4.00],
-    ['Jefferson Joel','+593992272410','capcut','2026-04-28',30,'2026-05-28',4.00],
-    ['Pamela','+593986206598','chatgpt','2026-04-28',30,'2026-05-28',3.75],
-    ['TORRES','+593968611932','capcut','2026-04-29',30,'2026-05-29',4.00],
-    ['Baquerito','+593992500218','capcut','2026-04-29',30,'2026-05-29',4.00],
-    ['ELIAN','+593994887593','capcut','2026-04-29',180,'2026-10-26',15.00],
-    ['Dario','+593995664255','capcut','2026-04-29',30,'2026-05-29',4.00],
-    ['Jaime Recinos','+593987625284','capcut','2026-04-29',30,'2026-05-29',4.00],
-    ['Victor Manuel','+593959088041','spotify','2026-04-29',90,'2026-07-28',8.00],
-    ['Wilmer del arroz','','spotify','2026-04-29',30,'2026-05-29',0.00],
-    ['GURB@','+593991166446','spotify','2026-04-30',90,'2026-07-29',8.00],
-    ['3 M','+593967729597','spotify','2026-04-30',90,'2026-07-29',8.00],
-    ['30 mayo','+593987930513','spotify','2026-04-30',30,'2026-05-30',3.50],
-    ['alejo 3m','+593968758450','spotify','2026-04-30',90,'2026-07-29',8.00],
-    ['pepe','+593963358261','chatgpt','2026-05-31',30,'2026-06-30',4.00],
-    ['Efectivo','+593962073790','spotify','2026-05-01',30,'2026-05-31',0.00],
-    ['Clarisma','+593979931767','capcut','2026-05-01',30,'2026-05-31',4.00],
-    ['ISRA','+593978914606','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['carlos','+593966773650','spotify','2026-05-02',30,'2026-06-01',3.00],
-    ['Marcelo Alvarez','+593988148848','capcut','2026-05-02',30,'2026-06-01',3.00],
-    ['sbg Jesus','+593985882807','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['Clarisma 2','+593979931767','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['pk pie','+593987331655','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['efectivo Netflix','+593967595939','netflix','2026-05-02',30,'2026-06-01',0.00],
-    ['KEAN','+593963673791','capcut','2026-05-02',30,'2026-06-01',4.00],
-    ['Carlitos','+593961977422','spotify','2026-05-03',30,'2026-06-02',3.50],
-    ['DIEGO','+593991762648','disney','2026-05-03',30,'2026-06-02',3.50],
-    ['ANDY RENOV','+593981040508','spotify','2026-05-03',30,'2026-06-02',3.50],
-    ['VICTOR FAM','+593987539458','spotify','2026-05-03',30,'2026-06-02',3.50],
-    ['OLAM','+593986727607','capcut','2026-05-03',30,'2026-06-02',4.00],
-    ['3 M (2)','+593967729597','spotify','2026-05-03',90,'2026-08-01',8.00],
-    ['channing','+593980437373','capcut','2026-05-03',30,'2026-06-02',4.00],
-    ['Carlos 3m','+593982844708','spotify','2026-05-04',90,'2026-08-02',8.00],
-    ['spotu 4myn','','spotify','2026-05-04',90,'2026-08-02',8.00],
-    ['Jahir fam','+593984737789','spotify','2026-05-04',30,'2026-06-03',3.50],
-    ['edisson','+593967673144','spotify','2026-05-04',90,'2026-08-02',8.00],
-    ['cc','+593991683712','spotify','2026-05-04',30,'2026-06-03',3.50],
-    ['4myo','+593964152431','capcut','2026-05-04',30,'2026-06-03',4.00],
-    ['Santiago Beltran','+593980878182','spotify','2026-05-04',30,'2026-06-03',3.50],
-    ['Jose Cornoza','+593992649254','capcut','2026-05-04',30,'2026-06-03',4.00],
-    ['Dark','+593999015132','spotify','2026-05-04',90,'2026-08-02',8.00],
-    ['fam Josue','+593989060196','spotify','2026-05-04',30,'2026-06-03',3.25],
-    ['Agradecido','+593939849157','capcut','2026-05-04',30,'2026-06-03',4.00],
-    ['Zona Cero','+593997339066','capcut','2026-05-04',30,'2026-06-03',4.00],
-    ['ARIEL','+593968782119','spotify','2026-05-05',30,'2026-06-04',3.00],
-    ['TINTA CHINA','+593963233400','capcut','2026-05-05',30,'2026-06-04',4.00],
-    ['Adrian Reinosa','+593967974518','capcut','2026-05-05',30,'2026-06-04',4.00],
-    ['Dan','+593999052674','capcut','2026-05-05',30,'2026-06-04',4.00],
-    ['hain','+593967051750','spotify','2026-05-05',30,'2026-06-04',3.50],
-    ['Johan Eduardo','+593992457470','spotify','2026-05-06',90,'2026-08-04',8.00],
-    ['Personal','','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['Martin Alejandro','+593963707945','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['Filme','+593998949621','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['Juan Johns','+593984289501','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['CESAR USER','+593994513386','spotify','2026-05-06',30,'2026-06-05',0.00],
-    ['JohanSpotify','+593981767757','spotify','2026-05-06',30,'2026-06-05',3.00],
-    ['Lacrema','+593436579092','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['DAVID','+593992216437','spotify','2026-05-06',30,'2026-06-05',3.50],
-    ['LACREMA Google','+593436579092','google one','2026-05-06',30,'2026-06-05',4.00],
-    ['intercab','','capcut','2026-05-06',30,'2026-06-05',4.00],
-    ['ISA','','capcut','2026-05-07',30,'2026-06-06',4.00],
-    ['Walter Lenin','+593983232837','spotify','2026-05-07',30,'2026-06-06',3.50],
-    ['Karol renovacion','+593968432718','netflix','2026-05-07',30,'2026-06-06',4.00],
-    ['Danilo Pluas','+593992246071','capcut','2026-05-08',30,'2026-06-07',4.00],
-    ['Karem Mendoza','+593983979768','capcut','2026-05-08',30,'2026-06-07',4.00],
-    ['LESLY KATTY','+593988899609','netflix','2026-05-08',30,'2026-06-07',4.50],
-    ['STALIN','+593969610035','netflix','2026-05-08',30,'2026-06-07',4.50],
-    ['Andres Obando 2','+593969583316','chatgpt','2026-05-08',30,'2026-06-07',4.00],
-    ['HENRY USER','+593961226196','spotify','2026-05-08',30,'2026-06-07',6.50],
-    ['Jonathan USER','+593998934889','spotify','2026-05-08',30,'2026-06-07',3.00],
-    ['Jupiter','','capcut','2026-05-09',30,'2026-06-08',4.00],
-    ['LA CREMA 2','+593436579092','capcut','2026-05-09',30,'2026-06-08',4.00]
-  ];
-  let counter = 1;
-  return raw.map(r => {
-    const [cliente, wa, srvKey, fecha, dias, vence, precio] = r;
-    const srvUid = srvMap[srvKey.toLowerCase()] || 'srv-capcut';
-    const srvNom = srvNomMap[srvUid] || srvKey;
-    return {
-      uid: 'hist-' + (counter++),
-      id: '#VTA-H' + String(counter).padStart(3,'0'),
-      fecha, vence, cliente, wa: wa || '',
-      srvUid, srvNom,
-      dias: dias,
-      plan: dias === 30 ? '1 mes' : dias === 90 ? '3 meses' : dias === 60 ? '2 meses' : dias === 120 ? '4 meses' : dias === 180 ? '6 meses' : '1 mes',
-      correo: '', perfil: '', pin: '', invCorreo: '',
-      precio: 0, // Corte financiero — ingresos anteriores no se contabilizan
-      metodo: 'Transferencia', estado: 'pagado',
-      costoAdq: 0, metodoAdq: 'Transferencia',
-      notas: 'Historial pre-corte — precio en $0 (corte financiero ' + hoy() + ')',
-      cuentaUID: null, cupoIdx: null,
-      activa: true, creado: fecha + 'T12:00:00.000Z'
-    };
-  });
-})();
+const VENTAS_HISTORICAS = [];
 
 // CATÁLOGOS DINÁMICOS
 let CATALOGO_CATEGORIAS = [
@@ -5112,6 +4967,9 @@ function renderRegistro(){
 }
 
 async function marcarVentaPagada(ventaUid){
+  if(!window.YoriSupabaseIntegration){alert('Conexión de Supabase pendiente; no se modificó la venta.');return;}
+  return window.YoriSupabaseIntegration.markPaid(ventaUid);
+  // Legacy body retained below for comparison, unreachable in integration copy.
   const v = APP.ventas.find(x => x.uid === ventaUid);
   if(!v || v.estado === 'pagado') return;
   if(!confirm(`¿Confirmar que ${v.cliente} pagó $${(parseFloat(v.precio)||0).toFixed(2)}?`)) return;
@@ -12097,6 +11955,7 @@ async function _verificarYActualizarDesdeSheets(){
 // API — COMUNICACIÓN CON GOOGLE SHEETS
 // ══════════════════════════════════════
 async function apiCall(body, timeoutMs){
+  throw new Error('En la copia de integración no se permite enviar paquetes a Google Sheets.');
   const accion = body && body.accion;
   const limite = timeoutMs || (accion === 'cargar' ? 120000 : 120000);
   let ultimoError = null;
@@ -12815,54 +12674,8 @@ function cargarDesdeSheets(data){
   if(huboDepuracion || conciliacion.reparados > 0) setTimeout(() => sincronizarConSheets(), 1200);
 }
 
-function inyectarDatosPDF(){
-  // ── CORTE FINANCIERO 2026-06-07 ──
-  // Los costos, recargas y movimientos Binance anteriores al corte
-  // NO se inyectan. Solo se mantiene el inventario de cuentas.
+function inyectarDatosPDF(){throw Error('Históricos deshabilitados en integración');}
 
-  // ── CUENTAS INVENTARIO (solo estructura, sin costos ni movimientos) ──
-  const cuentasPDF = [
-    { uid:'pdf-cnt-01', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF01', correo:'26ixrbnu5d@huunghiammo.site', pass:'capcut123', costo:0, metodoPago:'Binance USDT', desde:'2026-06-05', hasta:'2026-07-05', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-02', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF02', correo:'5vm5hctacp@huongcapcut.click', pass:'capcut123', costo:0, metodoPago:'Binance USDT', desde:'2026-06-05', hasta:'2026-07-05', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-04', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF04', correo:'bq97t8eh20@chebou.cutpro.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:4.00, notas:'CapCut Pro', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-05', srvUid:'srv-spotify', srvNom:'Spotify Familiar', id:'SPT-PDF01', correo:'yoritex7@gmail.com', pass:'', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:0, notas:'Spotify Familiar', cupos:[{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'}] },
-    { uid:'pdf-cnt-06', srvUid:'srv-spotify', srvNom:'Spotify Familiar', id:'SPT-PDF02', correo:'yoritex10@gmail.com', pass:'', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:0, notas:'Spotify Familiar', cupos:[{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'},{estado:'libre'}] },
-    { uid:'pdf-cnt-07', srvUid:'srv-spotify', srvNom:'Paramount+', id:'PMT-PDF01', correo:'mundial@yori-tex.com', pass:'', costo:0, metodoPago:'Binance USDT', desde:'2026-06-01', hasta:'2026-07-01', pventa:0, notas:'Paramount+', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-08', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF05', correo:'45fi4jw6co@nierdeecapedit.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-05-30', hasta:'2026-06-30', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-09', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF06', correo:'z7zltu1z29@plaesoseditzone.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-05-30', hasta:'2026-06-30', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-10', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF07', correo:'s4flds9d44@greacar.capspace.io.vn', pass:'a123456', costo:0, metodoPago:'Binance USDT', desde:'2026-05-30', hasta:'2026-06-30', pventa:4.00, notas:'CapCut Teams Pro', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-11', srvUid:'srv-disney', srvNom:'Disney+', id:'DIS-PDF01', correo:'labprisztm@streampez.xyz', pass:'Marlon800', costo:0, metodoPago:'Binance USDT', desde:'2026-05-29', hasta:'2026-06-29', pventa:3.50, notas:'Perfil Disney Premium', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-12', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF01', correo:'GlennMasteller378177@hotmail.com', pass:'fsvclg884585', costo:0, metodoPago:'Binance USDT', desde:'2026-05-29', hasta:'2026-06-29', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-13', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF02', correo:'BlancheSamuels333671@hotmail.com', pass:'pcrxm1441200', costo:0, metodoPago:'Binance USDT', desde:'2026-05-28', hasta:'2026-06-28', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-14', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF03', correo:'kauanquetanle@hotmail.com', pass:'trial@123456', costo:0, metodoPago:'Binance USDT', desde:'2026-06-02', hasta:'2026-07-02', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-15', srvUid:'srv-chatgpt', srvNom:'ChatGPT Plus', id:'CGP-PDF04', correo:'anluisjardo@hotmail.com', pass:'trial@123456', costo:0, metodoPago:'Binance USDT', desde:'2026-06-02', hasta:'2026-07-02', pventa:5.00, notas:'ChatGPT Plus', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-16', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF08', correo:'gentlecanvas074@flews.app', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-28', hasta:'2026-06-28', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-17', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF09', correo:'pandadelta91l9@delot.dev', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-28', hasta:'2026-06-28', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-18', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF10', correo:'36ntv8az@Kiwkiw.shop', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-27', hasta:'2026-06-27', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
-    { uid:'pdf-cnt-19', srvUid:'srv-capcut', srvNom:'CapCut Pro', id:'CAP-PDF11', correo:'vgxfjahh@Kiwkiw.shop', pass:'masuk123', costo:0, metodoPago:'Binance USDT', desde:'2026-05-27', hasta:'2026-06-27', pventa:4.00, notas:'CapCut', cupos:[{estado:'libre'}] },
-  ];
-
-  // Solo agregar cuentas al inventario — sin costos ni movimientos Binance
-  const cuentasEliminadasSet = new Set(APP.cuentasEliminadas || []);
-  cuentasPDF.forEach(c => {
-    if(cuentasEliminadasSet.has(c.uid)) return;
-    if(!APP.cuentas.find(x => x.uid === c.uid)){
-      APP.cuentas.push({
-        uid: c.uid, srvUid: c.srvUid, srvNom: c.srvNom,
-        id: c.id, correo: c.correo, pass: c.pass,
-        costo: c.costo, pventa: c.pventa, metodoPago: c.metodoPago,
-        desde: c.desde, hasta: c.hasta, notas: c.notas,
-        cupos: c.cupos, esVirtual: false
-      });
-    }
-  });
-
-  // ── ACTUALIZAR CORREO DE JIMMY ──
-  const cuentaJimmy = APP.cuentas.find(c => c.id === 'CAP-C104' || (c.srvUid === 'srv-capcut' && c.cupos && c.cupos.some(cu => cu.cliente === 'JIMMY')));
-  if(cuentaJimmy){ cuentaJimmy.correo = 'cremattaxuce-7148@ves.ink'; cuentaJimmy.pass = '123456'; }
-  const ventaJimmy = APP.ventas.find(v => v.cliente === 'JIMMY' && v.srvUid === 'srv-capcut');
-  if(ventaJimmy) ventaJimmy.correo = 'cremattaxuce-7148@ves.ink';
-}
 function inyectarHistorico(){
   // Primera vez: solo históricas
   APP.ventas = [...VENTAS_HISTORICAS];
@@ -13249,58 +13062,53 @@ function instalarSanitizadorRenders(){
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.addEventListener('online', () => {
-    if(_pinVerificado && !_operacionGuardando && !_ecGuardando && !_renGuardando) sincronizarConSheets(true);
-  });
-  inicializarAuthFirebase();
-  iniciarReparadorMojibake();
-  instalarReparadorMensajes();
-  instalarSanitizadorRenders();
-  if(new URLSearchParams(location.search).has('clean')){
-    try {
-      localStorage.removeItem('yoritex_local');
-      sessionStorage.clear();
-      history.replaceState(null, '', location.pathname);
-    } catch(e){}
-  }
-  document.getElementById('header-fecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'});
-  document.getElementById('pin-brand').textContent = APP.config.nombre || 'YORI-TEX';
-  // Poblar mapa de WA correctos desde VENTAS_HISTORICAS
-  _poblarWACorrectosMap();
-  // PWA: registrar service worker
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').then(reg => {
-      // FIX SYNC: Forzar verificación de nueva versión en cada carga
-      reg.update();
-    }).catch(()=>{});
-  }
-  // Limpiar caché corrupto — usar parsearFecha para corregir cualquier formato
-  // y también corregir números WA truncados en el caché local
-  try {
-    const local = localStorage.getItem('yoritex_local');
-    if(local){
-      const d = JSON.parse(local);
-      const ventas = d?.data?.ventas || [];
-      const fechaOk = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
-      const tieneCorruptos = ventas.some(v => !fechaOk(v.vence) || !fechaOk(v.fecha));
-      // Corregir WA truncados: si un número tiene menos de 12 dígitos y hay corrección disponible, aplicarla
-      const tieneWAMalos = ventas.some(v => v.wa && !_waEsValido(v.wa));
-      if(tieneCorruptos || tieneWAMalos){
-        d.data.ventas = ventas.map(v => {
-          const fechaBase = parsearFecha(v.fecha) || hoy();
-          const diasPeriodo = parseInt(v.dias) > 0 ? parseInt(v.dias) : 30;
-          const venceRep = parsearFecha(v.vence) || sumarDias(fechaBase, diasPeriodo);
-          // Corregir WA si está truncado
-          const waFixed = v.wa && !_waEsValido(v.wa) && v.uid && _WA_CORRECTO[v.uid]
-            ? _WA_CORRECTO[v.uid]
-            : v.wa;
-          return { ...v, fecha: fechaBase, vence: venceRep, dias: diasPeriodo, wa: waFixed };
-        });
-        localStorage.setItem('yoritex_local', JSON.stringify(d));
-      }
-    }
-  } catch(e){ localStorage.removeItem('yoritex_local'); }
-});
-
+window.YoriOriginalReadModel={
+ clear(){APP.ventas=[];APP.cuentas=[];document.getElementById('reg-lista-container').replaceChildren();},
+ setSales(rows){APP.ventas=rows;APP.cuentas=[];APP._filtroReg='todo';
+ document.getElementById('reg-sub').textContent=rows.length+' registros de Supabase · lectura parcial';
+ const cont=document.getElementById('reg-lista-container');
+ cont.innerHTML=rows.length?rows.map(v=>renderFilaRegistro(v,{pagado:'verde',por_cobrar:'amarillo',parcial:'amarillo',por_revisar:'gris'},{pagado:'Pagado',por_cobrar:'Por cobrar',parcial:'Parcial',por_revisar:'Sin confirmar'})).join(''):'<p>No hay ventas que coincidan con este filtro y búsqueda. Selecciona Todos para revisar el resto.</p>';
+ const cards=cont.querySelectorAll('.reg-sale-row');cards.forEach((card,i)=>{card.dataset.saleId=rows[i].uid;const target=card.querySelector('.reg-sale-account');if(target){target.replaceChildren();for(const a of rows[i]._supabase.assignments){const p=document.createElement('p');p.textContent=(a.state==='released'?'Cuenta anterior: ':'Cuenta actual: ')+a.account_label+' · Cupo '+a.slot_index;target.append(p)}}});
+ document.querySelector('#s-registro .kpi-grid').hidden=true;
+ }};
 </script>
+
+<style>/* Shared form presentation for the adapted copy; original source is preserved. */
+[hidden]{display:none!important}
+.modal-sheet label:has(>input,>select,>textarea),
+:is(#s-costos,#s-config,#s-dashboard) label:has(>input,>select,>textarea){
+ display:flex;flex-direction:column;gap:6px;margin:12px 0;
+ font-size:14px;color:var(--text2);line-height:1.45;
+}
+.modal-sheet label:has(>input[type="checkbox"]),
+:is(#s-costos,#s-config,#s-dashboard) label:has(>input[type="checkbox"]){
+ flex-direction:row;align-items:center;justify-content:space-between;gap:12px;
+}
+.modal-sheet input:not([type="checkbox"]):not([type="radio"]),
+.modal-sheet select,.modal-sheet textarea,
+:is(#s-costos,#s-config,#s-dashboard) input:not([type="checkbox"]),:is(#s-costos,#s-config,#s-dashboard) select,:is(#s-costos,#s-config,#s-dashboard) textarea{
+ box-sizing:border-box;width:100%;min-height:44px;padding:10px 12px;
+ border:1px solid var(--border);border-radius:10px;background:var(--surface2);
+ color:var(--text);font:inherit;color-scheme:dark;
+}
+.modal-sheet input[type="checkbox"]{flex:0 0 auto;width:20px;height:20px;accent-color:var(--orange)}
+.modal-sheet :is(input,select,textarea):focus-visible,:is(#s-costos,#s-config,#s-dashboard) :is(input,select,textarea):focus-visible{
+ outline:2px solid var(--orange);outline-offset:2px;
+}
+.modal-sheet :is(input,select,textarea):disabled{opacity:.55;cursor:not-allowed}
+.modal-sheet p{line-height:1.5;margin:10px 0;overflow-wrap:anywhere}
+.modal-sheet>.btn{margin-top:8px}
+#s-config pre{font:inherit;font-size:14px;line-height:1.6;margin:14px 0}
+#s-config p{line-height:1.5;margin:12px 0;overflow-wrap:anywhere}
+#s-config{padding-bottom:110px}
+
+#s-dashboard{padding-bottom:110px} #s-dashboard p{line-height:1.5;overflow-wrap:anywhere;margin:12px 0} #s-dashboard table{width:100%;border-collapse:collapse} #s-dashboard th,#s-dashboard td{text-align:left;padding:10px;border-bottom:1px solid var(--border);overflow-wrap:anywhere} #s-dashboard .kpi-grid .card{min-width:0} #s-dashboard h3{overflow-wrap:anywhere}
+
+/* Review controls scroll away so they cannot cover the app header or forms. */
+.integration-toolbar{position:relative;display:flex;flex-wrap:wrap;gap:6px;padding:12px;background:#fff3cd;color:#151515;box-sizing:border-box;line-height:1.4}
+.integration-toolbar>span{flex:1 0 100%;overflow-wrap:anywhere;font-size:13px}
+.integration-toolbar>button{font:inherit;font-size:12px;min-height:36px;padding:7px 10px;border:1px solid #bda66a;border-radius:8px;background:#fffaf0;color:#151515;cursor:pointer}
+.integration-toolbar>button:disabled{opacity:.55;cursor:default}
+.integration-toolbar>button:focus-visible{outline:2px solid #151515;outline-offset:2px}
+</style>
+<script type="module" src="./boot-704c0186b2d310ff.js"></script>
