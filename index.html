@@ -13068,8 +13068,9 @@ window.YoriOriginalReadModel={
  document.getElementById('reg-sub').textContent=rows.length+' registros de Supabase · lectura parcial';
  const cont=document.getElementById('reg-lista-container');
  cont.innerHTML=rows.length?rows.map(v=>renderFilaRegistro(v,{pagado:'verde',por_cobrar:'amarillo',parcial:'amarillo',por_revisar:'gris'},{pagado:'Pagado',por_cobrar:'Por cobrar',parcial:'Parcial',por_revisar:'Sin confirmar'})).join(''):'<p>No hay ventas que coincidan con este filtro y búsqueda. Selecciona Todos para revisar el resto.</p>';
- const cards=cont.querySelectorAll('.reg-sale-row');cards.forEach((card,i)=>{card.dataset.saleId=rows[i].uid;const target=card.querySelector('.reg-sale-account');if(target){target.replaceChildren();for(const a of rows[i]._supabase.assignments){const p=document.createElement('p');p.textContent=(a.state==='released'?'Cuenta anterior: ':'Cuenta actual: ')+a.account_label+' · Cupo '+a.slot_index;target.append(p)}}});
- document.querySelector('#s-registro .kpi-grid').hidden=true;
+ for(const n of cont.querySelectorAll('.hist-sub'))n.textContent=n.textContent.replace(' · No disponible en esta lectura','');
+ const cards=cont.querySelectorAll('.reg-sale-row');cards.forEach((card,i)=>{card.dataset.saleId=rows[i].uid;const kind=card.querySelector('.reg-sale-chips>span');if(kind&&rows[i].tipoRegistro==='sin_clasificar')kind.textContent='Registro';const target=card.querySelector('.reg-sale-account');if(target){target.replaceChildren();for(const a of rows[i]._supabase.assignments){const p=document.createElement('p');p.textContent=(a.state==='released'?'Cuenta anterior: ':'Cuenta actual: ')+a.account_label+' · Cupo '+a.slot_index;target.append(p)}}});
+ document.querySelector('#s-registro .kpi-grid').hidden=false;
  }};
 </script>
 
@@ -13119,5 +13120,27 @@ window.YoriOriginalReadModel={
 .sale-more-actions[open]{display:flex;flex-wrap:wrap;gap:6px}
 .sale-more-actions>summary{list-style:none}
 .sale-more-actions>.btn{margin:4px;font-size:12px}
+
+/* Preserve original visual hierarchy, not the temporary migration panels. */
+.account-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%}
+.account-heading-info{flex:1;min-width:0}.account-heading-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+.account-tools{display:flex;gap:6px;padding:12px}.account-tools .btn{font-size:12px;width:auto}
+.expiration-product{margin:14px 0 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface2)}
+.expiration-product>summary{list-style:none;display:flex;justify-content:space-between;gap:12px;padding:12px 13px;font-size:13px;font-weight:800;cursor:pointer;color:var(--white)}
+.expiration-product>summary::after{content:'⌄';color:var(--orange)}.expiration-product[open]>summary::after{content:'⌃'}
+.expiration-count{font-size:11px;color:var(--text2);font-weight:500;margin-left:auto}
+.expiration-section{padding:8px 10px 2px}.expiration-section-title{font-size:11px;font-weight:800;color:var(--text2);margin:0 2px 7px}
+.expiration-card-heading{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px}.expiration-customer{font-size:13px;font-weight:600;color:var(--white)}
+.expiration-not-renewed summary{list-style:none;cursor:pointer}.expiration-not-renewed>button{margin-top:5px;font-size:11px}
+#ven-search-scope .app-tools-panel{margin:6px 0;padding:6px}#ven-search-scope:has(>p:empty){background:none;border:0;padding:0}
+#s-config .plantilla-card>summary{padding:12px;cursor:pointer;font-size:13px;font-weight:700}#s-config .plantilla-card[open]{padding:12px}
+#s-costos .cost-row{flex-wrap:wrap;gap:6px}#s-costos .cost-row h3{flex:1 0 100%;font-size:13px;margin:0}#s-costos .cost-row p{flex:1 0 100%;font-size:11px;margin:0}#s-costos .cost-row .btn{width:auto;font-size:11px;padding:6px 8px}
+#s-costos .costs-original-controls .app-tools-panel{margin:8px 0}#s-costos .costs-original-controls>p{font-size:11px;color:var(--text3)}
+@media(max-width:600px){.account-heading-actions{max-width:45%;gap:4px}.account-heading-actions .chip{font-size:9px}.account-heading-actions .btn-sm{padding:4px 6px}.expiration-count{font-size:10px}}
+
+.expiration-whatsapp summary{list-style:none;cursor:pointer}.expiration-whatsapp[open]{grid-column:1/-1;padding:12px;background:var(--surface)}.expiration-whatsapp[open] label{display:flex;flex-direction:column;gap:5px;margin:8px 0}.expiration-whatsapp[open] textarea{width:100%}
+#s-vencimientos:not(.active) .expiration-product>summary::after{content:none}
+
+.original-template-editor>p{display:none}
 </style>
-<script type="module" src="./boot-6319944dc6c55612.js"></script>
+<script type="module" src="./boot-f7e12ef3a36f7606.js"></script>
