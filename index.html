@@ -13110,5 +13110,14 @@ window.YoriOriginalReadModel={
 .integration-toolbar>button{font:inherit;font-size:12px;min-height:36px;padding:7px 10px;border:1px solid #bda66a;border-radius:8px;background:#fffaf0;color:#151515;cursor:pointer}
 .integration-toolbar>button:disabled{opacity:.55;cursor:default}
 .integration-toolbar>button:focus-visible{outline:2px solid #151515;outline-offset:2px}
+
+/* Public app: keep the original header and navigation free of review controls. */
+.app-tools-panel{margin:18px 0;border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text)}
+.app-tools-panel>summary,.sale-more-actions>summary{cursor:pointer;color:var(--text2);font-size:13px;padding:8px}
+.app-tools{display:flex;flex-wrap:wrap;gap:8px;padding-top:12px}
+.sale-more-actions{grid-column:1/-1;margin-top:6px}
+.sale-more-actions[open]{display:flex;flex-wrap:wrap;gap:6px}
+.sale-more-actions>summary{list-style:none}
+.sale-more-actions>.btn{margin:4px;font-size:12px}
 </style>
-<script type="module" src="./boot-704c0186b2d310ff.js"></script>
+<script type="module" src="./boot-6319944dc6c55612.js"></script>
