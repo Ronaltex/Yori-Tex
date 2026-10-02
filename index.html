@@ -13069,7 +13069,7 @@ window.YoriOriginalReadModel={
  const cont=document.getElementById('reg-lista-container');
  cont.innerHTML=rows.length?rows.map(v=>renderFilaRegistro(v,{pagado:'verde',por_cobrar:'amarillo',parcial:'amarillo',por_revisar:'gris'},{pagado:'Pagado',por_cobrar:'Por cobrar',parcial:'Parcial',por_revisar:'Sin confirmar'})).join(''):'<p>No hay ventas que coincidan con este filtro y búsqueda. Selecciona Todos para revisar el resto.</p>';
  for(const n of cont.querySelectorAll('.hist-sub'))n.textContent=n.textContent.replace(' · No disponible en esta lectura','');
- const cards=cont.querySelectorAll('.reg-sale-row');cards.forEach((card,i)=>{card.dataset.saleId=rows[i].uid;const kind=card.querySelector('.reg-sale-chips>span');if(kind&&rows[i].tipoRegistro==='sin_clasificar')kind.textContent='Registro';const target=card.querySelector('.reg-sale-account');if(target){target.replaceChildren();for(const a of rows[i]._supabase.assignments){const p=document.createElement('p');p.textContent=(a.state==='released'?'Cuenta anterior: ':'Cuenta actual: ')+a.account_label+' · Cupo '+a.slot_index;target.append(p)}}});
+ const cards=cont.querySelectorAll('.reg-sale-row');cards.forEach((card,i)=>{card.dataset.saleId=rows[i].uid;const kind=card.querySelector('.reg-sale-chips>span');if(kind&&rows[i].tipoRegistro==='sin_clasificar')kind.textContent='Registro';const target=card.querySelector('.reg-sale-account');if(target){target.replaceChildren();for(const a of rows[i]._supabase.assignments){const p=document.createElement('p');p.textContent=(a.state==='released'?'Cuenta anterior: ':'Cuenta actual: ')+a.account_label+' · '+(a.slot_label||'Cupo '+(a.slot_index+1));target.append(p)}}});
  document.querySelector('#s-registro .kpi-grid').hidden=false;
  }};
 </script>
@@ -13164,4 +13164,4 @@ window.YoriOriginalReadModel={
 
 .original-message-preview>label{display:flex;align-items:center;justify-content:flex-start;gap:8px;font-size:12px}
 </style>
-<script type="module" src="./boot-295a79e24776fa9b.js"></script>
+<script type="module" src="./boot-9d59154fbf38e1f4.js"></script>
