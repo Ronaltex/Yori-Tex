@@ -4434,7 +4434,7 @@ function liberarCupoAnterior(cuentaUID, cupoIdx, ventaUID){
 function abrirModal(id){ document.getElementById(id).classList.add('open'); }
 function cerrarModal(id){ if(_operacionGuardando || (id==='modal-editar-cupo' && _ecGuardando))return;document.getElementById(id).classList.remove('open'); }
 document.addEventListener('click', e => {
-  if(e.target.classList.contains('modal-overlay')) cerrarModal(e.target.id);
+  if(e.target.id && e.target.classList.contains('modal-overlay')) cerrarModal(e.target.id);
 });
 
 // ══════════════════════════════════════
@@ -13165,4 +13165,4 @@ window.YoriOriginalReadModel={
 .original-message-preview>label{display:flex;align-items:center;justify-content:flex-start;gap:8px;font-size:12px}
 .purchase-form{display:grid;gap:10px}.purchase-form form{display:grid;gap:12px;padding:12px 0;border-top:1px solid var(--border)}.purchase-form label{display:grid;gap:6px;font-size:12px;color:var(--text2)}.purchase-form label:has(input[type=checkbox]){display:flex;align-items:center}.purchase-form input[type=checkbox]{width:19px;height:19px;appearance:auto}.purchase-form [data-field=cart]{display:grid;gap:7px}.purchase-form [data-field=cart] p{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);margin:0}.purchase-form [data-field=cart] button{width:auto}.combo-reference{font-size:11px;color:var(--orange);padding:5px 0;overflow-wrap:anywhere}
 </style>
-<script type="module" src="./boot-380a2839ba55a271.js"></script>
+<script type="module" src="./boot-9a4835682a70e563.js"></script>
