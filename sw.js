@@ -7,3 +7,5 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(event.request,{cache:'no-store'}));
   }
 });
+
+self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil((async()=>{const url=new URL('./',self.registration.scope).href;const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});const app=windows.find(c=>c.url.startsWith(url));if(app)return app.focus();return self.clients.openWindow(url);})());});
